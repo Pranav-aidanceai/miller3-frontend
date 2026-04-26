@@ -1,0 +1,198 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(0.985 0 89.876);
+  --foreground: oklch(0.141 0.004 285.824);
+  --card: oklch(1 0 89.876);
+  --card-foreground: oklch(0.141 0.004 285.824);
+  --popover: oklch(1 0 89.876);
+  --popover-foreground: oklch(0.141 0.004 285.824);
+  --primary: oklch(0.626 0.186 259.596);
+  --primary-foreground: oklch(1 0 89.876);
+  --secondary: oklch(0.968 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.884);
+  --muted: oklch(0.968 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.014 285.942);
+  --accent: oklch(0.968 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.884);
+  --destructive: oklch(0.637 0.208 25.326);
+  --destructive-foreground: oklch(1 0 89.876);
+  --success: oklch(0.69 0.148 162.368);
+  --success-foreground: oklch(1 0 89.876);
+  --warning: oklch(0.77 0.165 70.606);
+  --warning-foreground: oklch(1 0 89.876);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.626 0.186 259.596);
+  --radius: 0.5rem;
+  --sidebar-background: oklch(0.985 0 89.876);
+  --sidebar-foreground: oklch(0.37 0.012 285.801);
+  --sidebar-primary: oklch(0.626 0.186 259.596);
+  --sidebar-primary-foreground: oklch(1 0 89.876);
+  --sidebar-accent: oklch(0.968 0.001 286.375);
+  --sidebar-accent-foreground: oklch(0.21 0.006 285.884);
+  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-ring: oklch(0.626 0.186 259.596);
+  --surface: oklch(1 0 89.876);
+  --surface-elevated: oklch(0.968 0.001 286.375);
+}
+
+.dark {
+  --background: oklch(0.143 0.003 286.063);
+  --foreground: oklch(0.985 0 89.876);
+  --card: oklch(0.178 0.004 286.026);
+  --card-foreground: oklch(0.985 0 89.876);
+  --popover: oklch(0.178 0.004 286.026);
+  --popover-foreground: oklch(0.985 0 89.876);
+  --primary: oklch(0.626 0.186 259.596);
+  --primary-foreground: oklch(1 0 89.876);
+  --secondary: oklch(0.212 0.004 286.083);
+  --secondary-foreground: oklch(0.985 0 89.876);
+  --muted: oklch(0.212 0.004 286.083);
+  --muted-foreground: oklch(0.712 0.013 286.068);
+  --accent: oklch(0.212 0.004 286.083);
+  --accent-foreground: oklch(0.985 0 89.876);
+  --destructive: oklch(0.562 0.197 26.284);
+  --destructive-foreground: oklch(0.985 0 89.876);
+  --success: oklch(0.69 0.148 162.368);
+  --success-foreground: oklch(1 0 89.876);
+  --warning: oklch(0.77 0.165 70.606);
+  --warning-foreground: oklch(1 0 89.876);
+  --border: oklch(0.275 0.006 286.032);
+  --input: oklch(0.275 0.006 286.032);
+  --ring: oklch(0.626 0.186 259.596);
+  --sidebar-background: oklch(0.178 0.004 286.026);
+  --sidebar-foreground: oklch(0.968 0.001 286.375);
+  --sidebar-primary: oklch(0.626 0.186 259.596);
+  --sidebar-primary-foreground: oklch(1 0 89.876);
+  --sidebar-accent: oklch(0.212 0.004 286.083);
+  --sidebar-accent-foreground: oklch(0.968 0.001 286.375);
+  --sidebar-border: oklch(0.275 0.006 286.032);
+  --sidebar-ring: oklch(0.626 0.186 259.596);
+  --surface: oklch(0.178 0.004 286.026);
+  --surface-elevated: oklch(0.212 0.004 286.056);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    letter-spacing: -0.02em;
+  }
+
+  body {
+    line-height: 1.6;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-linear-to-r from-primary to-indigo-500;
+  }
+
+  .surface {
+    @apply bg-card border border-border;
+  }
+
+  .surface-elevated {
+    background: hsl(var(--surface-elevated));
+  }
+}
+
+@layer components {
+  .skeleton-shimmer {
+    @apply relative overflow-hidden;
+    background: hsl(var(--muted));
+  }
+
+  .skeleton-shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg,
+        transparent,
+        hsl(var(--foreground) / 0.04),
+        transparent);
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
