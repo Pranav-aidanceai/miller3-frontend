@@ -71,24 +71,6 @@ export async function refreshTokenAction() {
     }
 }
 
-export async function demoLoginAction(role: string) {
-    try {
-        const response = await axios.post(
-            `${API_BASE_URL}/api/v1/auth/demo-account`, { role },
-            { headers: { "Content-Type": "application/json" } }
-        );
-        return { data: response.data?.data, error: null }
-    } catch (error) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Login failed' }]
-            }
-        }
-        return { data: null, errors: [{ message: 'Something went wrong' }] }
-    }
-}
-
 export async function registerAction(name: string, email: string, password: string, confirmPassword: string, role: string) {
     try {
         const response = await axios.post(

@@ -3,12 +3,6 @@ import {
   Users, AlertTriangle, DollarSign, Database, Eye,
 } from "lucide-react";
 
-export const demoAccounts = [
-  { role: 'FREE', label: 'Free', icon: Gift, desc: '20 searches/day', color: 'border-border bg-card hover:border-muted-foreground/30' },
-  { role: 'STANDARD', label: 'Standard', icon: User, desc: '100 searches/day', color: 'border-warning/30 bg-warning/5 hover:border-warning/60' },
-  { role: 'PREMIUM', label: 'Premium', icon: Crown, desc: '500 searches/day', color: 'border-primary/30 bg-primary/5 hover:border-primary/60' },
-];
-
 export const tiers = [
   { role: 'Free', label: 'Free', icon: Gift, desc1: '10 Normal searches/min', desc2: 'No AI search available', desc3: 'No enrichment available', color: 'border-border bg-card hover:border-muted-foreground/30', active: 'border-border bg-card border-muted-foreground/30' },
   { role: 'Standard', label: 'Standard', icon: User, desc1: '30 Normal searches/min', desc2: '10 AI searches/min', desc3: '5 Enrichment requests/min', color: 'border-warning/30 bg-warning/5 hover:border-warning/60', active: 'border-warning/30 bg-warning/5 border-warning/60' },
