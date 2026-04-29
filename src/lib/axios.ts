@@ -1,32 +1,18 @@
+import { refreshTokenAction } from "@/app/auth/authServices";
 import axios from "axios";
 
-const API_URL = process.env.API_BASE_URL
+const API_URL = process.env.API_BASE_URL;
 
 const AXIOS = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true,
 });
 
-AXIOS.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("accessToken");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
 AXIOS.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
@@ -34,20 +20,10 @@ AXIOS.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
-
-        const res = await axios.post(
-          `${API_URL}/auth/refresh`,
-          { refreshToken }
-        );
-        const newAccessToken = res.data.accessToken;
-        localStorage.setItem("accessToken", newAccessToken);
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        await refreshTokenAction();
         return AXIOS(originalRequest);
       } catch (refreshError) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
+        window.location.href = "/";
         return Promise.reject(refreshError);
       }
     }

@@ -1,24 +1,24 @@
 'use client'
 
-import { useState } from 'react';
-import { Sparkles, ArrowRight, Check, Gift, User, Crown, CircleCheck } from 'lucide-react';
+import { Sparkles, ArrowRight, Check, CircleCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { tiers } from '@/lib/constants';
 
-const tiers = [
-    { role: 'FREE', label: 'Free', icon: Gift, desc1: '10 Normal searches/min', desc2: 'No AI search available', desc3: 'No enrichment available', color: 'border-border bg-card hover:border-muted-foreground/30', active: 'border-border bg-card border-muted-foreground/30' },
-    { role: 'STANDARD', label: 'Standard', icon: User, desc1: '30 Normal searches/min', desc2: '10 AI searches/min', desc3: '5 Enrichment requests/min', color: 'border-warning/30 bg-warning/5 hover:border-warning/60', active: 'border-warning/30 bg-warning/5 border-warning/60' },
-    { role: 'PREMIUM', label: 'Premium', icon: Crown, desc1: '60 Normal searches/min', desc2: '20 AI searches/min', desc3: '10 Enrichment requests/min', color: 'border-primary/30 bg-primary/5 hover:border-primary/60', active: 'border-primary/30 bg-primary/5 border-primary/60' },
-];
+interface OnboardingPageProps {
+    onTierSelect: (role: string) => void;
+    selectedTier: string;
+    onSubmit: () => void;
+    step: number;
+    setStep: (step: number) => void;
+    loading: boolean;
+}
 
-export default function OnboardingPage() {
+export default function OnboardingPage({ onTierSelect, selectedTier, onSubmit, step, setStep, loading }: OnboardingPageProps) {
     const router = useRouter();
-    const [step, setStep] = useState(0);
-    const [selectedTier, setSelectedTier] = useState<typeof tiers[0] | null>(tiers[0]);
 
     return (
         <div className="flex min-h-screen flex-col items-center justify-center p-6">
-
             {step === 0 && (
                 <div className="animate-fade-in text-center max-w-lg">
                     <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
@@ -40,12 +40,12 @@ export default function OnboardingPage() {
                             <div
                                 key={tier.role}
                                 onClick={() => {
-                                    setSelectedTier(tier);
+                                    onTierSelect(tier.role);
                                 }}
-                                className={cn('w-full rounded-lg border transition-all cursor-pointer', selectedTier?.role === tier.role ? tier.active : tier.color)}
+                                className={cn('w-full rounded-lg border transition-all cursor-pointer', selectedTier === tier.role ? tier.active : tier.color)}
                             >
                                 <div className='flex justify-end px-3 pt-2'>
-                                    <CircleCheck className={cn('h-5 w-5 text-success', selectedTier?.role === tier.role ? 'visible' : 'invisible')} />
+                                    <CircleCheck className={cn('h-5 w-5 text-success', selectedTier === tier.role ? 'visible' : 'invisible')} />
                                 </div>
                                 <div className='py-3 px-6 flex flex-col items-start gap-4'>
                                     <tier.icon className="h-20 w-20" />
@@ -68,8 +68,17 @@ export default function OnboardingPage() {
                             </div>
                         ))}
                     </div>
-                    <button onClick={() => setStep(2)} className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer">
-                        Continue <ArrowRight className="h-4 w-4" />
+                    <button onClick={() => onSubmit()} disabled={loading} className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">
+                        {loading ? (
+                            <span className="flex items-center justify-center gap-2 w-20">
+                                <svg className="h-5 w-5 animate-spin text-foreground" viewBox="0 0 24 24" fill="none">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                                </svg>
+                            </span>
+                        ) : (
+                            <>Continue <ArrowRight className="h-4 w-4" /></>
+                        )}
                     </button>
                 </div>
             )}
@@ -81,8 +90,8 @@ export default function OnboardingPage() {
                     </div>
                     <h2 className="text-2xl font-bold">You&apos;re ready!</h2>
                     <p className="mt-2 text-muted-foreground">Start searching for vendors</p>
-                    <button onClick={() => router.push('/auth')} className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer">
-                        Start Searching <ArrowRight className="h-4 w-4" />
+                    <button onClick={() => router.push('/')} className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer">
+                        Login to Start Searching <ArrowRight className="h-4 w-4" />
                     </button>
                 </div>
             )}
