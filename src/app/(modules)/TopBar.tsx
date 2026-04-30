@@ -1,4 +1,4 @@
-import { Command, Moon, Sun, Bell } from 'lucide-react';
+import { Moon, Sun, Bell, Command } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 
@@ -26,7 +26,7 @@ export function TopBar() {
 
     return (
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:px-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 invisible">
                 <button
                     className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
                 >
