@@ -28,6 +28,7 @@ export async function loginAction(email: string, password: string) {
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
             path: '/',
+            maxAge: 7 * 24 * 60 * 60 // 7 days
         })
 
         return { data: { role, user_details }, error: null }

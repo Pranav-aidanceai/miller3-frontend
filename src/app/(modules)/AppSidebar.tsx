@@ -8,19 +8,20 @@ import { logout, toggleSidebar } from '@/store/slices/authSlice';
 import { adminNav, mainNav, roleBadgeColor } from '@/lib/constants';
 import { logoutAction } from '../auth/authServices';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 export function AppSidebar() {
 
     const dispatch = useAppDispatch();
     const router = useRouter();
+    const pathName = usePathname();
     const user = useAppSelector(state => state.auth.user)
     const role = useAppSelector(state => state.auth.role)
     const sidebarCollapsed = useAppSelector(state => state.auth.sidebarCollapsed);
     const isAdmin = role === 'Admin';
 
     const NavItem = ({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) => {
-        const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to + '/'));
+        const active = pathName === to || (to !== '/' && pathName.startsWith(to + '/'));
         return (
             <Link
                 href={to}

@@ -29,12 +29,10 @@ AXIOS.interceptors.response.use(
     }
 
     if (error.response) {
-      console.error("API Error:", error.response.data);
+      throw error.response.data;
     } else {
-      console.error("Network Error:", error.message);
+      throw new Error("Network Error");
     }
-
-    return Promise.reject(error);
   }
 );
 

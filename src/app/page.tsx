@@ -72,6 +72,7 @@ export default function LoginPage() {
                   formik.handleChange(e);
                   setServerErrors(prev => ({ ...prev, email: '' }));
                 }}
+                onBlur={formik.handleBlur}
                 className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
                 placeholder="Enter your email"
               />
@@ -90,6 +91,7 @@ export default function LoginPage() {
                     formik.handleChange(e);
                     setServerErrors(prev => ({ ...prev, password: '' }));
                   }}
+                  onBlur={formik.handleBlur}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
                   placeholder="Enter your password"
                 />

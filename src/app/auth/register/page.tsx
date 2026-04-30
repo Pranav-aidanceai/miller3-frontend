@@ -98,18 +98,26 @@ export default function RegisterPage() {
                         <form onSubmit={() => setOnboarding(true)} className="mt-8 space-y-4">
                             <div>
                                 <label className="text-sm font-medium">Full Name</label>
-                                <input value={formik.values.name} onChange={(e) => {
-                                    formik.handleChange(e);
-                                    setServerErrors(prev => ({ ...prev, name: '' }));
-                                }} name="name" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Enter your name" />
+                                <input
+                                    value={formik.values.name}
+                                    onChange={(e) => {
+                                        formik.handleChange(e);
+                                        setServerErrors(prev => ({ ...prev, name: '' }));
+                                    }}
+                                    onBlur={formik.handleBlur}
+                                    name="name"
+                                    className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                                    placeholder="Enter your name"
+                                />
                                 {(serverErrors.name || (formik.touched.name && formik.errors.name)) && <p className="text-sm text-destructive">{serverErrors.name || formik.errors.name}</p>}
                             </div>
                             <div>
                                 <label className="text-sm font-medium">Email</label>
-                                <input value={formik.values.email} onChange={(e) => {
+                                <input 
+                                value={formik.values.email} onChange={(e) => {
                                     formik.handleChange(e);
                                     setServerErrors(prev => ({ ...prev, email: '' }));
-                                }} name="email" type="email" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Enter your email" />
+                                }} onBlur={formik.handleBlur} name="email" type="email" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Enter your email" />
                                 {(serverErrors.email || (formik.touched.email && formik.errors.email)) && <p className="text-sm text-destructive">{serverErrors.email || formik.errors.email}</p>}
                             </div>
                             <div>
@@ -124,6 +132,7 @@ export default function RegisterPage() {
                                             formik.handleChange(e);
                                             setServerErrors(prev => ({ ...prev, password: '' }));
                                         }}
+                                        onBlur={formik.handleBlur}
                                         className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                                         placeholder="Enter your password"
                                     />
@@ -139,7 +148,7 @@ export default function RegisterPage() {
                                     <input value={formik.values.confirm} onChange={(e) => {
                                         formik.handleChange(e);
                                         setServerErrors(prev => ({ ...prev, confirm: '' }));
-                                    }} name="confirm" type="password" placeholder="Confirm your password" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
+                                    }} onBlur={formik.handleBlur} name="confirm" type="password" placeholder="Confirm your password" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" />
                                     {formik.values.confirm && formik.values.password === formik.values.confirm && (
                                         <div className="absolute right-3 top-3/8 text-green-500">
                                             <Check className="h-4 w-4" />

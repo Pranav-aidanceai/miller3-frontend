@@ -1,9 +1,23 @@
 import { Command, Moon, Sun, Bell } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useEffect, useRef, useState } from 'react';
 
 export function TopBar() {
-
+    const [mounted, setMounted] = useState(false);
     const { theme, setTheme } = useTheme();
+    const initialized = useRef(false);
+
+    useEffect(() => {
+        if (initialized.current) return;
+        initialized.current = true;
+        setMounted(true);
+        const storedTheme = localStorage.getItem('theme');
+        if (!storedTheme) {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const systemTheme = prefersDark ? 'dark' : 'light';
+            setTheme(systemTheme);
+        }
+    }, [setTheme]);
 
     //   const limits = currentUser ? getUserLimits(currentUser.id) : ROLE_LIMITS.free;
     //   const used = currentUser?.searchesToday ?? 0;
@@ -41,8 +55,13 @@ export function TopBar() {
                 </button>
 
                 {/* Theme */}
-                <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" aria-label="Toggle theme">
-                    {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                <button
+                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                    aria-label="Toggle theme"
+                    disabled={!mounted}
+                >
+                    {!mounted ? <Moon className="h-4 w-4" /> : theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </button>
             </div>
         </header>

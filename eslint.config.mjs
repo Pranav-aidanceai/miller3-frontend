@@ -13,7 +13,7 @@ const eslintConfig = defineConfig([
       "no-console": "warn",
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       "@typescript-eslint/no-explicit-any": "warn",
-      "no-console": ["warn", { allow: ["error", "log"] }],
+      "no-console": ["warn"],
     },
   },
 
@@ -27,7 +27,7 @@ const eslintConfig = defineConfig([
       "src/server/**/*.ts",
     ],
     rules: {
-      "no-console": ["warn", { allow: ["error", "log"] }],
+      "no-console": ["warn"],
     },
   },
 

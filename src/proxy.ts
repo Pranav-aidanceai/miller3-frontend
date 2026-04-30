@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const WHITE_LISTED_ROUTES = [
-  "/auth/login",
+  "/",
   "/auth/register",
   "/forgot-password",
   "/reset-password",

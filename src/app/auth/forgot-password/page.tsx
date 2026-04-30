@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
           <form onSubmit={formik.handleSubmit} className="mt-8 space-y-4">
             <div>
               <label className="text-sm font-medium">Email</label>
-              <input value={formik.values.email} onChange={formik.handleChange} name="email" type="email" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="you@company.com" />
+              <input data-testid='email-input' value={formik.values.email} onChange={formik.handleChange} onBlur={formik.handleBlur} name="email" type="email" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Enter your email" />
               {(formik.touched.email && formik.errors.email) && <p className={cn("text-sm text-destructive", formik.errors.email ? 'visible' : 'invisible')}>{formik.errors.email}</p>}
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
