@@ -18,9 +18,12 @@ AXIOS.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-
       try {
-        await refreshTokenAction();
+        const response = await refreshTokenAction();
+        if (response.errors) {
+          window.location.href = '/';
+          return Promise.reject(response.errors);
+        }
         return AXIOS(originalRequest);
       } catch (refreshError) {
         window.location.href = "/";

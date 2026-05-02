@@ -5,49 +5,48 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { FilterInput, Toggle } from './helper';
 
+const initialFilters = {
+    stateFilter: [] as string[],
+    cityFilter: '',
+    naicsFilter: '',
+    minEmp: '',
+    maxEmp: '',
+    minRev: '',
+    maxRev: '',
+    demoFilter: [] as string[],
+    hasPhone: false,
+    hasEmail: false,
+    hasWebsite: false,
+};
+
+type Filters = typeof initialFilters;
+
 interface FiltersProps {
+    filters: typeof initialFilters;
+    setFilters: (f: typeof initialFilters) => void;
     setPage: (p: number) => void;
+    initialFilters: typeof initialFilters;
 }
 
-const Filters = ({ setPage }: FiltersProps) => {
-    const initialFilters = {
-        stateFilter: [] as string[],
-        cityFilter: '',
-        naicsFilter: '',
-        minEmp: '',
-        maxEmp: '',
-        minRev: '',
-        maxRev: '',
-        demoFilter: [] as string[],
-        hasPhone: false,
-        hasEmail: false,
-        hasWebsite: false,
-    }
-    const [draftFilters, setDraftFilters] = useState(initialFilters);
-    const activeFilterCount = Object.values(draftFilters).reduce((count, value) => {
+const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps) => {
+
+    const [draftFilters, setDraftFilters] = useState(filters);
+
+    const activeFilterCount = Object.values(filters).reduce((count, value) => {
         if (Array.isArray(value)) return count + value.length;
         if (typeof value === 'boolean') return count + (value ? 1 : 0);
         return count + (value ? 1 : 0);
     }, 0);
 
     const applyFilters = () => {
-        console.log("filters", draftFilters)
+        setFilters(draftFilters);
+        setPage(1);
     };
 
     const clearDraftFilters = () => {
-        setDraftFilters({
-            stateFilter: [],
-            cityFilter: '',
-            naicsFilter: '',
-            minEmp: '',
-            maxEmp: '',
-            minRev: '',
-            maxRev: '',
-            demoFilter: [],
-            hasPhone: false,
-            hasEmail: false,
-            hasWebsite: false,
-        });
+        setDraftFilters(initialFilters);
+        setFilters(initialFilters);
+        setPage(1);
     };
 
     return (
@@ -82,7 +81,7 @@ const Filters = ({ setPage }: FiltersProps) => {
                 {/* Industry */}
                 <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Industry</p>
-                    <FilterInput label="NAICS Code / Description" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="e.g. 541 or Software" mono />
+                    <FilterInput label="NAICS Code" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="e.g. 541" mono />
                 </div>
                 {/* Size */}
                 <div>
@@ -99,7 +98,7 @@ const Filters = ({ setPage }: FiltersProps) => {
                 {/* Demographics */}
                 <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Demographics</p>
-                    {['Minority-Owned', 'Women-Owned', 'Veteran-Owned', 'Small Business', 'HUBZone', '8(a) Certified'].map(d => (
+                    {['Minority-Owned', 'Women-Owned', 'Veteran-Owned'].map(d => (
                         <label key={d} className="flex items-center gap-2 py-1 text-sm cursor-pointer">
                             <input type="checkbox" checked={draftFilters.demoFilter.includes(d)}
                                 onChange={e => { setDraftFilters({ ...draftFilters, demoFilter: e.target.checked ? [...draftFilters.demoFilter, d] : draftFilters.demoFilter.filter(x => x !== d) }); setPage(1); }}

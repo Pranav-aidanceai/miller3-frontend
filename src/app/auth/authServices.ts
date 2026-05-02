@@ -52,7 +52,7 @@ export async function refreshTokenAction() {
             { refresh_token: token },
             { headers: { "Content-Type": "application/json" } }
         );
-        const { access_token } = response.data?.data
+        const { access_token } = response.data
         cookieStore.set('access_token', access_token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
