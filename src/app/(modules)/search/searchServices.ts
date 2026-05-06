@@ -35,22 +35,14 @@ export async function searchAction(payload: CompanySearchPayload) {
 export async function getCompanyAction(id: string) {
     try {
         const cookieStore = await cookies();
-        const params = { company_id: id };
         const response = await AXIOS.get(`/api/v1/companies/${id}`, {
             headers: {
                 "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
             }
         });
-        console.log("response", response)
         return { data: response.data, error: null }
     } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data ?? [{ message: 'Fetch company failed' }]
-            }
-        }
-        return { data: null, errors: [{ error: error, message: 'Something went wrong' }] }
+        return { data: null, error: error};
     }
 }
 
@@ -64,7 +56,6 @@ export async function getSimilarCompanyAction(payload: { company_id: string, lim
                 "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
             }
         });
-        console.log("response", response)
         return { data: response.data, error: null }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {

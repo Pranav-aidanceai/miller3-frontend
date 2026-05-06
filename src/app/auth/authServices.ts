@@ -14,7 +14,7 @@ export async function loginAction(email: string, password: string) {
             { headers: { "Content-Type": "application/json" } }
         );
 
-        const { access_token, refresh_token, role, user_details } = response.data?.data
+        const { access_token, refresh_token, role, user_details, role_details } = response.data?.data
 
         const cookieStore = await cookies()
         cookieStore.set('access_token', access_token, {
@@ -31,7 +31,7 @@ export async function loginAction(email: string, password: string) {
             maxAge: 7 * 24 * 60 * 60 // 7 days
         })
 
-        return { data: { role, user_details }, error: null }
+        return { data: { role, user_details, role_details }, error: null }
     } catch (error) {
         if (axios.isAxiosError(error)) {
             return {

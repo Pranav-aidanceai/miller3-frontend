@@ -8,7 +8,11 @@ import { FilterInput, Toggle } from './helper';
 const initialFilters = {
     stateFilter: [] as string[],
     cityFilter: '',
+    countyFilter: '',
     naicsFilter: '',
+    sicFilter: '',
+    minYear: '',
+    maxYear: '',
     minEmp: '',
     maxEmp: '',
     minRev: '',
@@ -66,6 +70,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
                 <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Location</p>
                     <FilterInput label="City" value={draftFilters.cityFilter} onChange={(v) => setDraftFilters({ ...draftFilters, cityFilter: v })} placeholder="e.g. Austin" />
+                    <FilterInput label="County" value={draftFilters.countyFilter} onChange={(v) => setDraftFilters({ ...draftFilters, countyFilter: v })} placeholder="e.g. Travis" />
                     <div className="mt-2">
                         <label className="text-xs font-medium text-muted-foreground">State</label>
                         <div className="mt-1 flex flex-wrap gap-1 max-h-24 overflow-auto">
@@ -82,6 +87,11 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
                 <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Industry</p>
                     <FilterInput label="NAICS Code" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="e.g. 541" mono />
+                    <FilterInput label="SIC Code" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="e.g. 541" mono />
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                        <FilterInput label="Min Year Founded" value={draftFilters.minYear} onChange={(v) => setDraftFilters({ ...draftFilters, minYear: v })} placeholder="1900" />
+                        <FilterInput label="Max Year Founded" value={draftFilters.maxYear} onChange={(v) => setDraftFilters({ ...draftFilters, maxYear: v })} placeholder="2023" />
+                    </div>
                 </div>
                 {/* Size */}
                 <div>

@@ -2,22 +2,25 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Search, X, Grid3X3, List, Download, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, X, Grid3X3, List, ChevronDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompanyDrawer } from './CompanyDrawer';
-import { useAppSelector } from '@/store/hooks';
 import Filters from './Filters';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchAction } from './searchServices';
 import { Company, CompanySearchPayload } from '@/types/search';
+import { useHasScope } from '@/hooks/usHasScopes';
 
 export default function SearchPage() {
 
-  const role = useAppSelector(state => state.auth.role);
   const initialFilters = {
     stateFilter: [] as string[],
     cityFilter: '',
+    countyFilter: '',
     naicsFilter: '',
+    sicFilter: '',
+    minYear: '',
+    maxYear: '',
     minEmp: '',
     maxEmp: '',
     minRev: '',
@@ -47,26 +50,26 @@ export default function SearchPage() {
     setIsLoading(true);
     try {
       const {
-        stateFilter, cityFilter, naicsFilter,
-        minEmp, maxEmp, minRev, maxRev,
-        demoFilter
+        stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
+        minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
+        demoFilter, hasEmail, hasPhone, hasWebsite
       } = appliedFilters;
 
       const payload: CompanySearchPayload = {
         search_text: searchQuery || null,
         state: stateFilter.length > 0 ? stateFilter : null,
         city: cityFilter || null,
-        county: null,
+        county: countyFilter || null,
         naics_code: naicsFilter || null,
-        sic_code: null,
+        sic_code: sicFilter || null,
         employee_size: (minEmp || maxEmp) ? [
           minEmp ? Number(minEmp) : 0,
           maxEmp ? Number(maxEmp) : Number.MAX_SAFE_INTEGER
         ] : null,
         annual_revenue_min: minRev ? Number(minRev) : null,
         annual_revenue_max: maxRev ? Number(maxRev) : null,
-        year_founded_min: null,
-        year_founded_max: null,
+        year_founded_min: minYear ? Number(minYear) : null,
+        year_founded_max: maxYear ? Number(maxYear) : null,
         ownership_type: null,
         minority_owned: demoFilter.includes('Minority-Owned') || null,
         women_owned: demoFilter.includes('Women-Owned') || null,
@@ -76,6 +79,9 @@ export default function SearchPage() {
         sort_order: 'asc',
         limit: perPage,
         cursor: cursorValue,
+        has_mobile_number: hasPhone ? true : null,
+        has_email: hasEmail ? true : null,
+        has_website: hasWebsite ? true : null
       };
 
       const response = await searchAction(payload);
@@ -111,13 +117,28 @@ export default function SearchPage() {
     fetchCompanies(prevCursor);
   };
 
-  const ContactDots = ({ c }: { c: Company }) => (
-    <div className="flex gap-1">
-      <div className={cn('h-2 w-2 rounded-full', c.phone ? 'bg-success' : 'bg-muted')} title={c.phone ? 'Has phone' : 'No phone'} />
-      <div className={cn('h-2 w-2 rounded-full', c.email ? 'bg-success' : 'bg-muted')} title={c.email ? 'Has email' : 'No email'} />
-      <div className={cn('h-2 w-2 rounded-full', c.website ? 'bg-success' : 'bg-muted')} title={c.website ? 'Has website' : 'No website'} />
-    </div>
-  );
+  const ContactDots = ({ c }: { c: Company }) => {
+    const hasPhoneScope = useHasScope('phone');
+    const hasEmailScope = useHasScope('email');
+    const hasWebsiteScope = useHasScope('website');
+
+    const getDotColor = (hasData: boolean, hasScope: boolean) => {
+      if (!hasData) return 'bg-destructive';
+      if (!hasScope) return 'bg-warning';
+      return 'bg-success';
+    };
+
+    return (
+      <div className="flex gap-1">
+        <div className={cn('h-2 w-2 rounded-full', getDotColor(c.has_mobile_number, hasPhoneScope))}
+          title={!c.has_mobile_number ? 'No mobile number available' : !hasPhoneScope ? 'Mobile number not in scope' : 'Mobile number available'} />
+        <div className={cn('h-2 w-2 rounded-full', getDotColor(c.has_email, hasEmailScope))}
+          title={!c.has_email ? 'No email available' : !hasEmailScope ? 'Email not in scope' : 'Email available'} />
+        <div className={cn('h-2 w-2 rounded-full', getDotColor(c.has_website, hasWebsiteScope))}
+          title={!c.has_website ? 'No website available' : !hasWebsiteScope ? 'Website not in scope' : 'Website available'} />
+      </div>
+    );
+  };
 
   const TableSkeleton = () => (
     <tbody>
@@ -170,7 +191,7 @@ export default function SearchPage() {
       <Filters
         filters={appliedFilters}
         setFilters={setAppliedFilters}
-        setPage={() => {}}
+        setPage={() => { }}
         initialFilters={initialFilters}
       />
 
@@ -204,7 +225,7 @@ export default function SearchPage() {
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
-          <button
+          {/* <button
             onClick={() => {
               if (role === 'free') { toast.error('Upgrade to export'); return; }
               toast.success('Export started');
@@ -212,7 +233,7 @@ export default function SearchPage() {
             className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer"
           >
             <Download className="h-4 w-4" /> Export
-          </button>
+          </button> */}
         </div>
 
         {/* Results count */}
@@ -235,7 +256,6 @@ export default function SearchPage() {
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Employees</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Revenue</th>
                     <th className="px-4 py-3 text-center font-medium text-muted-foreground">Contact</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Enriched</th>
                   </tr>
                 </thead>
                 {isLoading ? <TableSkeleton /> : (
@@ -258,7 +278,6 @@ export default function SearchPage() {
                         <td className="px-4 py-3 text-right">{c.employee_size?.toLocaleString() || '-'}</td>
                         <td className="px-4 py-3 text-right">{c.annual_revenue ? `$${c.annual_revenue.toLocaleString()}` : '-'}</td>
                         <td className="px-4 py-3"><div className="flex justify-center"><ContactDots c={c} /></div></td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{c.enrichment_status || '-'}</td>
                       </tr>
                     ))}
                   </tbody>

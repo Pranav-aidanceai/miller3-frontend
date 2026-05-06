@@ -13,7 +13,7 @@ export interface CompanySearchPayload {
   small_business?: true | null;
   hubzone?: true | null;
   eight_a_certified?: true | null;
-  has_phone?: true | null;
+  has_mobile_number?: true | null;
   has_email?: true | null;
   has_website?: true | null;
   sic_code: string | null;
@@ -38,9 +38,9 @@ export interface Company {
   annual_revenue: number | null;
   year_founded: number | null;
   enrichment_status: 'unenriched' | 'enriched' | 'pending';
-  phone: string | null;
-  email: string | null;
-  website: string | null;
+  has_mobile_number: boolean;
+  has_email: boolean;
+  has_website: boolean;
 }
 
 export interface CompanyData {

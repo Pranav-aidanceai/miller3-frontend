@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { X, ChevronDown, Loader2 } from 'lucide-react';
 import { getSimilarCompanyAction } from './searchServices';
 import { CompanyData } from '@/types/search';
 
@@ -12,12 +11,7 @@ interface SimilarPageProps {
 
 export default function SimilarPage({ companyId }: SimilarPageProps) {
 
-    const [perPage, setPerPage] = useState(25);
     const [companyData, setCompanyData] = useState<CompanyData[]>([]);
-    const [totalResults, setTotalResults] = useState(0);
-    const [hasNextPage, setHasNextPage] = useState<string | null>(null);
-    const [cursorStack, setCursorStack] = useState<string[]>([]);
-    const [currentCursor, setCurrentCursor] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
@@ -25,49 +19,53 @@ export default function SimilarPage({ companyId }: SimilarPageProps) {
         try {
             const payload = {
                 company_id: companyId,
-                limit: perPage,
+                limit: 5,
                 cursor: cursorValue
             };
             const response = await getSimilarCompanyAction(payload);
             setCompanyData(response.data.results);
-            setTotalResults(response.data.total);
-            setHasNextPage(response.data.next_cursor || null);
         } catch (error) {
             toast.error('Failed to fetch companies');
         } finally {
             setIsLoading(false);
         }
-    }, [perPage]);
+    }, []);
 
     useEffect(() => {
-        setCursorStack([]);
-        setCurrentCursor(null);
         fetchCompanies(null);
     }, [companyId]);
 
-    const handleNext = () => {
-        if (!hasNextPage) return;
-        setCursorStack(prev => [...prev, currentCursor ?? '']);
-        setCurrentCursor(hasNextPage);
-        fetchCompanies(hasNextPage);
-    };
+    // const handleNext = () => {
+    //     if (!hasNextPage) return;
+    //     setCursorStack(prev => [...prev, currentCursor ?? '']);
+    //     setCurrentCursor(hasNextPage);
+    //     fetchCompanies(hasNextPage);
+    // };
 
-    const handlePrev = () => {
-        if (cursorStack.length === 0) return;
-        const stack = [...cursorStack];
-        const prevCursor = stack.pop() ?? null;
-        setCursorStack(stack);
-        setCurrentCursor(prevCursor);
-        fetchCompanies(prevCursor);
-    };
+    // const handlePrev = () => {
+    //     if (cursorStack.length === 0) return;
+    //     const stack = [...cursorStack];
+    //     const prevCursor = stack.pop() ?? null;
+    //     setCursorStack(stack);
+    //     setCurrentCursor(prevCursor);
+    //     fetchCompanies(prevCursor);
+    // };
 
     return (
         <div className="flex-1 overflow-auto">
-            <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+            {/* <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Showing {companyData?.length} of {totalResults.toLocaleString()} results</span>
-            </div>
+            </div> */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {companyData.length === 0 ? (
+                {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="rounded-lg border border-border p-3 animate-pulse">
+                            <div className="h-3.5 w-2/3 rounded bg-muted mb-2" />
+                            <div className="h-3 w-1/2 rounded bg-muted mb-2" />
+                            <div className="h-3 w-1/3 rounded bg-muted" />
+                        </div>
+                    ))
+                ) : companyData.length === 0 ? (
                     <p className="col-span-full text-center py-8 text-muted-foreground">No similar companies found</p>
                 ) : companyData.map(c => (
                     <div key={c.id} className="rounded-lg border border-border p-3">
@@ -77,7 +75,7 @@ export default function SimilarPage({ companyId }: SimilarPageProps) {
                     </div>
                 ))}
             </div>
-            {(hasNextPage || cursorStack.length > 0) && (
+            {/* {(hasNextPage || cursorStack.length > 0) && (
                 <div className="mt-6 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="relative">
@@ -108,7 +106,7 @@ export default function SimilarPage({ companyId }: SimilarPageProps) {
                         </button>
                     </div>
                 </div>
-            )}
+            )} */}
         </div>
     );
 }
