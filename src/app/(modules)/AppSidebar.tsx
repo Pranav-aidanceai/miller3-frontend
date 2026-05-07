@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, LogOut, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -108,9 +108,9 @@ export function AppSidebar() {
                         )}
                         {!sidebarCollapsed && (
                             <div className="flex gap-1">
-                                <Link href="/settings" className="rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors" aria-label="Settings">
+                                {/* <Link href="/settings" className="rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors" aria-label="Settings">
                                     <Settings className="h-4 w-4" />
-                                </Link>
+                                </Link> */}
                                 <button onClick={handleLogout} className="rounded-md p-1.5 text-muted-foreground hover:text-destructive transition-colors cursor-pointer" aria-label="Log out">
                                     <LogOut className="h-4 w-4" />
                                 </button>
