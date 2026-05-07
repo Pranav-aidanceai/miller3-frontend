@@ -35,6 +35,7 @@ interface FiltersProps {
 const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps) => {
 
     const [draftFilters, setDraftFilters] = useState(filters);
+    const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify(filters);
 
     const activeFilterCount = Object.values(filters).reduce((count, value) => {
         if (Array.isArray(value)) return count + value.length;
@@ -62,7 +63,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
                 </div>
                 <div className="flex gap-2">
                     <button onClick={clearDraftFilters} className="text-xs text-primary cursor-pointer hover:underline">Clear</button>
-                    <button onClick={applyFilters} disabled={draftFilters === initialFilters} className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Apply</button>
+                    <button onClick={applyFilters} disabled={!hasChanges} className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Apply</button>
                 </div>
             </div>
             <div className="p-4 space-y-5">

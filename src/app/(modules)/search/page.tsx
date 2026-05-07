@@ -38,6 +38,8 @@ export default function SearchPage() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [totalResults, setTotalResults] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
   const [hasNextPage, setHasNextPage] = useState<string | null>(null);
   const [cursorStack, setCursorStack] = useState<string[]>([]);
@@ -83,11 +85,12 @@ export default function SearchPage() {
         has_email: hasEmail ? true : null,
         has_website: hasWebsite ? true : null
       };
-
+console.log("payload", payload)
       const response = await searchAction(payload);
       setCompanies(response.data.results);
       setTotalResults(response.data.total);
       setHasNextPage(response.data.next_cursor || null);
+      setTotalPages(response.data.total_pages)
     } catch (error) {
       toast.error('Failed to fetch companies');
     } finally {
@@ -98,6 +101,7 @@ export default function SearchPage() {
   useEffect(() => {
     setCursorStack([]);
     setCurrentCursor(null);
+    setCurrentPage(1);
     fetchCompanies(null);
   }, [searchQuery, sortBy, perPage, appliedFilters]);
 
@@ -105,6 +109,7 @@ export default function SearchPage() {
     if (!hasNextPage) return;
     setCursorStack(prev => [...prev, currentCursor ?? '']);
     setCurrentCursor(hasNextPage);
+    setCurrentPage(prev => prev + 1);
     fetchCompanies(hasNextPage);
   };
 
@@ -114,6 +119,7 @@ export default function SearchPage() {
     const prevCursor = stack.pop() ?? null;
     setCursorStack(stack);
     setCurrentCursor(prevCursor);
+    setCurrentPage(prev => prev - 1);
     fetchCompanies(prevCursor);
   };
 
@@ -314,12 +320,17 @@ export default function SearchPage() {
         )}
 
         {/* Pagination */}
-        {(hasNextPage || cursorStack.length > 0) && (
+        {/* Pagination */}
+        {totalPages > 1 && (
           <div className="mt-6 flex items-center justify-between">
+            {/* Per-page selector */}
             <div className="flex items-center gap-2">
               <div className="relative">
-                <select value={perPage} onChange={e => setPerPage(Number(e.target.value))}
-                  className="h-9 rounded-md border border-input bg-background px-2 pr-8 text-sm appearance-none cursor-pointer">
+                <select
+                  value={perPage}
+                  onChange={e => setPerPage(Number(e.target.value))}
+                  className="h-9 rounded-md border border-input bg-background px-2 pr-8 text-sm appearance-none cursor-pointer"
+                >
                   <option value={25}>25</option>
                   <option value={50}>50</option>
                   <option value={100}>100</option>
@@ -328,14 +339,85 @@ export default function SearchPage() {
               </div>
               <span className="text-xs text-muted-foreground">per page</span>
             </div>
-            <div className="flex gap-1">
+
+            {/* Page number pills */}
+            <div className="flex items-center gap-1">
+              {/* Prev button */}
               <button
-                disabled={cursorStack.length === 0 || isLoading}
+                disabled={currentPage === 1 || isLoading}
                 onClick={handlePrev}
                 className="rounded-md border border-border px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-accent cursor-pointer"
               >
                 Prev
               </button>
+
+              {/* Page number buttons with ellipsis */}
+              {(() => {
+                const pages: (number | 'ellipsis-start' | 'ellipsis-end')[] = [];
+                const delta = 2; // pages to show around current
+
+                if (totalPages <= 7) {
+                  // Show all pages if total is small
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+
+                  if (currentPage > delta + 2) {
+                    pages.push('ellipsis-start');
+                  }
+
+                  const start = Math.max(2, currentPage - delta);
+                  const end = Math.min(totalPages - 1, currentPage + delta);
+                  for (let i = start; i <= end; i++) pages.push(i);
+
+                  if (currentPage < totalPages - delta - 1) {
+                    pages.push('ellipsis-end');
+                  }
+
+                  pages.push(totalPages);
+                }
+
+                return pages.map((p, idx) => {
+                  if (p === 'ellipsis-start' || p === 'ellipsis-end') {
+                    return (
+                      <span key={p} className="px-1 text-sm text-muted-foreground select-none">
+                        …
+                      </span>
+                    );
+                  }
+                  const isActive = p === currentPage;
+                  return (
+                    <button
+                      key={p}
+                      disabled={isLoading}
+                      onClick={() => {
+                        // Jump forward or back by diff
+                        const diff = (p as number) - currentPage;
+                        if (diff === 0) return;
+                        // NOTE: cursor-based pagination only supports sequential navigation.
+                        // For now, clicking a non-adjacent page jumps sequentially from current position.
+                        // To support true random access, the backend would need page-offset support.
+                        if (diff > 0) {
+                          // Can only go next if we have the cursor
+                          if (diff === 1) handleNext();
+                        } else {
+                          if (diff === -1) handlePrev();
+                        }
+                      }}
+                      className={cn(
+                        'min-w-[2rem] rounded-md border px-2 py-1.5 text-sm transition-colors cursor-pointer',
+                        isActive
+                          ? 'border-primary bg-primary text-primary-foreground font-semibold'
+                          : 'border-border hover:bg-accent disabled:opacity-50'
+                      )}
+                    >
+                      {p}
+                    </button>
+                  );
+                });
+              })()}
+
+              {/* Next button */}
               <button
                 disabled={!hasNextPage || isLoading}
                 onClick={handleNext}

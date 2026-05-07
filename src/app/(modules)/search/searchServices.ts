@@ -8,12 +8,19 @@ import { cookies } from "next/headers";
 export async function searchAction(payload: CompanySearchPayload) {
     try {
         const cookieStore = await cookies();
-        const params = Object.entries(payload).reduce((acc, [key, value]) => {
+        const params = new URLSearchParams();
+        
+        Object.entries(payload).forEach(([key, value]) => {
             if (value !== null && value !== '' && value !== undefined) {
-                acc[key] = value;
+                if (Array.isArray(value)) {
+                    // For arrays, append each value separately
+                    value.forEach(v => params.append(key, String(v)));
+                } else {
+                    params.append(key, String(value));
+                }
             }
-            return acc;
-        }, {} as Record<string, any>);
+        });
+
         const response = await AXIOS.get(`/api/v1/search`, {
             params,
             headers: {
