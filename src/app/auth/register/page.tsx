@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { Eye, EyeOff, Check } from 'lucide-react';
 import { registerAction } from '../authServices';
 import { ApiError } from '@/types/common';
+import TermsModal from './TermsOfUse';
 
 export default function RegisterPage() {
 
@@ -17,6 +18,7 @@ export default function RegisterPage() {
     const [onboarding, setOnboarding] = useState(false);
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState(0);
+    const [showTerms, setShowTerms] = useState(false)
     const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
 
     const formik = useFormik({
@@ -113,11 +115,11 @@ export default function RegisterPage() {
                             </div>
                             <div>
                                 <label className="text-sm font-medium">Email</label>
-                                <input 
-                                value={formik.values.email} onChange={(e) => {
-                                    formik.handleChange(e);
-                                    setServerErrors(prev => ({ ...prev, email: '' }));
-                                }} onBlur={formik.handleBlur} name="email" type="email" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Enter your email" />
+                                <input
+                                    value={formik.values.email} onChange={(e) => {
+                                        formik.handleChange(e);
+                                        setServerErrors(prev => ({ ...prev, email: '' }));
+                                    }} onBlur={formik.handleBlur} name="email" type="email" className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Enter your email" />
                                 {(serverErrors.email || (formik.touched.email && formik.errors.email)) && <p className="text-sm text-destructive">{serverErrors.email || formik.errors.email}</p>}
                             </div>
                             <div>
@@ -159,7 +161,7 @@ export default function RegisterPage() {
                             </div>
                             <label className="flex items-center gap-2 text-sm">
                                 <input type="checkbox" checked={formik.values.touAccepted} onChange={formik.handleChange} name="touAccepted" className="rounded border-border cursor-pointer" />
-                                I accept the <button type="button" className="text-primary hover:underline">Terms of Use</button>
+                                I accept the <button type="button" onClick={() => setShowTerms(true)} className="text-primary hover:underline">Terms of Use</button>
                             </label>
                             {error && <p className={cn("text-sm text-destructive", error ? 'visible' : 'invisible')}>{error}</p>}
                             <button type="submit" disabled={!(formik.isValid && formik.dirty)} className="flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
@@ -172,6 +174,16 @@ export default function RegisterPage() {
                     </div>
                 </div>
             }
+
+            {showTerms && (
+                <TermsModal
+                    onAccept={() => {
+                        formik.setFieldValue('touAccepted', true)
+                        setShowTerms(false)
+                    }}
+                    onClose={() => setShowTerms(false)}
+                />
+            )}
         </>
     );
 }
