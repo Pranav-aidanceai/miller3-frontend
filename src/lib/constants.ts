@@ -32,3 +32,5 @@ export const roleBadgeColor: Record<string, string> = {
   STANDARD: 'bg-warning/10 text-warning',
   FREE: 'bg-muted text-muted-foreground',
 };
+
+export const statesList = ['AL', 'AZ', 'CA', 'CO', 'CT', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA', 'MA', 'MD', 'MI', 'MN', 'MO', 'NC', 'NJ', 'NY', 'OH', 'OK', 'OR', 'PA', 'SC', 'TN', 'TX', 'UT', 'VA', 'WA', 'WI'];

@@ -19,7 +19,7 @@ const isProtected = (pathname: string) =>
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get("access_token")?.value;
+  const token = request.cookies.get("refresh_token")?.value;
 
   if (isProtected(pathname) && !token) {
     const loginUrl = new URL("/", request.url);
