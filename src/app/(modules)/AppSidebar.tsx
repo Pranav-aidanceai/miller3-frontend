@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, LogOut, Settings } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';

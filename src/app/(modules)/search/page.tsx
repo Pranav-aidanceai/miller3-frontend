@@ -32,7 +32,7 @@ export default function SearchPage() {
   };
 
   const [nameQ, setNameQ] = useState('');
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [perPage, setPerPage] = useState(25);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -77,7 +77,7 @@ export default function SearchPage() {
         women_owned: demoFilter.includes('Women-Owned') || null,
         veteran_owned: demoFilter.includes('Veteran-Owned') || null,
         enrichment_status: null,
-        sort_by: 'created_at',
+        sort_by: sortBy,
         sort_order: 'asc',
         limit: perPage,
         cursor: cursorValue,
@@ -85,18 +85,19 @@ export default function SearchPage() {
         has_email: hasEmail ? true : null,
         has_website: hasWebsite ? true : null
       };
-console.log("payload", payload)
+
       const response = await searchAction(payload);
       setCompanies(response.data.results);
       setTotalResults(response.data.total);
       setHasNextPage(response.data.next_cursor || null);
       setTotalPages(response.data.total_pages)
     } catch (error) {
+      console.error(error)
       toast.error('Failed to fetch companies');
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, sortBy, perPage, appliedFilters]);
+  }, [searchQuery, perPage, appliedFilters, sortBy]);
 
   useEffect(() => {
     setCursorStack([]);
@@ -225,9 +226,9 @@ console.log("payload", payload)
           </div>
           <div className="relative">
             <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 pr-8 text-sm appearance-none cursor-pointer">
-              <option value="name">Name A–Z</option>
-              <option value="revenue">Revenue ↓</option>
-              <option value="employees">Employees ↓</option>
+              <option value="created_at">Name A–Z</option>
+              <option value="annual_revenue">Revenue ↓</option>
+              <option value="employee_size">Employees ↓</option>
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
@@ -342,7 +343,6 @@ console.log("payload", payload)
 
             {/* Page number pills */}
             <div className="flex items-center gap-1">
-              {/* Prev button */}
               <button
                 disabled={currentPage === 1 || isLoading}
                 onClick={handlePrev}
@@ -351,73 +351,30 @@ console.log("payload", payload)
                 Prev
               </button>
 
-              {/* Page number buttons with ellipsis */}
-              {(() => {
-                const pages: (number | 'ellipsis-start' | 'ellipsis-end')[] = [];
-                const delta = 2; // pages to show around current
-
-                if (totalPages <= 7) {
-                  // Show all pages if total is small
-                  for (let i = 1; i <= totalPages; i++) pages.push(i);
-                } else {
-                  pages.push(1);
-
-                  if (currentPage > delta + 2) {
-                    pages.push('ellipsis-start');
-                  }
-
-                  const start = Math.max(2, currentPage - delta);
-                  const end = Math.min(totalPages - 1, currentPage + delta);
-                  for (let i = start; i <= end; i++) pages.push(i);
-
-                  if (currentPage < totalPages - delta - 1) {
-                    pages.push('ellipsis-end');
-                  }
-
-                  pages.push(totalPages);
-                }
-
-                return pages.map((p, idx) => {
-                  if (p === 'ellipsis-start' || p === 'ellipsis-end') {
-                    return (
-                      <span key={p} className="px-1 text-sm text-muted-foreground select-none">
-                        …
-                      </span>
-                    );
-                  }
+              {[currentPage - 1, currentPage, currentPage + 1]
+                .filter((p) => p >= 1 && (p < currentPage || p === currentPage || hasNextPage))
+                .map((p) => {
                   const isActive = p === currentPage;
                   return (
                     <button
                       key={p}
                       disabled={isLoading}
                       onClick={() => {
-                        // Jump forward or back by diff
-                        const diff = (p as number) - currentPage;
-                        if (diff === 0) return;
-                        // NOTE: cursor-based pagination only supports sequential navigation.
-                        // For now, clicking a non-adjacent page jumps sequentially from current position.
-                        // To support true random access, the backend would need page-offset support.
-                        if (diff > 0) {
-                          // Can only go next if we have the cursor
-                          if (diff === 1) handleNext();
-                        } else {
-                          if (diff === -1) handlePrev();
-                        }
+                        if (p === currentPage - 1) handlePrev();
+                        else if (p === currentPage + 1) handleNext();
                       }}
                       className={cn(
-                        'min-w-[2rem] rounded-md border px-2 py-1.5 text-sm transition-colors cursor-pointer',
+                        'min-w-8 rounded-md border px-2 py-1.5 text-sm transition-colors cursor-pointer',
                         isActive
-                          ? 'border-primary bg-primary text-primary-foreground font-semibold'
+                          ? 'border-primary bg-primary text-primary-foreground font-semibold pointer-events-none'
                           : 'border-border hover:bg-accent disabled:opacity-50'
                       )}
                     >
                       {p}
                     </button>
                   );
-                });
-              })()}
+                })}
 
-              {/* Next button */}
               <button
                 disabled={!hasNextPage || isLoading}
                 onClick={handleNext}

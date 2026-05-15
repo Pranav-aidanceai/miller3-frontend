@@ -14,7 +14,7 @@ export default function SimilarPage({ companyId }: SimilarPageProps) {
     const [companyData, setCompanyData] = useState<CompanyData[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
-    const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
+    const fetchCompanies = async (cursorValue: string | null = null) => {
         setIsLoading(true);
         try {
             const payload = {
@@ -25,11 +25,12 @@ export default function SimilarPage({ companyId }: SimilarPageProps) {
             const response = await getSimilarCompanyAction(payload);
             setCompanyData(response.data.results);
         } catch (error) {
+            console.error(error)
             toast.error('Failed to fetch companies');
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    };
 
     useEffect(() => {
         fetchCompanies(null);
