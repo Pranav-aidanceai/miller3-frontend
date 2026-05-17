@@ -45,6 +45,7 @@ export interface Company {
 
 export interface CompanyData {
   id: string;
+  company_id: string;
   company_name: string;
   city: string;
   county: string | null;
@@ -69,4 +70,5 @@ export interface CompanyData {
   created_at: string;
   updated_at: string;
   execution_time_ms: number;
+  not_accessible: string[];
 }

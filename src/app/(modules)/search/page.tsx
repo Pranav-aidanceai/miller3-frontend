@@ -2,14 +2,15 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Search, X, Grid3X3, List, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, X, Grid3X3, List, ChevronDown, Loader2, Info, Phone, Mail, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompanyDrawer } from './CompanyDrawer';
 import Filters from './Filters';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchAction } from './searchServices';
 import { Company, CompanySearchPayload } from '@/types/search';
-import { useHasScope } from '@/hooks/usHasScopes';
+import { Tooltip } from 'react-tooltip';
+import 'react-tooltip/dist/react-tooltip.css';
 
 export default function SearchPage() {
 
@@ -39,6 +40,7 @@ export default function SearchPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [notAccessibleFields, setNotAccessibleFields] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [appliedFilters, setAppliedFilters] = useState(initialFilters);
   const [hasNextPage, setHasNextPage] = useState<string | null>(null);
@@ -90,9 +92,10 @@ export default function SearchPage() {
       setCompanies(response.data.results);
       setTotalResults(response.data.total);
       setHasNextPage(response.data.next_cursor || null);
-      setTotalPages(response.data.total_pages)
+      setTotalPages(response.data.total_pages);
+      setNotAccessibleFields(response.data.not_accessible);
     } catch (error) {
-      console.error(error)
+      console.error(error);
       toast.error('Failed to fetch companies');
     } finally {
       setIsLoading(false);
@@ -124,25 +127,134 @@ export default function SearchPage() {
     fetchCompanies(prevCursor);
   };
 
-  const ContactDots = ({ c }: { c: Company }) => {
-    const hasPhoneScope = useHasScope('phone');
-    const hasEmailScope = useHasScope('email');
-    const hasWebsiteScope = useHasScope('website');
+  /**
+   * Returns masked JSX if `fieldKey` is in notAccessibleFields.
+   * If not locked: shows `displayValue` when truthy, else falls back to `fallback` (default 'NA').
+   */
+  const MaskedCell = ({
+    fieldKey,
+    displayValue,
+    mono = false,
+    align = 'left',
+    fallback = 'NA',
+    tooltipPlace = 'top',
+  }: {
+    fieldKey: string;
+    displayValue: string | number | null | undefined;
+    mono?: boolean;
+    align?: 'left' | 'right' | 'center';
+    fallback?: string;
+    tooltipPlace?: 'top' | 'bottom' | 'left' | 'right';
+  }) => {
+    const isLocked = notAccessibleFields.includes(fieldKey);
+    const tooltipId = `upgrade-tip-${fieldKey}`;
+    const alignClass = align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start';
 
-    const getDotColor = (hasData: boolean, hasScope: boolean) => {
-      if (!hasData) return 'bg-destructive';
-      if (!hasScope) return 'bg-warning';
-      return 'bg-success';
-    };
+    if (isLocked) {
+      return (
+        <span className={cn('flex items-center gap-1', alignClass)}>
+          <span className={cn('tracking-widest text-muted-foreground/50 select-none', mono && 'font-mono')}>
+            ••••
+          </span>
+          <span
+            data-tooltip-id={tooltipId}
+            data-tooltip-content="Please upgrade to see this field"
+            className="inline-flex items-center text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+            aria-label="Upgrade to view this field"
+          >
+            <Info className="h-3 w-3" />
+          </span>
+          <Tooltip
+            id={tooltipId}
+            place={tooltipPlace}
+            className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
+          />
+        </span>
+      );
+    }
 
     return (
-      <div className="flex gap-1">
-        <div className={cn('h-2 w-2 rounded-full', getDotColor(c.has_mobile_number, hasPhoneScope))}
-          title={!c.has_mobile_number ? 'No mobile number available' : !hasPhoneScope ? 'Mobile number not in scope' : 'Mobile number available'} />
-        <div className={cn('h-2 w-2 rounded-full', getDotColor(c.has_email, hasEmailScope))}
-          title={!c.has_email ? 'No email available' : !hasEmailScope ? 'Email not in scope' : 'Email available'} />
-        <div className={cn('h-2 w-2 rounded-full', getDotColor(c.has_website, hasWebsiteScope))}
-          title={!c.has_website ? 'No website available' : !hasWebsiteScope ? 'Website not in scope' : 'Website available'} />
+      <span className={cn(mono && 'font-mono')}>
+        {displayValue ?? fallback}
+      </span>
+    );
+  };
+
+  const ContactIcons = ({ c }: { c: Company }) => {
+    // green = has value, yellow = locked (in notAccessibleFields), red = null/missing
+    const getState = (hasData: boolean, fieldKey: string): 'green' | 'yellow' | 'red' => {
+      if (!hasData) return 'red';
+      if (notAccessibleFields.includes(fieldKey)) return 'yellow';
+      return 'green';
+    };
+
+    const colorMap = {
+      green:  'text-emerald-500',
+      yellow: 'text-amber-400',
+      red:    'text-rose-500',
+    };
+
+    const titleMap = {
+      phone: {
+        green:  'Mobile number available',
+        yellow: 'Upgrade to access mobile number',
+        red:    'No mobile number available',
+      },
+      email: {
+        green:  'Email available',
+        yellow: 'Upgrade to access email',
+        red:    'No email available',
+      },
+      website: {
+        green:  'Website available',
+        yellow: 'Upgrade to access website',
+        red:    'No website available',
+      },
+    };
+
+    const phoneState   = getState(c.has_mobile_number, 'phone');
+    const emailState   = getState(c.has_email, 'email');
+    const websiteState = getState(c.has_website, 'website');
+
+    // Unique tooltip ids per row to avoid conflicts when multiple rows render
+    const phoneTooltipId   = `contact-phone-${c.id}`;
+    const emailTooltipId   = `contact-email-${c.id}`;
+    const websiteTooltipId = `contact-website-${c.id}`;
+
+    return (
+      <div className="flex items-center gap-1.5">
+        {/* Phone */}
+        <span data-tooltip-id={phoneTooltipId} className="inline-flex cursor-default">
+          <Phone className={cn('h-3.5 w-3.5', colorMap[phoneState])} strokeWidth={2} />
+        </span>
+        <Tooltip
+          id={phoneTooltipId}
+          place="top"
+          content={titleMap.phone[phoneState]}
+          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
+        />
+
+        {/* Email */}
+        <span data-tooltip-id={emailTooltipId} className="inline-flex cursor-default">
+          <Mail className={cn('h-3.5 w-3.5', colorMap[emailState])} strokeWidth={2} />
+        </span>
+        <Tooltip
+          id={emailTooltipId}
+          place="top"
+          content={titleMap.email[emailState]}
+          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
+        />
+
+        {/* Website / Globe */}
+        <span data-tooltip-id={websiteTooltipId} className="inline-flex cursor-default">
+          <Globe className={cn('h-3.5 w-3.5', colorMap[websiteState])} strokeWidth={2} />
+        </span>
+        <Tooltip
+          id={websiteTooltipId}
+          place="top"
+          content={titleMap.website[websiteState]}
+          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
+        />
       </div>
     );
   };
@@ -163,7 +275,6 @@ export default function SearchPage() {
             <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
             <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
           </div></td>
-          <td className="px-4 py-3"><div className="h-4 w-20 rounded bg-muted animate-pulse" /></td>
         </tr>
       ))}
     </tbody>
@@ -232,15 +343,6 @@ export default function SearchPage() {
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
-          {/* <button
-            onClick={() => {
-              if (role === 'free') { toast.error('Upgrade to export'); return; }
-              toast.success('Export started');
-            }}
-            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer"
-          >
-            <Download className="h-4 w-4" /> Export
-          </button> */}
         </div>
 
         {/* Results count */}
@@ -269,7 +371,7 @@ export default function SearchPage() {
                   <tbody>
                     {companies.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-16 text-center text-muted-foreground">
+                        <td colSpan={5} className="py-16 text-center text-muted-foreground">
                           <p className="text-lg font-medium">No companies match your filters</p>
                           <p className="mt-1 text-sm">Try loosening your criteria or switching to AI Search</p>
                         </td>
@@ -281,10 +383,33 @@ export default function SearchPage() {
                           <p className="font-medium">{c.company_name}</p>
                           <p className="text-xs text-muted-foreground">{c.city}, {c.state}</p>
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs">{c.naics_code || '-'}</td>
-                        <td className="px-4 py-3 text-right">{c.employee_size?.toLocaleString() || '-'}</td>
-                        <td className="px-4 py-3 text-right">{c.annual_revenue ? `$${c.annual_revenue.toLocaleString()}` : '-'}</td>
-                        <td className="px-4 py-3"><div className="flex justify-center"><ContactDots c={c} /></div></td>
+                        <td className="px-4 py-3 text-xs">
+                          <MaskedCell
+                            fieldKey="naics_code"
+                            displayValue={c.naics_code}
+                            mono
+                            tooltipPlace="right"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <MaskedCell
+                            fieldKey="employee_size"
+                            displayValue={c.employee_size != null ? c.employee_size.toLocaleString() : null}
+                            align="right"
+                            tooltipPlace="top"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <MaskedCell
+                            fieldKey="annual_revenue"
+                            displayValue={c.annual_revenue != null ? `$${c.annual_revenue.toLocaleString()}` : null}
+                            align="right"
+                            tooltipPlace="top"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-center"><ContactIcons c={c} /></div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -305,15 +430,36 @@ export default function SearchPage() {
               <button key={c.id} onClick={() => setSelectedCompany(c)}
                 className="flex flex-col rounded-lg border border-border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-md">
                 <div className="flex items-start justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">{c.company_name.charAt(0)}</div>
-                  <ContactDots c={c} />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
+                    {c.company_name.charAt(0)}
+                  </div>
+                  <ContactIcons c={c} />
                 </div>
                 <p className="mt-3 font-semibold">{c.company_name}</p>
                 <p className="text-xs text-muted-foreground">{c.city}, {c.state}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="rounded-pill bg-muted px-2 py-0.5 text-[10px] font-mono">{c.naics_code || '-'}</span>
-                  <span className="text-xs text-muted-foreground">{c.employee_size?.toLocaleString() || '-'} emp</span>
-                  <span className="text-xs text-muted-foreground">{c.annual_revenue ? `$${c.annual_revenue.toLocaleString()}` : '-'}</span>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-pill bg-muted px-2 py-0.5 text-[10px]">
+                    <MaskedCell
+                      fieldKey="naics_code"
+                      displayValue={c.naics_code}
+                      mono
+                      tooltipPlace="bottom"
+                    />
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    <MaskedCell
+                      fieldKey="employee_size"
+                      displayValue={c.employee_size != null ? c.employee_size.toLocaleString() : null}
+                      tooltipPlace="bottom"
+                    />
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    <MaskedCell
+                      fieldKey="annual_revenue"
+                      displayValue={c.annual_revenue != null ? `$${c.annual_revenue.toLocaleString()}` : null}
+                      tooltipPlace="bottom"
+                    />
+                  </span>
                 </div>
               </button>
             ))}
@@ -321,10 +467,8 @@ export default function SearchPage() {
         )}
 
         {/* Pagination */}
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="mt-6 flex items-center justify-between">
-            {/* Per-page selector */}
             <div className="flex items-center gap-2">
               <div className="relative">
                 <select
@@ -341,7 +485,6 @@ export default function SearchPage() {
               <span className="text-xs text-muted-foreground">per page</span>
             </div>
 
-            {/* Page number pills */}
             <div className="flex items-center gap-1">
               <button
                 disabled={currentPage === 1 || isLoading}
