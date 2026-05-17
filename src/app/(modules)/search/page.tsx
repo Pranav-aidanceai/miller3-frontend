@@ -183,8 +183,8 @@ export default function SearchPage() {
   const ContactIcons = ({ c }: { c: Company }) => {
     // green = has value, yellow = locked (in notAccessibleFields), red = null/missing
     const getState = (hasData: boolean, fieldKey: string): 'green' | 'yellow' | 'red' => {
-      if (!hasData) return 'red';
       if (notAccessibleFields.includes(fieldKey)) return 'yellow';
+      if (!hasData) return 'red';
       return 'green';
     };
 
