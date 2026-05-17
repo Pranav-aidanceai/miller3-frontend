@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getSimilarCompanyAction } from './searchServices';
 import { CompanyData } from '@/types/search';
 
 interface SimilarPageProps {
     companyId: string;
+    handleFetch: (id: string) => void
 }
 
-export default function SimilarPage({ companyId }: SimilarPageProps) {
+export default function SimilarPage({ companyId, handleFetch }: SimilarPageProps) {
 
     const [companyData, setCompanyData] = useState<CompanyData[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +70,13 @@ export default function SimilarPage({ companyId }: SimilarPageProps) {
                 ) : companyData.length === 0 ? (
                     <p className="col-span-full text-center py-8 text-muted-foreground">No similar companies found</p>
                 ) : companyData.map(c => (
-                    <div key={c.id} className="rounded-lg border border-border p-3">
+                    <div
+                        key={c.company_id}
+                        className="rounded-lg border border-border p-3 cursor-pointer"
+                        onClick={() => {
+                            handleFetch(c.company_id)
+                        }}
+                    >
                         <p className="font-medium text-sm">{c.company_name}</p>
                         <p className="text-xs text-muted-foreground">{c.city}, {c.state}</p>
                         <p className="text-xs text-muted-foreground mt-1 font-mono">{c.naics_code}</p>
