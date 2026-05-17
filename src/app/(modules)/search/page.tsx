@@ -182,7 +182,7 @@ export default function SearchPage() {
 
   const ContactIcons = ({ c }: { c: Company }) => {
     // green = has value, yellow = locked (in notAccessibleFields), red = null/missing
-    const getState = (hasData: boolean, fieldKey: string): 'green' | 'yellow' | 'red' => {
+    const getState = (hasData: string | null, fieldKey: string): 'green' | 'yellow' | 'red' => {
       if (notAccessibleFields.includes(fieldKey)) return 'yellow';
       if (!hasData) return 'red';
       return 'green';
@@ -212,9 +212,9 @@ export default function SearchPage() {
       },
     };
 
-    const phoneState   = getState(c.has_mobile_number, 'phone');
-    const emailState   = getState(c.has_email, 'email');
-    const websiteState = getState(c.has_website, 'website');
+    const phoneState   = getState(c.phone, 'phone');
+    const emailState   = getState(c.email, 'email');
+    const websiteState = getState(c.website, 'website');
 
     // Unique tooltip ids per row to avoid conflicts when multiple rows render
     const phoneTooltipId   = `contact-phone-${c.id}`;
