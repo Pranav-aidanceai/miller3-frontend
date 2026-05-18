@@ -66,10 +66,8 @@ export default function SearchPage() {
         county: countyFilter || null,
         naics_code: naicsFilter || null,
         sic_code: sicFilter || null,
-        employee_size: (minEmp || maxEmp) ? [
-          minEmp ? Number(minEmp) : 0,
-          maxEmp ? Number(maxEmp) : Number.MAX_SAFE_INTEGER
-        ] : null,
+        employee_size_min: minEmp ? parseInt(minEmp) : null,
+        employee_size_max: maxEmp ? parseInt(maxEmp) : null,
         annual_revenue_min: minRev ? Number(minRev) : null,
         annual_revenue_max: maxRev ? Number(maxRev) : null,
         year_founded_min: minYear ? Number(minYear) : null,
@@ -189,36 +187,36 @@ export default function SearchPage() {
     };
 
     const colorMap = {
-      green:  'text-emerald-500',
+      green: 'text-emerald-500',
       yellow: 'text-amber-400',
-      red:    'text-rose-500',
+      red: 'text-rose-500',
     };
 
     const titleMap = {
       phone: {
-        green:  'Mobile number available',
+        green: 'Mobile number available',
         yellow: 'Upgrade to access mobile number',
-        red:    'No mobile number available',
+        red: 'No mobile number available',
       },
       email: {
-        green:  'Email available',
+        green: 'Email available',
         yellow: 'Upgrade to access email',
-        red:    'No email available',
+        red: 'No email available',
       },
       website: {
-        green:  'Website available',
+        green: 'Website available',
         yellow: 'Upgrade to access website',
-        red:    'No website available',
+        red: 'No website available',
       },
     };
 
-    const phoneState   = getState(c.phone, 'phone');
-    const emailState   = getState(c.email, 'email');
+    const phoneState = getState(c.phone, 'phone');
+    const emailState = getState(c.email, 'email');
     const websiteState = getState(c.website, 'website');
 
     // Unique tooltip ids per row to avoid conflicts when multiple rows render
-    const phoneTooltipId   = `contact-phone-${c.id}`;
-    const emailTooltipId   = `contact-email-${c.id}`;
+    const phoneTooltipId = `contact-phone-${c.id}`;
+    const emailTooltipId = `contact-email-${c.id}`;
     const websiteTooltipId = `contact-website-${c.id}`;
 
     return (

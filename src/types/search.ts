@@ -4,7 +4,8 @@ export interface CompanySearchPayload {
   city: string | null;
   county: string | null;
   naics_code: string | null;
-  employee_size: number[] | null
+  employee_size_min: number | null
+  employee_size_max: number | null
   annual_revenue_min: number | null;
   annual_revenue_max: number | null;
   minority_owned: true | null;
