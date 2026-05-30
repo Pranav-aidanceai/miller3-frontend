@@ -7,7 +7,7 @@ import authReducer from './slices/authSlice'
 const authPersistConfig = {
   key: 'auth',
   storage,
-  whitelist: ['user', 'role', 'roleDetails']
+  whitelist: ['user', 'role', 'roleDetails','has_seen_onboarding', 'sidebarCollapsed']
 }
 
 const persistedAuthReducer = persistReducer(authPersistConfig, authReducer)

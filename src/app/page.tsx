@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { DatabaseZap, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useFormik } from 'formik';
 import { useRouter } from 'next/navigation';
@@ -34,6 +34,7 @@ export default function LoginPage() {
       setError('');
       setLoading(true);
       const { data, errors } = await loginAction(values.email, values.password);
+      console.log("data", data)
       setLoading(false);
       if (errors || !data) {
         const fieldErrors: Record<string, string> = {};

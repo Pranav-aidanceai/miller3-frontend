@@ -3,4 +3,5 @@ export type UserDetails = {
   name: string
   email: string
   role: string
+  has_seen_onboarding: boolean
 }

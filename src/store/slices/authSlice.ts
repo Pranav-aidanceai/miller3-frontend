@@ -23,6 +23,7 @@ interface AuthState {
   roleDetails: RoleDetails | null
   isAuthenticated: boolean
   sidebarCollapsed?: boolean
+  has_seen_onboarding: boolean
 }
 
 const initialState: AuthState = {
@@ -31,6 +32,7 @@ const initialState: AuthState = {
   roleDetails: null,
   isAuthenticated: false,
   sidebarCollapsed: false,
+  has_seen_onboarding: false,
 }
 
 const authSlice = createSlice({
@@ -53,13 +55,17 @@ const authSlice = createSlice({
       state.user = null
       state.isAuthenticated = false
       state.sidebarCollapsed = false
+      state.has_seen_onboarding = false
       storage.removeItem('persist:auth')
     },
     toggleSidebar: (state) => {
       state.sidebarCollapsed = !state.sidebarCollapsed
+    },
+    setOnboardingSeen: (state) => {  // ← Add this action
+      state.has_seen_onboarding = true
     }
   }
 })
 
-export const { setCredentials, logout, toggleSidebar } = authSlice.actions
+export const { setCredentials, logout, toggleSidebar, setOnboardingSeen } = authSlice.actions
 export default authSlice.reducer

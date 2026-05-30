@@ -52,7 +52,7 @@ export function TopBar() {
                     <span>{limits.searches - used} left</span>
                 </div> */}
                 <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
-                    <span>{limits.searches} credits left</span>
+                    <span data-tour="credits">{limits.searches} credits left</span>
                 </div>
 
                 {/* Notifications */}
@@ -63,6 +63,7 @@ export function TopBar() {
 
                 {/* Theme */}
                 <button
+                    data-tour="theme-toggle"
                     onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                     className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                     aria-label="Toggle theme"

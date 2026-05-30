@@ -55,6 +55,7 @@ export function AppSidebar() {
 
     return (
         <aside
+            data-tour="sidebar"
             className={cn(
                 'flex h-full flex-col border-r border-border bg-card transition-all duration-200',
                 sidebarCollapsed ? 'w-16' : 'w-60'

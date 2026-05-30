@@ -55,7 +55,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
     };
 
     return (
-        <aside className="w-80 shrink-0 border-r border-border bg-card overflow-auto hidden lg:block" style={{ height: 'calc(100vh - 3.5rem)' }}>
+        <aside data-tour="filters-section" className="w-80 shrink-0 border-r border-border bg-card overflow-auto hidden lg:block" style={{ height: 'calc(100vh - 3.5rem)' }}>
             <div className="sticky top-0 bg-card flex items-center justify-between border-b p-4 border-border">
                 <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-sm">Filters</h3>
@@ -68,7 +68,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
             </div>
             <div className="p-4 space-y-5">
                 {/* Location */}
-                <div>
+                <div data-tour="location-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Location</p>
                     <FilterInput label="City" value={draftFilters.cityFilter} onChange={(v) => setDraftFilters({ ...draftFilters, cityFilter: v })} placeholder="e.g. Austin" />
                     <FilterInput label="County" value={draftFilters.countyFilter} onChange={(v) => setDraftFilters({ ...draftFilters, countyFilter: v })} placeholder="e.g. Travis" />
@@ -85,7 +85,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
                     </div>
                 </div>
                 {/* Industry */}
-                <div>
+                <div data-tour="industry-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Industry</p>
                     <FilterInput label="NAICS Code" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="e.g. 541" mono />
                     <FilterInput label="SIC Code" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="e.g. 541" mono />
@@ -95,7 +95,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
                     </div>
                 </div>
                 {/* Size */}
-                <div>
+                <div data-tour="size-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Company Size</p>
                     <div className="grid grid-cols-2 gap-2">
                         <FilterInput label="Min Employees" value={draftFilters.minEmp} onChange={(v) => setDraftFilters({ ...draftFilters, minEmp: v })} placeholder="0" />
@@ -107,7 +107,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
                     </div>
                 </div>
                 {/* Demographics */}
-                <div>
+                <div data-tour="demographics-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Demographics</p>
                     {['Minority-Owned', 'Women-Owned', 'Veteran-Owned'].map(d => (
                         <label key={d} className="flex items-center gap-2 py-1 text-sm cursor-pointer">
@@ -119,7 +119,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
                     ))}
                 </div>
                 {/* Data Quality */}
-                <div>
+                <div data-tour="data-quality-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Data Quality</p>
                     <Toggle label="Has phone" checked={draftFilters.hasPhone} onChange={v => { setDraftFilters({ ...draftFilters, hasPhone: v }); setPage(1); }} />
                     <Toggle label="Has email" checked={draftFilters.hasEmail} onChange={v => { setDraftFilters({ ...draftFilters, hasEmail: v }); setPage(1); }} />
