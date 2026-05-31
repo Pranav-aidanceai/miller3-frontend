@@ -1,6 +1,7 @@
 import {
   Crown, Gift, User, Search, LayoutDashboard,
-  Users, AlertTriangle, DollarSign, Database, Eye,
+  Users, AlertTriangle, DollarSign, Database, Eye, 
+  Sparkles, History
 } from "lucide-react";
 
 export const tiers = [
@@ -11,8 +12,8 @@ export const tiers = [
 
 export const mainNav = [
   { to: '/search', icon: Search, label: 'Search' },
-  // { to: '/ai-search', icon: Sparkles, label: 'AI Search' },
-  // { to: '/history', icon: History, label: 'Query History' },
+  { to: '/ai-search', icon: Sparkles, label: 'AI Search' },
+  { to: '/query-history', icon: History, label: 'Query History' },
   // { to: '/exports', icon: Download, label: 'Exports' },
   // { to: '/enrichment', icon: Zap, label: 'Enrichment' },
 ];

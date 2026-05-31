@@ -137,3 +137,27 @@ export async function resetPasswordAction(email: string) {
         return { data: null, errors: [{ message: 'Something went wrong' }] }
     }
 }
+
+export async function onboardingAction() {
+    try {
+        const cookieStore = await cookies()
+        const response = await AXIOS.patch(
+            `${API_BASE_URL}/api/v1/auth/onboarding/complete`,
+            {},
+            {
+                headers: {
+                    "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
+                }
+            }
+        );
+        return { data: response.data?.data, error: null }
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            return {
+                data: null,
+                errors: error.response?.data?.errors ?? [{ message: 'onboarding failed' }]
+            }
+        }
+        return { data: null, errors: [{ message: 'Something went wrong' }] }
+    }
+}

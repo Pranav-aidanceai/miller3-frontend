@@ -1,5 +1,4 @@
 // store/slices/authSlice.ts
-import { UserDetails } from '@/types/auth'
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import storage from 'redux-persist/lib/storage'
 
@@ -15,6 +14,14 @@ interface RoleDetails {
   ai_search_rate_limit_per_min: number
   enrichment_rate_limit_per_min: number
   visible_columns: string[]
+}
+
+export type UserDetails = {
+  id: string
+  name: string
+  email: string
+  role: string
+  has_seen_onboarding: boolean
 }
 
 interface AuthState {
@@ -47,6 +54,7 @@ const authSlice = createSlice({
       state.role = action.payload.role
       state.user = action.payload.user_details
       state.roleDetails = action.payload.role_details
+      state.has_seen_onboarding = action.payload.user_details.has_seen_onboarding
       state.isAuthenticated = true
       state.sidebarCollapsed = false
     },
@@ -61,7 +69,7 @@ const authSlice = createSlice({
     toggleSidebar: (state) => {
       state.sidebarCollapsed = !state.sidebarCollapsed
     },
-    setOnboardingSeen: (state) => {  // ← Add this action
+    setOnboardingSeen: (state) => {
       state.has_seen_onboarding = true
     }
   }

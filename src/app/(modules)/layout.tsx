@@ -19,7 +19,6 @@ export default function ModuleLayout({
 
   useEffect(() => {
     if (mounted && showOnboarding) {
-      // Small delay to ensure elements are rendered
       const timer = setTimeout(() => {
         startTour();
       }, 500);

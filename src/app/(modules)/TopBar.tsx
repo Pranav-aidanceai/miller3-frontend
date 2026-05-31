@@ -23,8 +23,10 @@ export function TopBar() {
     }, [setTheme]);
 
     const limits = roleDetails ? {
-        searches: roleDetails.search_rate_limit_per_min
-    } : { searches: 0 };
+        searches: roleDetails.search_rate_limit_per_min,
+        enrichments: roleDetails.enrichment_rate_limit_per_min,
+        aiSearch: roleDetails.ai_search_rate_limit_per_min
+    } : { searches: 0, enrichments: 0, aiSearch: 0 };
     // const pct = Math.min((used / limits.searches) * 100, 100);
     // const quotaColor = pct >= 95 ? 'text-destructive' : pct >= 80 ? 'text-warning' : 'text-muted-foreground';
 
@@ -51,9 +53,18 @@ export function TopBar() {
                     </div>
                     <span>{limits.searches - used} left</span>
                 </div> */}
-                <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
-                    <span data-tour="credits">{limits.searches} credits left</span>
+                <div data-tour="credits" className='flex items-center gap-2'>
+                    <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
+                        <span>Search credits left: {limits.searches}</span>
+                    </div>
+                    <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
+                        <span>Enrichment credits left: {limits.enrichments}</span>
+                    </div>
+                    <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
+                        <span>AI Search credits left: {limits.aiSearch}</span>
+                    </div>
                 </div>
+
 
                 {/* Notifications */}
                 <button className="relative rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" aria-label="Notifications">
