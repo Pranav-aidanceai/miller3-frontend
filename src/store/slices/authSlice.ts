@@ -63,7 +63,7 @@ const authSlice = createSlice({
       state.user = null
       state.isAuthenticated = false
       state.sidebarCollapsed = false
-      state.has_seen_onboarding = false
+      // state.has_seen_onboarding = false
       storage.removeItem('persist:auth')
     },
     toggleSidebar: (state) => {

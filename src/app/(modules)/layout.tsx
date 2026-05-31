@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { TopBar } from './TopBar';
 import { useOnboarding } from '@/hooks/useOnboarding';
+import { WelcomeScreen } from '../WelcomeScreen';
 
 export default function ModuleLayout({
   children,
@@ -12,19 +13,21 @@ export default function ModuleLayout({
 }>) {
   const { showOnboarding, startTour } = useOnboarding();
   const [mounted, setMounted] = useState(false);
+  const [tourStarted, setTourStarted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (mounted && showOnboarding) {
-      const timer = setTimeout(() => {
-        startTour();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [mounted, showOnboarding, startTour]);
+  const handleStartTour = () => {
+    setTourStarted(true);
+    startTour();
+  };
+
+  // Show welcome screen only if onboarding should be shown and tour hasn't started
+  if (mounted && showOnboarding && !tourStarted) {
+    return <WelcomeScreen onStartTour={handleStartTour} />;
+  }
 
   return (
     <div className="flex h-screen w-full bg-background">
