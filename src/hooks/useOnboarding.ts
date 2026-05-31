@@ -198,7 +198,6 @@ export function useOnboarding() {
 
     driverObj = driver({
       allowClose: true,
-      overlayClickBehavior: 'nextStep',
       overlayOpacity: 0.5,
       showProgress: true,
       showButtons: ['next', 'previous', 'close'],

@@ -21,7 +21,9 @@ export default function ModuleLayout({
 
   const handleStartTour = () => {
     setTourStarted(true);
-    startTour();
+    setTimeout(() => {
+      startTour();
+    }, 500);
   };
 
   // Show welcome screen only if onboarding should be shown and tour hasn't started
