@@ -1,5 +1,4 @@
 // store/slices/authSlice.ts
-import { UserDetails } from '@/types/auth'
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import storage from 'redux-persist/lib/storage'
 
@@ -17,12 +16,21 @@ interface RoleDetails {
   visible_columns: string[]
 }
 
+export type UserDetails = {
+  id: string
+  name: string
+  email: string
+  role: string
+  has_seen_onboarding: boolean
+}
+
 interface AuthState {
   role: string | null
   user: UserDetails | null
   roleDetails: RoleDetails | null
   isAuthenticated: boolean
   sidebarCollapsed?: boolean
+  has_seen_onboarding: boolean
 }
 
 const initialState: AuthState = {
@@ -31,6 +39,7 @@ const initialState: AuthState = {
   roleDetails: null,
   isAuthenticated: false,
   sidebarCollapsed: false,
+  has_seen_onboarding: false,
 }
 
 const authSlice = createSlice({
@@ -45,6 +54,7 @@ const authSlice = createSlice({
       state.role = action.payload.role
       state.user = action.payload.user_details
       state.roleDetails = action.payload.role_details
+      state.has_seen_onboarding = action.payload.user_details.has_seen_onboarding
       state.isAuthenticated = true
       state.sidebarCollapsed = false
     },
@@ -53,13 +63,17 @@ const authSlice = createSlice({
       state.user = null
       state.isAuthenticated = false
       state.sidebarCollapsed = false
+      state.has_seen_onboarding = false
       storage.removeItem('persist:auth')
     },
     toggleSidebar: (state) => {
       state.sidebarCollapsed = !state.sidebarCollapsed
+    },
+    setOnboardingSeen: (state) => {
+      state.has_seen_onboarding = true
     }
   }
 })
 
-export const { setCredentials, logout, toggleSidebar } = authSlice.actions
+export const { setCredentials, logout, toggleSidebar, setOnboardingSeen } = authSlice.actions
 export default authSlice.reducer
