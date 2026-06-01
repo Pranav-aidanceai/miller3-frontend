@@ -46,7 +46,7 @@ export function useOnboarding() {
       element: '[data-tour="credits"]',
       popover: {
         title: '💳 Credit Balance',
-        description: 'Monitor your remaining search, AI search and enrichment credits here. Each query/enrichment consumes credits based on your plan.',
+        description: 'Monitor your remaining AI search, Enrichment and Export credits here. Each query, enrichment and export consumes credits based on your plan.',
         side: 'bottom',
         align: 'end',
       },
