@@ -8,7 +8,7 @@ export function TopBar() {
     const [mounted, setMounted] = useState(false);
     const { theme, setTheme } = useTheme();
     const initialized = useRef(false);
-    const roleDetails = useAppSelector(state => state.auth.roleDetails)
+    const credits_left = useAppSelector(state => state.auth.credits_left)
 
     useEffect(() => {
         if (initialized.current) return;
@@ -22,11 +22,6 @@ export function TopBar() {
         }
     }, [setTheme]);
 
-    const limits = roleDetails ? {
-        searches: roleDetails.search_rate_limit_per_min,
-        enrichments: roleDetails.enrichment_rate_limit_per_min,
-        aiSearch: roleDetails.ai_search_rate_limit_per_min
-    } : { searches: 0, enrichments: 0, aiSearch: 0 };
     // const pct = Math.min((used / limits.searches) * 100, 100);
     // const quotaColor = pct >= 95 ? 'text-destructive' : pct >= 80 ? 'text-warning' : 'text-muted-foreground';
 
@@ -55,13 +50,13 @@ export function TopBar() {
                 </div> */}
                 <div data-tour="credits" className='flex items-center gap-2'>
                     <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
-                        <span>Search credits left: {limits.searches}</span>
+                        <span>AI Search credits left: {credits_left?.ai_search}</span>
                     </div>
                     <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
-                        <span>Enrichment credits left: {limits.enrichments}</span>
+                        <span>Enrichment credits left: {credits_left?.enrichment}</span>
                     </div>
                     <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
-                        <span>AI Search credits left: {limits.aiSearch}</span>
+                        <span>Export credits left: {credits_left?.export}</span>
                     </div>
                 </div>
 

@@ -28,6 +28,7 @@ interface AuthState {
   role: string | null
   user: UserDetails | null
   roleDetails: RoleDetails | null
+  credits_left: { export: number; ai_search: number; enrichment: number }
   isAuthenticated: boolean
   sidebarCollapsed?: boolean
   has_seen_onboarding: boolean
@@ -37,6 +38,7 @@ const initialState: AuthState = {
   role: null,
   user: null,
   roleDetails: null,
+  credits_left: { export: 0, ai_search: 0, enrichment: 0 },
   isAuthenticated: false,
   sidebarCollapsed: false,
   has_seen_onboarding: false,
@@ -50,10 +52,12 @@ const authSlice = createSlice({
       role: string
       user_details: UserDetails
       role_details: RoleDetails
+      credits_left: { export: number; ai_search: number; enrichment: number }
     }>) => {
       state.role = action.payload.role
       state.user = action.payload.user_details
       state.roleDetails = action.payload.role_details
+      state.credits_left = action.payload.credits_left
       state.has_seen_onboarding = action.payload.user_details.has_seen_onboarding
       state.isAuthenticated = true
       state.sidebarCollapsed = false
@@ -61,6 +65,7 @@ const authSlice = createSlice({
     logout: (state) => {
       state.role = null
       state.user = null
+      state.credits_left = { export: 0, ai_search: 0, enrichment: 0 }
       state.isAuthenticated = false
       state.sidebarCollapsed = false
       // state.has_seen_onboarding = false
