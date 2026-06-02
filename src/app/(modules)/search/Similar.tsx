@@ -26,7 +26,6 @@ export default function SimilarPage({ companyId, handleFetch }: SimilarPageProps
             const response = await getSimilarCompanyAction(payload);
             setCompanyData(response.data.results);
         } catch (error) {
-            console.error(error)
             toast.error('Failed to fetch companies');
         } finally {
             setIsLoading(false);
@@ -35,7 +34,7 @@ export default function SimilarPage({ companyId, handleFetch }: SimilarPageProps
 
     useEffect(() => {
         fetchCompanies(null);
-    }, [companyId]);
+    }, [companyId, fetchCompanies]);
 
     // const handleNext = () => {
     //     if (!hasNextPage) return;

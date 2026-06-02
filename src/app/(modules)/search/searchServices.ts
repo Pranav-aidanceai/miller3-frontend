@@ -9,7 +9,7 @@ export async function searchAction(payload: CompanySearchPayload) {
     try {
         const cookieStore = await cookies();
         const params = new URLSearchParams();
-        
+
         Object.entries(payload).forEach(([key, value]) => {
             if (value !== null && value !== '' && value !== undefined) {
                 if (Array.isArray(value)) {
@@ -49,7 +49,7 @@ export async function getCompanyAction(id: string) {
         });
         return { data: response.data, error: null }
     } catch (error: unknown) {
-        return { data: null, error: error};
+        return { data: null, error: error };
     }
 }
 

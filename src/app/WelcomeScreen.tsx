@@ -27,7 +27,7 @@ export function WelcomeScreen({ onStartTour }: WelcomeScreenProps) {
                     </h1>
 
                     <p className="text-lg text-muted-foreground mb-8 animate-slide-up" style={{ animationDelay: '200ms' }}>
-                        Discover companies with precision. Search, filter, and export with ease. Let's get you started with a quick tour of the platform.
+                        Discover companies with precision. Search, filter, and export with ease. Let&apos;s get you started with a quick tour of the platform.
                     </p>
 
                     {/* Features Grid */}
