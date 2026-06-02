@@ -2,15 +2,18 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Search, X, Grid3X3, List, ChevronDown, Loader2, Info, Phone, Mail, Globe } from 'lucide-react';
+import { Search, X, Grid3X3, List, ChevronDown, Loader2, Info, Phone, Mail, Globe, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompanyDrawer } from './CompanyDrawer';
 import Filters from './Filters';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchAction } from './searchServices';
-import { Company, CompanySearchPayload } from '@/types/search';
+import { Company, CompanySearchPayload, ExportPayload } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
+import ExportModal from './ExportModal';
+import { RootState } from '@/store/store';
+import { useSelector } from 'react-redux';
 
 export default function SearchPage() {
 
@@ -32,9 +35,10 @@ export default function SearchPage() {
     hasWebsite: false
   };
 
+  const role = useSelector((state: RootState) => state.auth.role);
   const [nameQ, setNameQ] = useState('');
   const [sortBy, setSortBy] = useState('');
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('card');
   const [perPage, setPerPage] = useState(25);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -47,7 +51,10 @@ export default function SearchPage() {
   const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [currentCursor, setCurrentCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
+  const [exportPayload, setExportPayload] = useState<ExportPayload | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+  const [isExporting, setIsExporting] = useState(false);
   const searchQuery = useDebounce(nameQ, 500).toLowerCase();
 
   const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
@@ -86,6 +93,14 @@ export default function SearchPage() {
         has_website: hasWebsite ? true : null
       };
 
+      const { limit, cursor, ...payloadWithoutPagination } = payload;
+      const exportPayload: ExportPayload = {
+        ...payloadWithoutPagination,
+        format: 'csv',
+        row_limit: limit
+      };
+      setExportPayload(exportPayload);
+
       const response = await searchAction(payload);
       setCompanies(response.data.results);
       setTotalResults(response.data.total);
@@ -93,7 +108,6 @@ export default function SearchPage() {
       setTotalPages(response.data.total_pages);
       setNotAccessibleFields(response.data.not_accessible);
     } catch (error) {
-      console.error(error);
       toast.error('Failed to fetch companies');
     } finally {
       setIsLoading(false);
@@ -105,7 +119,66 @@ export default function SearchPage() {
     setCurrentCursor(null);
     setCurrentPage(1);
     fetchCompanies(null);
-  }, [searchQuery, sortBy, perPage, appliedFilters]);
+  }, [searchQuery, sortBy, perPage, appliedFilters, fetchCompanies]);
+
+  const handleExport = async () => {
+    if (!exportPayload) {
+      toast.error('No data to export');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const payload = {
+        ...exportPayload,
+        format: exportFormat,
+      };
+
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const blob = await response.blob();
+
+      // Generate filename with local time
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).replace(/\//g, '-');
+      const timeStr = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }).replace(/:/g, '-');
+      const filename = `search_export_${dateStr}_${timeStr}.${exportFormat}`;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast.success(`Downloaded ${filename}`);
+      setShowExportModal(false);
+    } catch (error) {
+      toast.error('Export failed');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleNext = () => {
     if (!hasNextPage) return;
@@ -195,17 +268,17 @@ export default function SearchPage() {
     const titleMap = {
       phone: {
         green: 'Mobile number available',
-        yellow: 'Upgrade to access mobile number',
+        yellow: 'Please upgrade to access mobile number',
         red: 'No mobile number available',
       },
       email: {
         green: 'Email available',
-        yellow: 'Upgrade to access email',
+        yellow: 'Please upgrade to access email',
         red: 'No email available',
       },
       website: {
         green: 'Website available',
-        yellow: 'Upgrade to access website',
+        yellow: 'Please upgrade to access website',
         red: 'No website available',
       },
     };
@@ -330,8 +403,8 @@ export default function SearchPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setViewMode('table')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'table' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Table view"><List className="h-4 w-4" /></button>
             <button onClick={() => setViewMode('card')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'card' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Card view"><Grid3X3 className="h-4 w-4" /></button>
+            <button onClick={() => setViewMode('table')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'table' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Table view"><List className="h-4 w-4" /></button>
           </div>
           <div className="relative">
             <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 pr-8 text-sm appearance-none cursor-pointer">
@@ -341,6 +414,23 @@ export default function SearchPage() {
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
+
+          <button
+            data-tooltip-id="export-tip"
+            onClick={() => setShowExportModal(true)}
+            disabled={role === 'FREE'}
+            className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98]",
+              role === 'FREE' && 'cursor-not-allowed opacity-50'
+            )}
+          >
+            <Download className="h-4 w-4" /> Export
+          </button>
+          <Tooltip
+            id="export-tip"
+            place="bottom"
+            content={role === 'FREE' ? 'Please upgrade to export search results' : 'Export search results'}
+            className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
+          />
         </div>
 
         {/* Results count */}
@@ -425,8 +515,8 @@ export default function SearchPage() {
                 <p className="text-lg font-medium">No companies match your filters</p>
               </div>
             ) : companies.map(c => (
-              <button key={c.id} onClick={() => setSelectedCompany(c)}
-                className="flex flex-col rounded-lg border border-border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-md">
+              <button type="button" key={c.id} onClick={() => setSelectedCompany(c)}
+                className="flex flex-col rounded-lg border border-border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-md cursor-pointer">
                 <div className="flex items-start justify-between">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
                     {c.company_name.charAt(0)}
@@ -529,6 +619,17 @@ export default function SearchPage() {
       </div>
 
       {selectedCompany && <CompanyDrawer id={selectedCompany.id} onClose={() => setSelectedCompany(null)} />}
+
+      {showExportModal && (
+        <ExportModal
+          showExportModal={showExportModal}
+          setShowExportModal={setShowExportModal}
+          exportFormat={exportFormat}
+          setExportFormat={setExportFormat}
+          handleExport={handleExport}
+          isExporting={isExporting}
+        />
+      )}
     </div>
   );
 }

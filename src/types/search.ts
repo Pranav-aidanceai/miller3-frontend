@@ -28,6 +28,36 @@ export interface CompanySearchPayload {
   enrichment_status: string | null;
 }
 
+export interface ExportPayload {
+  format: string,
+  row_limit: number,
+  search_text: string | null;
+  state: string[] | null;
+  city: string | null;
+  county: string | null;
+  naics_code: string | null;
+  employee_size_min: number | null
+  employee_size_max: number | null
+  annual_revenue_min: number | null;
+  annual_revenue_max: number | null;
+  minority_owned: true | null;
+  women_owned: true | null;
+  veteran_owned: true | null;
+  small_business?: true | null;
+  hubzone?: true | null;
+  eight_a_certified?: true | null;
+  has_mobile_number?: true | null;
+  has_email?: true | null;
+  has_website?: true | null;
+  sic_code: string | null;
+  sort_by: string | null;
+  sort_order: 'asc' | 'desc';
+  year_founded_min: number | null;
+  year_founded_max: number | null;
+  ownership_type: string[] | null;
+  enrichment_status: string | null;
+}
+
 export interface Company {
   id: string;
   company_name: string;

@@ -2,6 +2,7 @@ export type ApiError = {
   code: string
   message: string
   field?: string
+  detail: string
 }
 
 export interface ApiErrorDetail {
