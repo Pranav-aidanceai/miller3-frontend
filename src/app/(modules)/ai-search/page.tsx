@@ -95,12 +95,13 @@ export default function AISearchPage() {
             className="w-full min-w-4xl rounded-lg border border-input bg-background p-4 pr-24 text-sm outline-none focus:ring-2 focus:ring-ring resize-none min-h-20"
             rows={3}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }}
+            disabled
           />
           <button
             type="button"
             data-tour="ai-search-button"
             className="absolute right-3 bottom-3 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
-            disabled={thinking || formik.values.query.trim() === ''}
+            disabled
             onClick={() => formik.handleSubmit()}
           >
             <Sparkles className="h-4 w-4" /> Search
@@ -116,6 +117,7 @@ export default function AISearchPage() {
           {templates.map(template => (
             <button
               key={template.id}
+              disabled
               onClick={() => {
                 formik.setValues({ query: template.query })
                 formik.handleSubmit();
