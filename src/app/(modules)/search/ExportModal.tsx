@@ -38,7 +38,7 @@ export default function ExportModal({
                 <button
                     onClick={() => setShowExportModal(false)}
                     disabled={isExporting}
-                    className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-foreground"
                 >
                     <X className="h-4 w-4" />
                 </button>
@@ -68,7 +68,7 @@ export default function ExportModal({
                             disabled={isExporting}
                             className={`group relative rounded-xl border p-4 text-left transition-all duration-200
                 ${exportFormat === 'csv'
-                                    ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                                    ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20 cursor-pointer'
                                     : 'border-border hover:border-primary/40 hover:bg-accent/50'
                                 }
               `}
@@ -97,8 +97,8 @@ export default function ExportModal({
                             disabled={!hasJsonAccess || isExporting}
                             onClick={() => hasJsonAccess && setExportFormat('json')}
                             className={`group relative rounded-xl border p-4 text-left transition-all duration-200 overflow-hidden ${exportFormat === 'json' && hasJsonAccess
-                                ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
-                                : 'border-border hover:border-primary/40 hover:bg-accent/50'
+                                ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20 cursor-pointer'
+                                : 'border-border hover:border-primary/40 hover:bg-accent/50 cursor-not-allowed'
                                 } ${!hasJsonAccess ? 'cursor-not-allowed' : ''}`}
                         >
                             {/* Locked Overlay */}
@@ -151,7 +151,7 @@ export default function ExportModal({
                     <button
                         onClick={() => setShowExportModal(false)}
                         disabled={isExporting}
-                        className="h-10 rounded-lg border border-border px-4 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                        className="h-10 rounded-lg border border-border px-4 text-sm font-medium transition-colors cursor-pointer hover:bg-accent disabled:opacity-50"
                     >
                         Cancel
                     </button>
@@ -159,7 +159,7 @@ export default function ExportModal({
                     <button
                         onClick={handleExport}
                         disabled={isExporting}
-                        className="flex h-10 min-w-[120px] items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:opacity-90 disabled:opacity-50"
+                        className="flex h-10 min-w-30 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:opacity-90 cursor-pointer disabled:opacity-50"
                     >
                         {isExporting ? (
                             <>

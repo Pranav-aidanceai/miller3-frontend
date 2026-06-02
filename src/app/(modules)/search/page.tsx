@@ -13,7 +13,8 @@ import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 import ExportModal from './ExportModal';
 import { RootState } from '@/store/store';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { updateExportCredits } from '@/store/slices/authSlice';
 
 export default function SearchPage() {
 
@@ -36,6 +37,7 @@ export default function SearchPage() {
   };
 
   const role = useSelector((state: RootState) => state.auth.role);
+  const dispatch = useDispatch();
   const [nameQ, setNameQ] = useState('');
   const [sortBy, setSortBy] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'card'>('card');
@@ -133,7 +135,6 @@ export default function SearchPage() {
         ...exportPayload,
         format: exportFormat,
       };
-
       const response = await fetch('/api/export', {
         method: 'POST',
         headers: {
@@ -141,14 +142,10 @@ export default function SearchPage() {
         },
         body: JSON.stringify(payload),
       });
-
       if (!response.ok) {
         throw new Error('Export failed');
       }
-
       const blob = await response.blob();
-
-      // Generate filename with local time
       const now = new Date();
       const dateStr = now.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -161,7 +158,6 @@ export default function SearchPage() {
         hour12: true
       }).replace(/:/g, '-');
       const filename = `search_export_${dateStr}_${timeStr}.${exportFormat}`;
-
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -170,11 +166,12 @@ export default function SearchPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-
+      const remaining = parseInt(response.headers.get('x-export-credits-remaining') ?? '0');
+      dispatch(updateExportCredits(remaining));
       toast.success(`Downloaded ${filename}`);
       setShowExportModal(false);
     } catch (error) {
-      toast.error('Export failed');
+      toast.error('Export failed. Please try again.');
     } finally {
       setIsExporting(false);
     }
@@ -419,7 +416,7 @@ export default function SearchPage() {
             data-tooltip-id="export-tip"
             onClick={() => setShowExportModal(true)}
             disabled={role === 'FREE'}
-            className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98]",
+            className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
               role === 'FREE' && 'cursor-not-allowed opacity-50'
             )}
           >

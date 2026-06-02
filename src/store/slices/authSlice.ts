@@ -76,9 +76,18 @@ const authSlice = createSlice({
     },
     setOnboardingSeen: (state) => {
       state.has_seen_onboarding = true
+    },
+    updateExportCredits: (state, action: PayloadAction<number>) => {
+      state.credits_left.export = action.payload
+    },
+    updateAiSearchCredits: (state, action: PayloadAction<number>) => {
+      state.credits_left.ai_search = action.payload
+    },
+    updateEnrichmentCredits: (state, action: PayloadAction<number>) => {
+      state.credits_left.enrichment = action.payload
     }
   }
 })
 
-export const { setCredentials, logout, toggleSidebar, setOnboardingSeen } = authSlice.actions
+export const { setCredentials, logout, toggleSidebar, setOnboardingSeen, updateExportCredits, updateAiSearchCredits, updateEnrichmentCredits } = authSlice.actions
 export default authSlice.reducer

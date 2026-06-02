@@ -37,9 +37,14 @@ export async function POST(req: Request) {
             )
         );
 
+        headers.set(
+            'x-export-credits-remaining',
+            String(response.headers['x-export-credits-remaining'] ?? '0')
+        );
+
         return new Response(response.data, {
             status: 200,
-            headers,
+            headers
         });
         
     } catch (error: unknown) {
