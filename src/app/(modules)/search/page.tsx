@@ -143,7 +143,21 @@ export default function SearchPage() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        throw new Error('Export failed');
+        const body = await response.json().catch(() => null);
+        let detail = 'Export failed. Please try again.';
+        if (body?.error) {
+          try {
+            const parsed = typeof body.error === 'string' ? JSON.parse(body.error) : body.error;
+            if (parsed?.detail) detail = parsed.detail;
+          } catch {
+            if (typeof body.error === 'string') detail = body.error;
+          }
+        }
+        toast.error(detail, {
+          duration: 5000,
+          className: '!bg-destructive !text-white !border-destructive',
+        });
+        return;
       }
       const blob = await response.blob();
       const now = new Date();
@@ -170,7 +184,7 @@ export default function SearchPage() {
       dispatch(updateExportCredits(remaining));
       toast.success(`Downloaded ${filename}`);
       setShowExportModal(false);
-    } catch (error) {
+    } catch {
       toast.error('Export failed. Please try again.');
     } finally {
       setIsExporting(false);

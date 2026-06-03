@@ -1,14 +1,47 @@
-import { cn } from '@/lib/utils';
 import { Moon, Sun, Bell, Command } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { useAppSelector } from '@/store/hooks';
 
+function CreditBar({ label, remaining, total }: { label: string; remaining: number; total: number }) {
+    const [labelWidth, setLabelWidth] = useState(0);
+    const labelRef = useRef<HTMLDivElement>(null);
+    
+    const pct = total > 0 ? Math.min((remaining / total) * 100, 100) : 0;
+    const barColor = pct > 60 ? 'bg-green-500' : pct > 30 ? 'bg-yellow-400' : 'bg-red-500';
+    const textColor = pct > 60 ? 'text-green-500' : pct > 30 ? 'text-yellow-400' : 'text-red-500';
+    const borderColor = pct > 60 ? 'border-green-500/30' : pct > 30 ? 'border-yellow-400/30' : 'border-red-500/30';
+
+    useEffect(() => {
+        if (labelRef.current) {
+            setLabelWidth(labelRef.current.offsetWidth);
+        }
+    }, [label]);
+
+    return (
+        <div className={`rounded-md border ${borderColor} bg-background px-3 py-1.5 text-xs group relative cursor-default select-none flex items-center gap-3`}>
+            <div className="flex flex-col gap-1">
+                <div ref={labelRef} className="text-muted-foreground font-medium">{label}</div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden" style={{ width: `${labelWidth}px` }}>
+                    <div
+                        className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                        style={{ width: `${pct}%` }}
+                    />
+                </div>
+            </div>
+            <div className={`text-sm font-semibold tabular-nums ${textColor}`}>
+                {remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}k` : remaining}
+            </div>
+        </div>
+    );
+}
+
 export function TopBar() {
     const [mounted, setMounted] = useState(false);
     const { theme, setTheme } = useTheme();
     const initialized = useRef(false);
-    const credits_left = useAppSelector(state => state.auth.credits_left)
+    const credits_left = useAppSelector(state => state.auth.credits_left);
+    const roleDetails = useAppSelector(state => state.auth.roleDetails);
 
     useEffect(() => {
         if (initialized.current) return;
@@ -22,9 +55,6 @@ export function TopBar() {
         }
     }, [setTheme]);
 
-    // const pct = Math.min((used / limits.searches) * 100, 100);
-    // const quotaColor = pct >= 95 ? 'text-destructive' : pct >= 80 ? 'text-warning' : 'text-muted-foreground';
-
     return (
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:px-6">
             <div className="flex items-center gap-4 invisible">
@@ -37,34 +67,28 @@ export function TopBar() {
                 </button>
             </div>
 
-            <div className="flex items-center gap-3">
-                {/* Quota */}
-                {/* <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium', quotaColor)}>
-                    <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
-                        <div
-                            className={cn('h-full rounded-full transition-all', pct >= 95 ? 'bg-destructive' : pct >= 80 ? 'bg-warning' : 'bg-primary')}
-                            style={{ width: `${pct}%` }}
-                        />
-                    </div>
-                    <span>{limits.searches - used} left</span>
-                </div> */}
-                <div data-tour="credits" className='flex items-center gap-2'>
-                    <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
-                        <span>AI Search credits left: {credits_left?.ai_search}</span>
-                    </div>
-                    <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
-                        <span>Enrichment credits left: {credits_left?.enrichment}</span>
-                    </div>
-                    <div className={cn('flex items-center gap-2 rounded-pill border border-border px-3 py-1 text-xs font-medium')}>
-                        <span>Export credits left: {credits_left?.export}</span>
-                    </div>
+            <div className="flex items-center gap-2">
+                <div data-tour="credits" className="flex items-center gap-2">
+                    <CreditBar
+                        label="AI Search credits"
+                        remaining={credits_left?.ai_search ?? 0}
+                        total={roleDetails?.ai_search_credits_monthly ?? 50}
+                    />
+                    <CreditBar
+                        label="Enrichment credits"
+                        remaining={credits_left?.enrichment ?? 0}
+                        total={roleDetails?.enrichment_credits_monthly ?? 100}
+                    />
+                    <CreditBar
+                        label="Export credits"
+                        remaining={credits_left?.export ?? 0}
+                        total={roleDetails?.export_credits_monthly ?? 3000}
+                    />
                 </div>
-
 
                 {/* Notifications */}
                 <button className="relative rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" aria-label="Notifications">
                     <Bell className="h-4 w-4" />
-                    {/* <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" /> */}
                 </button>
 
                 {/* Theme */}

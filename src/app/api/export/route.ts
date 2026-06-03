@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { AxiosError } from 'axios';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import AXIOS from '@/lib/axios';
@@ -46,21 +46,35 @@ export async function POST(req: Request) {
             status: 200,
             headers
         });
-        
+
     } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-            return NextResponse.json(
-                error.response?.data ?? {
-                    message: 'Export failed',
-                },
-                {
-                    status: error.response?.status ?? 500,
+        if (error instanceof AxiosError) {
+            let errorData = error?.response?.data;
+            if (Buffer.isBuffer(errorData)) {
+                try {
+                    errorData = JSON.parse(errorData.toString('utf-8'));
+                } catch {
+                    errorData = errorData.toString('utf-8');
                 }
+            }
+            console.error('[export] AxiosError', error.response?.status, JSON.stringify(errorData));
+            return NextResponse.json(
+                { message: "Export failed.", error: errorData, status: error.response?.status },
+                { status: error.response?.status ?? 500 }
             );
         }
-
+        console.error('[export] Unexpected error', error);
+        // @ts-ignore
+        let errorData = error?.data ?? String(error);
+        if (Buffer.isBuffer(errorData)) {
+            try {
+                errorData = JSON.parse(errorData.toString('utf-8'));
+            } catch {
+                errorData = errorData.toString('utf-8');
+            }
+        }
         return NextResponse.json(
-            { message: (error as Error).message || 'Export failed' },
+            { message: "Export failed.", error: errorData },
             { status: 500 }
         );
     }
