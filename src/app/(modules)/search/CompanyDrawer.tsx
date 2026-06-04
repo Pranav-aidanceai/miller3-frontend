@@ -2,21 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { X, Copy, AlertCircle, Info } from 'lucide-react';
+import { X, Copy, AlertCircle, Info, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCompanyAction } from './searchServices';
+import { getCompanyAction, singleEnrichAction } from './searchServices';
 import { CompanyData } from '@/types/search';
 import SimilarPage from './Similar';
 import { ApiErrorResponse } from '@/types/common';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
+import { useDispatch } from 'react-redux';
+import { updateEnrichmentCredits } from '@/store/slices/authSlice';
 
 export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
 
+    const dispatch = useDispatch();
     const [tab, setTab] = useState<'overview' | 'similar' | 'location' | 'activity'>('overview');
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [enriching, setEnriching] = useState<boolean>(false);
 
     const fetchCompany = async (id: string) => {
         setLoading(true);
@@ -37,10 +41,28 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
         }
     }, [id]);
 
-    /**
-     * Renders a field row. If the field key is present in `not_accessible`,
-     * the value is replaced with masked "xxxx" text and an upgrade tooltip is shown.
-     */
+    const handleEnrich = async () => {
+        setEnriching(true);
+        const payload = {
+            company_name: companyData?.company_name || '',
+            location: [companyData?.city, companyData?.state, companyData?.zip_code].filter(Boolean).join(', ')
+        };
+        const { data, errors } = await singleEnrichAction(payload);
+        if (errors) {
+            setEnriching(false);
+            console.error('Enrich error', errors);
+            toast.error(errors[0].message || 'Enrich failed', {
+                duration: 5000,
+                className: '!bg-destructive !text-white !border-destructive'
+            });
+        } else if (data?.status === "SUCCESS") {
+            setEnriching(false);
+            dispatch(updateEnrichmentCredits(data.headers));
+            fetchCompany(id);
+            toast.success('Company enriched successfully');
+        }
+    };
+
     const Field = ({
         label,
         value,
@@ -117,6 +139,16 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                     <span className="rounded-pill bg-muted px-2 py-0.5 text-xs">{companyData?.year_founded}</span>
                                 )}
                             </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    disabled={enriching}
+                                    onClick={handleEnrich}
+                                    className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50")}
+                                >
+                                    <Zap className="h-4 w-4" /> {enriching ? 'Enriching...' : 'Enrich'}
+                                </button>
+                            </div>
                         </div>
                         <button onClick={onClose} className="rounded-md p-1 hover:bg-accent"><X className="h-5 w-5" /></button>
                     </div>
@@ -164,10 +196,10 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Firmographics</h3>
-                                <Field label="Legal Name"  fieldKey="company_name"    value={companyData?.company_name} />
-                                <Field label="NAICS"       fieldKey="naics_code"      value={companyData?.naics_code   ?? 'NA'} mono />
-                                <Field label="SIC"         fieldKey="sic_code"        value={companyData?.sic_code     ?? 'NA'} mono />
-                                <Field label="Employees"   fieldKey="employee_size"   value={companyData?.employee_size ?? 'NA'} />
+                                <Field label="Legal Name" fieldKey="company_name" value={companyData?.company_name} />
+                                <Field label="NAICS" fieldKey="naics_code" value={companyData?.naics_code ?? 'NA'} mono />
+                                <Field label="SIC" fieldKey="sic_code" value={companyData?.sic_code ?? 'NA'} mono />
+                                <Field label="Employees" fieldKey="employee_size" value={companyData?.employee_size ?? 'NA'} />
                                 <Field
                                     label="Revenue"
                                     fieldKey="annual_revenue"
@@ -175,21 +207,21 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                         ? `$${companyData.annual_revenue.toLocaleString()}`
                                         : 'NA'}
                                 />
-                                <Field label="Founded"     fieldKey="year_founded"    value={companyData?.year_founded} />
-                                <Field label="Ownership"   fieldKey="ownership_type"  value={companyData?.ownership_type || 'Not specified'} />
+                                <Field label="Founded" fieldKey="year_founded" value={companyData?.year_founded} />
+                                <Field label="Ownership" fieldKey="ownership_type" value={companyData?.ownership_type || 'Not specified'} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Contact</h3>
-                                <Field label="Phone"   fieldKey="phone"   value={companyData?.phone} />
-                                <Field label="Email"   fieldKey="email"   value={companyData?.email} />
+                                <Field label="Phone" fieldKey="phone" value={companyData?.phone} />
+                                <Field label="Email" fieldKey="email" value={companyData?.email} />
                                 <Field label="Website" fieldKey="website" value={companyData?.website} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Location</h3>
-                                <Field label="City"    fieldKey="city"     value={companyData?.city} />
-                                <Field label="State"   fieldKey="state"    value={companyData?.state} />
+                                <Field label="City" fieldKey="city" value={companyData?.city} />
+                                <Field label="State" fieldKey="state" value={companyData?.state} />
                                 <Field label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
-                                <Field label="County"  fieldKey="county"   value={companyData?.county} />
+                                <Field label="County" fieldKey="county" value={companyData?.county} />
                             </div>
                         </div>
                     )}

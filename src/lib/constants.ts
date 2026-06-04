@@ -14,15 +14,13 @@ export const mainNav = [
   { to: '/search', icon: Search, label: 'Search' },
   { to: '/ai-search', icon: Sparkles, label: 'AI Search' },
   { to: '/query-history', icon: History, label: 'Query History' },
-  // { to: '/exports', icon: Download, label: 'Exports' },
-  // { to: '/enrichment', icon: Zap, label: 'Enrichment' },
 ];
 
 export const adminNav = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/users', icon: Users, label: 'Users' },
   { to: '/admin/errors', icon: AlertTriangle, label: 'Errors' },
-  { to: '/admin/costs', icon: DollarSign, label: 'Cost Center' },
+  { to: '/admin/cost-centre', icon: DollarSign, label: 'Cost Center' },
   { to: '/admin/data-health', icon: Database, label: 'Data Health' },
   { to: '/admin/searches', icon: Eye, label: 'Search Oversight' },
 ];

@@ -30,7 +30,7 @@ function CreditBar({ label, remaining, total }: { label: string; remaining: numb
                 </div>
             </div>
             <div className={`text-sm font-semibold tabular-nums ${textColor}`}>
-                {remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}k` : remaining}
+                {remaining}
             </div>
         </div>
     );
