@@ -22,6 +22,7 @@ export type UserDetails = {
   email: string
   role: string
   has_seen_onboarding: boolean
+  tou_accepted: boolean
 }
 
 interface AuthState {

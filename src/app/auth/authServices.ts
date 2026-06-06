@@ -72,7 +72,7 @@ export async function refreshTokenAction() {
     }
 }
 
-export async function registerAction(name: string, email: string, password: string, confirmPassword: string, role: string) {
+export async function registerAction(name: string, email: string, password: string, confirmPassword: string, role: string, tou: boolean) {
     try {
         const response = await axios.post(
             `${API_BASE_URL}/api/v1/auth/register`, {
@@ -80,7 +80,8 @@ export async function registerAction(name: string, email: string, password: stri
             email: email,
             password: password,
             confirm_password: confirmPassword,
-            user_tier_requested: role
+            user_tier_requested: role,
+            tou_accepted: tou
         },
             { headers: { "Content-Type": "application/json" } }
         );

@@ -6,7 +6,7 @@ import { useAppSelector } from '@/store/hooks';
 function CreditBar({ label, remaining, total }: { label: string; remaining: number; total: number }) {
     const [labelWidth, setLabelWidth] = useState(0);
     const labelRef = useRef<HTMLDivElement>(null);
-    
+
     const pct = total > 0 ? Math.min((remaining / total) * 100, 100) : 0;
     const barColor = pct > 60 ? 'bg-green-500' : pct > 30 ? 'bg-yellow-400' : 'bg-red-500';
     const textColor = pct > 60 ? 'text-green-500' : pct > 30 ? 'text-yellow-400' : 'text-red-500';
@@ -30,7 +30,7 @@ function CreditBar({ label, remaining, total }: { label: string; remaining: numb
                 </div>
             </div>
             <div className={`text-sm font-semibold tabular-nums ${textColor}`}>
-                {remaining >= 1000 ? `${(remaining / 1000).toFixed(1)}k` : remaining}
+                {remaining}
             </div>
         </div>
     );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { X, Copy, AlertCircle, Info } from 'lucide-react';
+import { X, Copy, AlertCircle, Info, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCompanyAction } from './searchServices';
 import { CompanyData } from '@/types/search';
@@ -117,6 +117,17 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                     <span className="rounded-pill bg-muted px-2 py-0.5 text-xs">{companyData?.year_founded}</span>
                                 )}
                             </div>
+                            {companyData?.last_enriched_at && <p className='text-xs'>Last enriched at {companyData?.last_enriched_at}</p>}
+                            {/* <div className="mt-2 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    disabled={enriching}
+                                    onClick={handleEnrich}
+                                    className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50")}
+                                >
+                                    <Zap className="h-4 w-4" /> {enriching ? 'Enriching...' : 'Enrich'}
+                                </button>
+                            </div> */}
                         </div>
                         <button onClick={onClose} className="rounded-md p-1 hover:bg-accent"><X className="h-5 w-5" /></button>
                     </div>

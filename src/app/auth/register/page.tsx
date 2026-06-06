@@ -48,7 +48,7 @@ export default function RegisterPage() {
                 setError('');
                 setServerErrors({});
                 setLoading(true);
-                const { data, errors } = await registerAction(values.name, values.email, values.password, values.confirm, values.role);
+                const { data, errors } = await registerAction(values.name, values.email, values.password, values.confirm, values.role, values.touAccepted);
                 setLoading(false);
                 if (errors || !data) {
                     setOnboarding(false);

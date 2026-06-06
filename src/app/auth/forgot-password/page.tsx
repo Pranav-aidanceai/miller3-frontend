@@ -85,7 +85,7 @@ function OtpInput({ value, onChange, disabled }: { value: string; onChange: (otp
           autoComplete={i === 0 ? 'one-time-code' : 'off'}
           maxLength={1}
           disabled={disabled}
-          className="h-12 w-full rounded-md border border-input bg-background text-center text-lg font-medium outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+          className="h-16 w-full rounded-md border border-input bg-background text-center text-lg font-medium outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       ))}
     </div>
