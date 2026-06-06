@@ -100,6 +100,7 @@ export interface CompanyData {
   enrichment_status: 'unenriched' | 'enriched' | 'pending';
   enrichment_source: string | null;
   last_enriched_at: string | null;
+  last_enriched_label: string,
   field_completeness_pct: number | null;
   created_at: string;
   updated_at: string;

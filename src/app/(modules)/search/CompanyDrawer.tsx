@@ -98,9 +98,9 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-2xl bg-card border-l border-border overflow-auto animate-slide-in-right">
+            <div className="relative w-full max-w-2xl h-[90vh] max-h-[90vh] bg-card border border-border rounded-lg shadow-xl overflow-auto animate-in fade-in zoom-in-95 duration-200">
                 <div className="sticky top-0 z-10 bg-card border-b border-border p-6">
                     <div className="flex items-start justify-between">
                         <div>
@@ -117,7 +117,7 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                     <span className="rounded-pill bg-muted px-2 py-0.5 text-xs">{companyData?.year_founded}</span>
                                 )}
                             </div>
-                            {companyData?.last_enriched_at && <p className='text-xs'>Last enriched at {companyData?.last_enriched_at}</p>}
+                            {(companyData?.last_enriched_at || companyData?.last_enriched_label) && <p className='text-xs mt-2 text-red-500'>{companyData?.last_enriched_label} {companyData?.last_enriched_at}</p>}
                             {/* <div className="mt-2 flex flex-wrap gap-2">
                                 <button
                                     type="button"

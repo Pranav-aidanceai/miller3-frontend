@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { getSimilarCompanyAction } from './searchServices';
 import { CompanyData } from '@/types/search';
@@ -15,7 +15,8 @@ export default function SimilarPage({ companyId, handleFetch }: SimilarPageProps
     const [companyData, setCompanyData] = useState<CompanyData[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
-    const fetchCompanies = async (cursorValue: string | null = null) => {
+    const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
+        if (companyData.length > 0) { return; }
         setIsLoading(true);
         try {
             const payload = {
@@ -30,11 +31,11 @@ export default function SimilarPage({ companyId, handleFetch }: SimilarPageProps
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [])
 
     useEffect(() => {
         fetchCompanies(null);
-    }, [companyId, fetchCompanies]);
+    }, [fetchCompanies]);
 
     // const handleNext = () => {
     //     if (!hasNextPage) return;
