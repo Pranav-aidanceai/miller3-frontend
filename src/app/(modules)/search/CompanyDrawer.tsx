@@ -44,6 +44,7 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
     const handleEnrich = async () => {
         setEnriching(true);
         const payload = {
+            company_id: id,
             company_name: companyData?.company_name || '',
             location: [companyData?.city, companyData?.state, companyData?.zip_code].filter(Boolean).join(', ')
         };

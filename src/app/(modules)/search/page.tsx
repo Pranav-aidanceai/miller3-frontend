@@ -358,13 +358,13 @@ export default function SearchPage() {
             id="export-tip"
             place="bottom"
             content={role === 'FREE' ? 'Please upgrade to export search results' : 'Export search results'}
-            className="text-xs! px-2! py-11 rounded-md! bg-foreground! text-background!"
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
           />
 
           <button
             type="button"
             onClick={handleBatchEnrich}
-            disabled={selectedIds.size <=1}
+            disabled={selectedIds.size <= 1}
             className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
