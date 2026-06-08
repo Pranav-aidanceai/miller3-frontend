@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import * as Yup from 'yup';
 import { loginAction } from '@/app/auth/authServices';
 import { useAppDispatch } from '@/store/hooks';
-import { setCredentials } from '@/store/slices/authSlice';
+import { logout, setCredentials } from '@/store/slices/authSlice';
 import { ApiError } from '@/types/common';
 import TermsModal from './auth/register/TermsOfUse';
 import axios from 'axios';
@@ -156,7 +156,17 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-      {showTouModal && <TermsModal onAccept={() => handleTouAccept()} onClose={() => setShowTouModal(false)} />}
+      {showTouModal &&
+        <TermsModal
+          onAccept={() => handleTouAccept()}
+          onClose={async () => {
+            const { data } = await axios.post('/api/delete-cookie');
+            if (data?.success) {
+              dispatch(logout());
+              setShowTouModal(false);
+            }
+          }}
+        />}
     </>
   );
 }

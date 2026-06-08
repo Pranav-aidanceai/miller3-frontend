@@ -7,10 +7,9 @@ import ReactMarkdown from 'react-markdown'
 interface TermsModalProps {
   onAccept: () => void
   onClose: () => void
-  loadingProp?: boolean
 }
 
-export default function TermsModal({ onAccept, onClose, loadingProp = false }: TermsModalProps) {
+export default function TermsModal({ onAccept, onClose }: TermsModalProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(true)
@@ -109,7 +108,7 @@ export default function TermsModal({ onAccept, onClose, loadingProp = false }: T
 
         <div className="flex items-center justify-between gap-2 border-t border-input px-6 py-4">
           <p className="text-xs text-muted-foreground">
-            {scrolledToEnd ? 'You have read the full agreement.' : 'Scroll to the bottom to enable Accept.'}
+            {scrolledToEnd ? 'You have read the full agreement.' : 'Please read fully to accept.'}
           </p>
           <div className="flex gap-2">
             <button
