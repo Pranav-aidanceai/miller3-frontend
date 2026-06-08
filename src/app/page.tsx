@@ -35,6 +35,7 @@ export default function LoginPage() {
     onSubmit: async (values) => {
       formik.setErrors({});
       setError('');
+      setServerErrors({});
       setLoading(true);
       const { data, errors } = await loginAction(values.email, values.password);
       setLoading(false);
