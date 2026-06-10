@@ -20,7 +20,7 @@ export async function POST(req: Request) {
         })
 
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {

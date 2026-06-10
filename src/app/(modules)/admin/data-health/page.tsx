@@ -45,7 +45,23 @@ export default function AdminDataHealthPage() {
     };
 
     useEffect(() => {
-        fetchDataHealth();
+        let active = true;
+        (async () => {
+            try {
+                const res = await axios.get('/api/admin/data-health');
+                if (active) setData(res.data.data);
+            } catch (err: unknown) {
+                if (!active) return;
+                if (axios.isAxiosError(err)) {
+                    setError(err.response?.data?.error || 'Failed to load data health metrics');
+                } else {
+                    setError('Failed to load data health metrics');
+                }
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
     }, []);
 
     if (error) {

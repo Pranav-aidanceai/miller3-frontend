@@ -10,14 +10,13 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "react/react-in-jsx-scope": "off",
-      "no-console": "warn",
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", ignoreRestSiblings: true }],
       "@typescript-eslint/no-explicit-any": "warn",
       "no-console": ["warn"],
     },
   },
 
-  // Allow console.error in server/API files only
+  // Allow console.error / console.warn in server/API files only
   {
     files: [
       "src/app/api/**/*.ts",
@@ -27,7 +26,7 @@ const eslintConfig = defineConfig([
       "src/server/**/*.ts",
     ],
     rules: {
-      "no-console": ["warn"],
+      "no-console": ["warn", { allow: ["error", "warn"] }],
     },
   },
 

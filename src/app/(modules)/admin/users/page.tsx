@@ -19,6 +19,7 @@ interface AdminUser {
         structured: number;
         total: number;
     };
+    status: string
     exports_this_month: number;
     last_active: string | null;
 }
@@ -32,6 +33,16 @@ interface UsersResponse {
 const ROLES = ['free', 'standard', 'premium', 'admin'] as const;
 type Role = typeof ROLES[number];
 
+const STATUSES = ['active', 'inactive', 'pending', 'rejected'] as const;
+type Status = typeof STATUSES[number];
+
+const STATUS_LABELS: Record<string, string> = {
+    active: 'Active',
+    inactive: 'Inactive',
+    pending: 'Pending Approval',
+    rejected: 'Rejected',
+};
+
 const PRESET_LIMITS = [20, 50, 100] as const;
 
 const roleBadge: Record<string, string> = {
@@ -41,12 +52,20 @@ const roleBadge: Record<string, string> = {
     free: 'bg-muted text-muted-foreground',
 };
 
+const statusBadge: Record<string, string> = {
+    active: 'bg-success/10 text-success',
+    inactive: 'bg-muted text-muted-foreground',
+    pending: 'bg-warning/10 text-warning',
+    rejected: 'bg-destructive/10 text-destructive',
+};
+
 export default function AdminUsersPage() {
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(20);
     const [roleFilter, setRoleFilter] = useState<Role | null>(null);
+    const [statusFilter, setStatusFilter] = useState<Status | null>(null);
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebounce(search.trim(), 400);
     const [loading, setLoading] = useState(true);
@@ -54,6 +73,7 @@ export default function AdminUsersPage() {
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
     const [rolePopoverOpen, setRolePopoverOpen] = useState(false);
+    const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
     const [limitPopoverOpen, setLimitPopoverOpen] = useState(false);
     const [customMode, setCustomMode] = useState(false);
     const [customLimit, setCustomLimit] = useState('');
@@ -66,6 +86,7 @@ export default function AdminUsersPage() {
         try {
             const params: Record<string, string | number> = { page, limit };
             if (roleFilter) params.role = roleFilter;
+            if (statusFilter) params.status = statusFilter;
             if (debouncedSearch) params.username = debouncedSearch;
             const res = await axios.get('/api/admin/users', { params });
             const payload: UsersResponse = res.data.data;
@@ -80,21 +101,53 @@ export default function AdminUsersPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, limit, roleFilter, debouncedSearch]);
+    }, [page, limit, roleFilter, statusFilter, debouncedSearch]);
 
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        let active = true;
+        (async () => {
+            try {
+                const params: Record<string, string | number> = { page, limit };
+                if (roleFilter) params.role = roleFilter;
+                if (statusFilter) params.status = statusFilter;
+                if (debouncedSearch) params.username = debouncedSearch;
+                const res = await axios.get('/api/admin/users', { params });
+                if (!active) return;
+                const payload: UsersResponse = res.data.data;
+                setUsers(payload.users ?? []);
+                setTotal(payload.total ?? 0);
+            } catch (err: unknown) {
+                if (!active) return;
+                if (axios.isAxiosError(err)) {
+                    setError(err.response?.data?.error || 'Failed to load users');
+                } else {
+                    setError('Failed to load users');
+                }
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
+    }, [page, limit, roleFilter, statusFilter, debouncedSearch]);
 
-    // Reset to the first page whenever a new search term is applied.
-    useEffect(() => {
+    // Reset to the first page whenever a new search term is applied. Adjusting
+    // state during render (instead of in an effect) avoids a cascading re-render.
+    const [prevSearch, setPrevSearch] = useState(debouncedSearch);
+    if (debouncedSearch !== prevSearch) {
+        setPrevSearch(debouncedSearch);
         setPage(1);
-    }, [debouncedSearch]);
+    }
 
     const toggleRole = (role: Role) => {
         setPage(1);
         setRoleFilter(prev => (prev === role ? null : role));
         setRolePopoverOpen(false);
+    };
+
+    const toggleStatus = (status: Status) => {
+        setPage(1);
+        setStatusFilter(prev => (prev === status ? null : status));
+        setStatusPopoverOpen(false);
     };
 
     const applyLimit = (value: number) => {
@@ -165,6 +218,43 @@ export default function AdminUsersPage() {
                         )}
                     </PopoverContent>
                 </Popover>
+
+                {/* Status filter */}
+                <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <button
+                            className={cn(
+                                'flex items-center gap-1.5 h-10 rounded-md border px-3 text-sm cursor-pointer transition-colors',
+                                statusFilter
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-input bg-background hover:bg-accent'
+                            )}
+                        >
+                            <ListFilter className="h-4 w-4" />
+                            {statusFilter ? <span>{STATUS_LABELS[statusFilter]}</span> : 'Status'}
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-1" align="start">
+                        {STATUSES.map(status => (
+                            <button
+                                key={status}
+                                onClick={() => toggleStatus(status)}
+                                className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                            >
+                                {STATUS_LABELS[status]}
+                                {statusFilter === status && <Check className="h-4 w-4 text-primary" />}
+                            </button>
+                        ))}
+                        {statusFilter && (
+                            <button
+                                onClick={() => { setStatusFilter(null); setPage(1); setStatusPopoverOpen(false); }}
+                                className="mt-1 w-full rounded-md border-t border-border px-2 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                            >
+                                Clear
+                            </button>
+                        )}
+                    </PopoverContent>
+                </Popover>
             </div>
 
             {error && (
@@ -183,6 +273,7 @@ export default function AdminUsersPage() {
                                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Role</th>
                                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Searches Today</th>
                                 <th className="px-4 py-3 text-right font-medium text-muted-foreground">Exports (this month)</th>
+                                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                                 <th className="px-4 py-3 text-left font-medium text-muted-foreground">Last Active</th>
                             </tr>
                         </thead>
@@ -223,6 +314,7 @@ export default function AdminUsersPage() {
                                         <td className="px-4 py-3"><span className={cn('rounded-pill px-2 py-0.5 text-xs font-medium capitalize', roleBadge[u.role])}>{u.role}</span></td>
                                         <td className="px-4 py-3 text-right">{u.searches_today.total}</td>
                                         <td className="px-4 py-3 text-right">{u.exports_this_month}</td>
+                                        <td className="px-4 py-3"><span className={cn('rounded-pill px-2 py-0.5 text-xs font-medium', statusBadge[u.status] ?? 'bg-muted text-muted-foreground')}>{STATUS_LABELS[u.status] ?? u.status}</span></td>
                                         <td className="px-4 py-3 text-xs text-muted-foreground">{u.last_active ? new Date(u.last_active).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
                                     </tr>
                                 ))
@@ -319,7 +411,12 @@ export default function AdminUsersPage() {
             )}
 
             {selectedUserId && (
-                <UserDetailModal userId={selectedUserId} onClose={() => setSelectedUserId(null)} onUpdated={fetchUsers} />
+                <UserDetailModal
+                    userId={selectedUserId}
+                    status={users.find(u => u.id === selectedUserId)?.status}
+                    onClose={() => setSelectedUserId(null)}
+                    onUpdated={fetchUsers}
+                />
             )}
         </div>
     );

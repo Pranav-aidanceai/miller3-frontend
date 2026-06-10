@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
-import { X, Copy, AlertCircle, Info, Zap } from 'lucide-react';
+import { X, Copy, AlertCircle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCompanyAction } from './searchServices';
 import { CompanyData } from '@/types/search';
@@ -11,11 +12,81 @@ import { ApiErrorResponse } from '@/types/common';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 
+// Leaflet relies on `window`, so load the map only on the client.
+const LocationMap = dynamic(() => import('./LocationMap'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex h-72 w-full items-center justify-center rounded-lg border border-border bg-muted/30">
+            <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+    ),
+});
+
+/**
+ * Renders a field row. If the field key is present in `notAccessible`,
+ * the value is replaced with masked "xxxx" text and an upgrade tooltip is shown.
+ */
+function Field({
+    label,
+    value,
+    mono,
+    fieldKey,
+    notAccessible,
+}: {
+    label: string;
+    value: string | number | null | undefined;
+    mono?: boolean;
+    fieldKey?: string;
+    notAccessible?: string[];
+}) {
+    const isLocked = fieldKey !== undefined && notAccessible?.includes(fieldKey);
+
+    // Unique tooltip anchor id per field to avoid conflicts
+    const tooltipId = `upgrade-tooltip-${fieldKey ?? label.replace(/\s+/g, '-').toLowerCase()}`;
+
+    return (
+        <div className="flex justify-between py-2 border-b border-border">
+            <span className="text-sm text-muted-foreground">{label}</span>
+
+            {isLocked ? (
+                <span className="flex items-center gap-1.5">
+                    <span
+                        className={cn(
+                            'text-sm font-medium text-right select-none tracking-widest text-muted-foreground/60',
+                            mono && 'font-mono'
+                        )}
+                    >
+                        ••••
+                    </span>
+                    {/* Info icon — tooltip anchor */}
+                    <span
+                        data-tooltip-id={tooltipId}
+                        data-tooltip-content="Please upgrade to see this field"
+                        className="inline-flex items-center cursor-pointer text-muted-foreground hover:text-primary transition-colors"
+                        aria-label="Upgrade to view this field"
+                    >
+                        <Info className="h-3.5 w-3.5" />
+                    </span>
+                    <Tooltip
+                        id={tooltipId}
+                        place="left"
+                        className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+                    />
+                </span>
+            ) : (
+                <span className={cn('text-sm font-medium text-right', mono && 'font-mono')}>
+                    {value || 'NA'}
+                </span>
+            )}
+        </div>
+    );
+}
+
 export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
 
     const [tab, setTab] = useState<'overview' | 'similar' | 'location' | 'activity'>('overview');
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const fetchCompany = async (id: string) => {
@@ -32,70 +103,21 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
     };
 
     useEffect(() => {
-        if (id) {
-            fetchCompany(id);
-        }
+        if (!id) return;
+        let active = true;
+        (async () => {
+            const response = await getCompanyAction(id);
+            if (!active) return;
+            if (response.error) {
+                const errBody = response.error as ApiErrorResponse;
+                setError(errBody.detail);
+            } else {
+                setCompanyData(response.data);
+            }
+            setLoading(false);
+        })();
+        return () => { active = false; };
     }, [id]);
-
-    /**
-     * Renders a field row. If the field key is present in `not_accessible`,
-     * the value is replaced with masked "xxxx" text and an upgrade tooltip is shown.
-     */
-    const Field = ({
-        label,
-        value,
-        mono,
-        fieldKey,
-    }: {
-        label: string;
-        value: string | number | null | undefined;
-        mono?: boolean;
-        fieldKey?: string;
-    }) => {
-        const isLocked =
-            fieldKey !== undefined &&
-            companyData?.not_accessible?.includes(fieldKey);
-
-        // Unique tooltip anchor id per field to avoid conflicts
-        const tooltipId = `upgrade-tooltip-${fieldKey ?? label.replace(/\s+/g, '-').toLowerCase()}`;
-
-        return (
-            <div className="flex justify-between py-2 border-b border-border">
-                <span className="text-sm text-muted-foreground">{label}</span>
-
-                {isLocked ? (
-                    <span className="flex items-center gap-1.5">
-                        <span
-                            className={cn(
-                                'text-sm font-medium text-right select-none tracking-widest text-muted-foreground/60',
-                                mono && 'font-mono'
-                            )}
-                        >
-                            ••••
-                        </span>
-                        {/* Info icon — tooltip anchor */}
-                        <span
-                            data-tooltip-id={tooltipId}
-                            data-tooltip-content="Please upgrade to see this field"
-                            className="inline-flex items-center cursor-pointer text-muted-foreground hover:text-primary transition-colors"
-                            aria-label="Upgrade to view this field"
-                        >
-                            <Info className="h-3.5 w-3.5" />
-                        </span>
-                        <Tooltip
-                            id={tooltipId}
-                            place="left"
-                            className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-                        />
-                    </span>
-                ) : (
-                    <span className={cn('text-sm font-medium text-right', mono && 'font-mono')}>
-                        {value || 'NA'}
-                    </span>
-                )}
-            </div>
-        );
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -175,32 +197,33 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Firmographics</h3>
-                                <Field label="Legal Name"  fieldKey="company_name"    value={companyData?.company_name} />
-                                <Field label="NAICS"       fieldKey="naics_code"      value={companyData?.naics_code   ?? 'NA'} mono />
-                                <Field label="SIC"         fieldKey="sic_code"        value={companyData?.sic_code     ?? 'NA'} mono />
-                                <Field label="Employees"   fieldKey="employee_size"   value={companyData?.employee_size ?? 'NA'} />
+                                <Field notAccessible={companyData?.not_accessible} label="Legal Name"  fieldKey="company_name"    value={companyData?.company_name} />
+                                <Field notAccessible={companyData?.not_accessible} label="NAICS"       fieldKey="naics_code"      value={companyData?.naics_code   ?? 'NA'} mono />
+                                <Field notAccessible={companyData?.not_accessible} label="SIC"         fieldKey="sic_code"        value={companyData?.sic_code     ?? 'NA'} mono />
+                                <Field notAccessible={companyData?.not_accessible} label="Employees"   fieldKey="employee_size"   value={companyData?.employee_size ?? 'NA'} />
                                 <Field
+                                    notAccessible={companyData?.not_accessible}
                                     label="Revenue"
                                     fieldKey="annual_revenue"
                                     value={companyData?.annual_revenue
                                         ? `$${companyData.annual_revenue.toLocaleString()}`
                                         : 'NA'}
                                 />
-                                <Field label="Founded"     fieldKey="year_founded"    value={companyData?.year_founded} />
-                                <Field label="Ownership"   fieldKey="ownership_type"  value={companyData?.ownership_type || 'Not specified'} />
+                                <Field notAccessible={companyData?.not_accessible} label="Founded"     fieldKey="year_founded"    value={companyData?.year_founded} />
+                                <Field notAccessible={companyData?.not_accessible} label="Ownership"   fieldKey="ownership_type"  value={companyData?.ownership_type || 'Not specified'} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Contact</h3>
-                                <Field label="Phone"   fieldKey="phone"   value={companyData?.phone} />
-                                <Field label="Email"   fieldKey="email"   value={companyData?.email} />
-                                <Field label="Website" fieldKey="website" value={companyData?.website} />
+                                <Field notAccessible={companyData?.not_accessible} label="Phone"   fieldKey="phone"   value={companyData?.phone} />
+                                <Field notAccessible={companyData?.not_accessible} label="Email"   fieldKey="email"   value={companyData?.email} />
+                                <Field notAccessible={companyData?.not_accessible} label="Website" fieldKey="website" value={companyData?.website} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Location</h3>
-                                <Field label="City"    fieldKey="city"     value={companyData?.city} />
-                                <Field label="State"   fieldKey="state"    value={companyData?.state} />
-                                <Field label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
-                                <Field label="County"  fieldKey="county"   value={companyData?.county} />
+                                <Field notAccessible={companyData?.not_accessible} label="City"    fieldKey="city"     value={companyData?.city} />
+                                <Field notAccessible={companyData?.not_accessible} label="State"   fieldKey="state"    value={companyData?.state} />
+                                <Field notAccessible={companyData?.not_accessible} label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
+                                <Field notAccessible={companyData?.not_accessible} label="County"  fieldKey="county"   value={companyData?.county} />
                             </div>
                         </div>
                     )}
@@ -212,6 +235,20 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                     )}
                     {tab === 'location' && (
                         <div className="space-y-4">
+                            {companyData?.latitude != null && companyData?.longitude != null ? (
+                                <LocationMap
+                                    lat={companyData.latitude}
+                                    lng={companyData.longitude}
+                                    companyName={companyData.company_name}
+                                    address={[companyData.city, companyData.state, companyData.zip_code]
+                                        .filter(Boolean)
+                                        .join(', ')}
+                                />
+                            ) : (
+                                <div className="flex h-72 w-full items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 text-sm text-muted-foreground">
+                                    No map coordinates available for this company.
+                                </div>
+                            )}
                             <p className="text-sm">{companyData?.city}, {companyData?.state} {companyData?.zip_code}</p>
                             <p className="text-sm text-muted-foreground">{companyData?.county}</p>
                             <button

@@ -15,7 +15,7 @@ export async function GET() {
         })
 
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {
@@ -38,11 +38,10 @@ export async function GET() {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
     try {
 
         const cookieStore = await cookies();
-        const data = await request.json()
         const response = await axios.post(`${API_URL}/api/v1/auth/tou/accept`, {}, {
             headers: {
                 Authorization: `Bearer ${cookieStore.get(
@@ -58,7 +57,7 @@ export async function POST(request: Request) {
         })
 
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {

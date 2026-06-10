@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { X, Save, Loader2, Shield, Gauge } from 'lucide-react';
+import { X, Save, Loader2, Shield, Gauge, UserCheck, UserX, Ban, RotateCcw, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,6 +27,8 @@ interface GetUserResponse {
     name: string;
     email: string;
     role: string;
+    status: string;
+    rejection_reason: string | null
     role_defaults: RoleDefaults;
     custom_quotas: CustomQuotas;
     override_reason: string | null;
@@ -57,13 +59,58 @@ const QUOTA_FIELDS: { key: keyof CustomQuotas; label: string }[] = [
     { key: 'enrichment_quota_monthly', label: 'Enrichment quota (monthly)' },
 ];
 
+const STATUS_LABELS: Record<string, string> = {
+    active: 'Active',
+    inactive: 'Inactive',
+    pending: 'Pending Approval',
+    rejected: 'Rejected',
+};
+
+const statusBadge: Record<string, string> = {
+    active: 'bg-success/10 text-success',
+    inactive: 'bg-muted text-muted-foreground',
+    pending: 'bg-warning/10 text-warning',
+    rejected: 'bg-destructive/10 text-destructive',
+};
+
+type ActionKey = 'approve' | 'reject' | 'deactivate' | 'reactivate';
+
+interface ActionDef {
+    key: ActionKey;
+    label: string;
+    endpoint: string;
+    icon: typeof UserCheck;
+    variant: 'primary' | 'destructive';
+    confirm?: boolean;
+    requiresReason?: boolean;
+    reasonLabel?: string;
+    reasonPlaceholder?: string;
+    success: string;
+}
+
+const ACTIONS: Record<ActionKey, ActionDef> = {
+    approve: { key: 'approve', label: 'Accept user', endpoint: '/api/admin/approve', icon: UserCheck, variant: 'primary', success: 'User accepted' },
+    reject: { key: 'reject', label: 'Reject user', endpoint: '/api/admin/reject', icon: UserX, variant: 'destructive', confirm: true, requiresReason: true, reasonLabel: 'Reason for rejection', reasonPlaceholder: 'Explain why this user is being rejected', success: 'User rejected' },
+    deactivate: { key: 'deactivate', label: 'Deactivate user', endpoint: '/api/admin/deactivate', icon: Ban, variant: 'destructive', confirm: true, requiresReason: true, reasonLabel: 'Reason for deactivation', reasonPlaceholder: 'Explain why this user is being deactivated', success: 'User deactivated' },
+    reactivate: { key: 'reactivate', label: 'Reactivate user', endpoint: '/api/admin/reactivate', icon: RotateCcw, variant: 'primary', confirm: true, requiresReason: true, reasonLabel: 'Reason for reactivation', reasonPlaceholder: 'Explain why this user is being reactivated', success: 'User reactivated' },
+};
+
+// Which actions are available for a given account status.
+const STATUS_ACTIONS: Record<string, ActionKey[]> = {
+    pending: ['approve', 'reject'],
+    rejected: ['approve'],
+    active: ['deactivate'],
+    inactive: ['reactivate'],
+};
+
 interface UserDetailModalProps {
     userId: string;
+    status?: string;
     onClose: () => void;
     onUpdated?: () => void;
 }
 
-export default function UserDetailModal({ userId, onClose, onUpdated }: UserDetailModalProps) {
+export default function UserDetailModal({ userId, status, onClose, onUpdated }: UserDetailModalProps) {
     const [user, setUser] = useState<GetUserResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -81,6 +128,11 @@ export default function UserDetailModal({ userId, onClose, onUpdated }: UserDeta
         enrichment_quota_monthly: '',
         reason: '',
     });
+
+    const [actionLoading, setActionLoading] = useState<ActionKey | null>(null);
+    const [confirming, setConfirming] = useState<ActionKey | null>(null);
+    const [rejectReason, setRejectReason] = useState('');
+    const [rejectReasonError, setRejectReasonError] = useState(false);
 
     const fetchUser = useCallback(async () => {
         setLoading(true);
@@ -110,8 +162,35 @@ export default function UserDetailModal({ userId, onClose, onUpdated }: UserDeta
     }, [userId]);
 
     useEffect(() => {
-        fetchUser();
-    }, [fetchUser]);
+        let active = true;
+        (async () => {
+            try {
+                const res = await axios.get('/api/admin/get-user', { params: { user_id: userId } });
+                if (!active) return;
+                const data: GetUserResponse = res.data.data;
+                setUser(data);
+                setRole(data.role);
+                setOverrideEnabled(data.custom_quotas.enabled);
+                setOverrideValues({
+                    search_quota_daily: data.custom_quotas.search_quota_daily?.toString() ?? '',
+                    export_quota_daily: data.custom_quotas.export_quota_daily?.toString() ?? '',
+                    export_row_cap: data.custom_quotas.export_row_cap?.toString() ?? '',
+                    enrichment_quota_monthly: data.custom_quotas.enrichment_quota_monthly?.toString() ?? '',
+                    reason: data.override_reason ?? '',
+                });
+            } catch (err: unknown) {
+                if (!active) return;
+                if (axios.isAxiosError(err)) {
+                    setError(err.response?.data?.error || 'Failed to load user details');
+                } else {
+                    setError('Failed to load user details');
+                }
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
+    }, [userId]);
 
     const updateRole = async () => {
         if (!user || role === user.role) return;
@@ -158,6 +237,38 @@ export default function UserDetailModal({ userId, onClose, onUpdated }: UserDeta
         }
     };
 
+    const runAction = async (action: ActionDef) => {
+        if (!user) return;
+        const reason = rejectReason.trim();
+        if (action.requiresReason && !reason) {
+            setRejectReasonError(true);
+            return;
+        }
+        setActionLoading(action.key);
+        try {
+            const params: Record<string, string> = { user_id: user.id };
+            if (action.requiresReason) params.reason = reason;
+            await axios.patch(action.endpoint, null, { params });
+            toast.success(action.success);
+            onUpdated?.();
+            onClose();
+        } catch (err: unknown) {
+            const msg = axios.isAxiosError(err) ? err.response?.data?.error : null;
+            toast.error(msg || `Failed to ${action.label.toLowerCase()}`);
+            setActionLoading(null);
+            setConfirming(null);
+        }
+    };
+
+    const cancelConfirm = () => {
+        setConfirming(null);
+        setRejectReason('');
+        setRejectReasonError(false);
+    };
+
+    const effectiveStatus = user?.status ?? status;
+    const availableActions = (effectiveStatus ? STATUS_ACTIONS[effectiveStatus] ?? [] : []).map(k => ACTIONS[k]);
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
@@ -187,6 +298,11 @@ export default function UserDetailModal({ userId, onClose, onUpdated }: UserDeta
                                     <div className='flex items-center gap-2'>
                                         <p className="text-lg font-bold truncate">{user.name}</p>
                                         <p className={cn('rounded-md px-2 py-0.5 text-xs font-medium capitalize', roleBadge[user.role])}>{user.role}</p>
+                                        {effectiveStatus && (
+                                            <p className={cn('rounded-md px-2 py-0.5 text-xs font-medium', statusBadge[effectiveStatus] ?? 'bg-muted text-muted-foreground')}>
+                                                {STATUS_LABELS[effectiveStatus] ?? effectiveStatus}
+                                            </p>
+                                        )}
                                     </div>
                                     <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                                 </div>
@@ -198,6 +314,93 @@ export default function UserDetailModal({ userId, onClose, onUpdated }: UserDeta
 
                         {/* Body */}
                         <div className="overflow-y-auto p-6 space-y-6">
+                            {/* Rejection reason */}
+                            {effectiveStatus === 'rejected' && user.rejection_reason && (
+                                <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3">
+                                    <UserX className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                                    <div>
+                                        <p className="text-xs font-semibold text-destructive">Rejection reason</p>
+                                        <p className="mt-0.5 text-sm text-foreground whitespace-pre-wrap">{user.rejection_reason}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Account actions */}
+                            {availableActions.length > 0 && (
+                                <section>
+                                    <h3 className="mb-2 text-sm font-semibold">Account actions</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {availableActions.map(action => {
+                                            const Icon = action.icon;
+                                            const busy = actionLoading === action.key;
+                                            const isConfirming = confirming === action.key;
+                                            const destructive = action.variant === 'destructive';
+                                            if (isConfirming) {
+                                                return (
+                                                    <div key={action.key} className="w-full space-y-3 rounded-md border border-border bg-muted/40 p-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+                                                            <span className="text-sm">Confirm {action.label.toLowerCase()}?</span>
+                                                        </div>
+                                                        {action.requiresReason && (
+                                                            <div>
+                                                                <label className="text-xs font-medium text-muted-foreground">
+                                                                    {action.reasonLabel ?? 'Reason'} <span className="text-destructive">*</span>
+                                                                </label>
+                                                                <textarea
+                                                                    autoFocus
+                                                                    value={rejectReason}
+                                                                    onChange={e => { setRejectReason(e.target.value); if (rejectReasonError) setRejectReasonError(false); }}
+                                                                    rows={2}
+                                                                    placeholder={action.reasonPlaceholder ?? 'Provide a reason'}
+                                                                    className={cn('mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-1 resize-none',
+                                                                        rejectReasonError ? 'border-destructive focus:ring-destructive' : 'border-input focus:ring-ring')}
+                                                                />
+                                                                {rejectReasonError && <p className="mt-1 text-xs text-destructive">Please provide a reason</p>}
+                                                            </div>
+                                                        )}
+                                                        <div className="flex justify-end gap-2">
+                                                            <button
+                                                                onClick={cancelConfirm}
+                                                                disabled={busy}
+                                                                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:opacity-40 cursor-pointer"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                            <button
+                                                                onClick={() => runAction(action)}
+                                                                disabled={busy}
+                                                                className={cn('flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40 cursor-pointer',
+                                                                    destructive ? 'bg-destructive hover:bg-destructive/90' : 'bg-primary hover:bg-primary/90')}
+                                                            >
+                                                                {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+                                                                {action.requiresReason ? action.label : 'Yes'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <button
+                                                    key={action.key}
+                                                    onClick={() => (action.confirm ? setConfirming(action.key) : runAction(action))}
+                                                    disabled={actionLoading !== null}
+                                                    className={cn(
+                                                        'flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors',
+                                                        destructive
+                                                            ? 'border border-destructive/40 text-destructive hover:bg-destructive/10'
+                                                            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                    )}
+                                                >
+                                                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+                                                    {action.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+                            )}
+
                             {/* Role */}
                             <section>
                                 <div className="mb-2 flex items-center gap-2">

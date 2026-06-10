@@ -10,14 +10,16 @@ export async function GET(request: Request) {
         const limit = searchParams.get('limit');
         const role = searchParams.get('role');
         const username = searchParams.get('username');
+        const status = searchParams.get('status')
         if (page) params.page = page;
         if (limit) params.limit = limit;
         if (role) params.role = role;
+        if (status) params.status = status;
         if (username) params.username = username;
         const response = await AXIOS.get('/api/v1/admin/users', { params });
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {

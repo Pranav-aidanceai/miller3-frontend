@@ -1,14 +1,22 @@
-import { AxiosError } from 'axios';
 import AXIOS from '@/lib/axios';
+import { AxiosError } from 'axios';
 import { NextResponse } from 'next/server';
+const API_URL = process.env.API_BASE_URL;
 
-export async function PATCH(request: Request) {
+export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const user_id = searchParams.get("user_id");
-        const reason = searchParams.get("reason");
-        const response = await AXIOS.patch(`/api/v1/admin/users/${user_id}/reactivate`, { reason });
-        return NextResponse.json({ data: response.data }, { status: 200 });
+        const params: Record<string, string> = {};
+        const company_id = searchParams.get('companyId');
+        const limit = searchParams.get('limit');
+        if (limit) params.limit = limit;
+        const response = await AXIOS.get(`${API_URL}/api/v1/companies/${company_id}/similar/map`, { params });
+        return NextResponse.json({
+            data: response.data
+        }, {
+            status: response.status || 200
+        })
+
     } catch (error: unknown) {
         console.error("error", error)
         if (error instanceof AxiosError) {

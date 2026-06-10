@@ -1,18 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
 import { DollarSign, Zap, Cpu, Database, ShieldAlert, Pencil, Check, X, Loader2, RefreshCw } from 'lucide-react';
 
 interface CostResponse {
-    serper_credit_balance: number;
-    serper_credit_total: number;
     hard_stop_threshold: number;
     serper: {
-        credit_balance: number;
-        credit_total: number;
-        percent_used: number;
+        serper_credits_remaining: number;
+        serper_creds_used: number;
+        serper_total_cost: number;
     };
     openai: {
         input_tokens: number;
@@ -24,7 +22,6 @@ interface CostResponse {
     };
     enrichment: {
         count: number;
-        total_spend: number;
     };
     grand_total_spend: number;
 }
@@ -40,9 +37,7 @@ export default function AdminCostsPage() {
     const [thresholdInput, setThresholdInput] = useState('');
     const [saving, setSaving] = useState(false);
 
-    const fetchCost = async () => {
-        setLoading(true);
-        setError(null);
+    const fetchCost = useCallback(async () => {
         try {
             const res = await axios.get('/api/admin/cost');
             setData(res.data.data);
@@ -55,10 +50,32 @@ export default function AdminCostsPage() {
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    const refresh = () => {
+        setLoading(true);
+        setError(null);
+        void fetchCost();
     };
 
     useEffect(() => {
-        fetchCost();
+        let active = true;
+        (async () => {
+            try {
+                const res = await axios.get('/api/admin/cost');
+                if (active) setData(res.data.data);
+            } catch (err: unknown) {
+                if (!active) return;
+                if (axios.isAxiosError(err)) {
+                    setError(err.response?.data?.error || 'Failed to load cost data');
+                } else {
+                    setError('Failed to load cost data');
+                }
+            } finally {
+                if (active) setLoading(false);
+            }
+        })();
+        return () => { active = false; };
     }, []);
 
     const startEdit = () => {
@@ -90,6 +107,9 @@ export default function AdminCostsPage() {
         }
     };
 
+    const serperTotal = data ? data.serper.serper_credits_remaining + data.serper.serper_creds_used : 0;
+    const serperPercentUsed = data && serperTotal > 0 ? (data.serper.serper_creds_used / serperTotal) * 100 : 0;
+
     return (
         <div className="p-6">
             <div className="flex items-center justify-between mb-6">
@@ -99,7 +119,7 @@ export default function AdminCostsPage() {
                 </div>
                 <button
                     type="button"
-                    onClick={fetchCost}
+                    onClick={refresh}
                     disabled={loading}
                     className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
                 >
@@ -148,12 +168,12 @@ export default function AdminCostsPage() {
                                     <Zap className="h-4 w-4 text-blue-500" />
                                 </div>
                             </div>
-                            <p className="mt-3 text-3xl font-bold text-blue-500">{data.serper.credit_balance.toLocaleString()}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">of {data.serper.credit_total.toLocaleString()} total</p>
+                            <p className="mt-3 text-3xl font-bold text-blue-500">{data.serper.serper_credits_remaining.toLocaleString()}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">of {serperTotal.toLocaleString()} total</p>
                             <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
-                                <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min(100, data.serper.percent_used)}%` }} />
+                                <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min(100, serperPercentUsed)}%` }} />
                             </div>
-                            <p className="mt-1 text-xs text-muted-foreground">{data.serper.percent_used.toFixed(1)}% used</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{serperPercentUsed.toFixed(1)}% used · {usd(data.serper.serper_total_cost)} spent</p>
                         </div>
 
                         {/* OpenAI */}
@@ -180,8 +200,8 @@ export default function AdminCostsPage() {
                                     <Database className="h-4 w-4 text-amber-500" />
                                 </div>
                             </div>
-                            <p className="mt-3 text-3xl font-bold text-amber-500">{usd(data.enrichment.total_spend)}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{data.enrichment.count.toLocaleString()} enrichments</p>
+                            <p className="mt-3 text-3xl font-bold text-amber-500">{data.enrichment.count.toLocaleString()}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">total enrichments</p>
                         </div>
                     </div>
 

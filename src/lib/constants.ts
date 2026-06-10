@@ -1,6 +1,6 @@
 import {
   Crown, Gift, User, Search, LayoutDashboard,
-  Users, AlertTriangle, DollarSign, Database, Eye, 
+  Users, DollarSign, Database,
   Sparkles, History
 } from "lucide-react";
 

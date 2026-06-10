@@ -6,10 +6,11 @@ export async function PATCH(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const user_id = searchParams.get("user_id");
-        const response = await AXIOS.patch(`/api/v1/admin/users/${user_id}/deactivate`);
+        const reason = searchParams.get("reason");
+        const response = await AXIOS.patch(`/api/v1/admin/users/${user_id}/deactivate`, { reason });
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {
@@ -29,5 +30,5 @@ export async function PATCH(request: Request) {
                 status: 500
             });
         }
-    }   
+    }
 }

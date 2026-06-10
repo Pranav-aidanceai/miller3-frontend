@@ -79,7 +79,23 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    fetchDashboard();
+    let active = true;
+    (async () => {
+      try {
+        const res = await axios.get('/api/admin/dashboard');
+        if (active) setData(res.data.data);
+      } catch (err: unknown) {
+        if (!active) return;
+        if (axios.isAxiosError(err)) {
+          setError(err.response?.data?.error || 'Failed to load dashboard data');
+        } else {
+          setError('Failed to load dashboard data');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
   }, []);
 
   return (
