@@ -119,7 +119,7 @@ export default function TermsModal({ onAccept, onClose }: TermsModalProps) {
             </button>
             <button
               onClick={onAccept}
-              disabled={!scrolledToEnd || loading}
+              disabled={!scrolledToEnd || loading || loadingProp}
               className="h-9 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               I accept

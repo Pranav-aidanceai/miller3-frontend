@@ -1,6 +1,6 @@
 import {
   Crown, Gift, User, Search, LayoutDashboard,
-  Users, AlertTriangle, DollarSign, Database, Eye, 
+  Users, DollarSign, Database,
   Sparkles, History
 } from "lucide-react";
 
@@ -19,12 +19,12 @@ export const mainNav = [
 ];
 
 export const adminNav = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/users', icon: Users, label: 'Users' },
-  { to: '/admin/errors', icon: AlertTriangle, label: 'Errors' },
-  { to: '/admin/costs', icon: DollarSign, label: 'Cost Center' },
-  { to: '/admin/data-health', icon: Database, label: 'Data Health' },
-  { to: '/admin/searches', icon: Eye, label: 'Search Oversight' },
+  // { to: '/admin/errors', icon: AlertTriangle, label: 'Errors' },
+  { to: '/admin/cost-centre', icon: DollarSign, label: 'Cost Center' },
+  { to: '/admin/data-health', icon: Database, label: 'Data Health' }
+  // { to: '/admin/searches', icon: Eye, label: 'Search Oversight' }
 ];
 
 export const roleBadgeColor: Record<string, string> = {

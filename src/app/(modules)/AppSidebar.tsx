@@ -18,7 +18,7 @@ export function AppSidebar() {
     const user = useAppSelector(state => state.auth.user)
     const role = useAppSelector(state => state.auth.role)
     const sidebarCollapsed = useAppSelector(state => state.auth.sidebarCollapsed);
-    const isAdmin = role === 'Admin';
+    const isAdmin = role === 'ADMIN';
 
     const NavItem = ({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) => {
         const active = pathName === to || (to !== '/' && pathName.startsWith(to + '/'));

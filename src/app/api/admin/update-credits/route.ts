@@ -1,24 +1,20 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import AXIOS from '@/lib/axios';
 import { NextResponse } from 'next/server';
-const API_URL = process.env.API_BASE_URL;
 
-export async function POST(req: Request) {
+export async function PATCH(request: Request) {
     try {
-        const data = await req.json();
-
+        const data = await request.json();
         const payload = {
-            email: data.email,
-            otp: data.otp
+            enabled: data.enabled,
+            search_quota_daily: data.search_quota_daily,
+            export_quota_daily: data.export_quota_daily,
+            export_row_cap: data.export_row_cap,
+            enrichment_quota_monthly: data.enrichment_quota_monthly,
+            override_reason: data.override_reason
         }
-
-        const response = await axios.post(`${API_URL}/api/v1/auth/reset-password/verify-otp`, payload);
-
-        return NextResponse.json({
-            data: response.data
-        }, {
-            status: response.status || 200
-        })
-
+        const response = await AXIOS.patch(`/api/v1/admin/users/${data?.user_id}/quotas`, payload);
+        return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
         console.error("error", error)
         if (error instanceof AxiosError) {

@@ -96,7 +96,10 @@ export interface CompanyData {
   veteran_owned: boolean | null;
   phone: string | null;
   email: string | null;
+  emails: string[];
   website: string | null;
+  latitude: number | null;
+  longitude: number | null;
   enrichment_status: 'unenriched' | 'enriched' | 'pending';
   enrichment_source: string | null;
   last_enriched_at: string | null;

@@ -1,9 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+import axios from 'axios';
 import { toast } from 'sonner';
 import { getSimilarCompanyAction } from './searchServices';
 import { CompanyData } from '@/types/search';
+import type { SimilarMapPoint } from './SimilarMap';
+
+// Leaflet relies on `window`, so load the map only on the client.
+const SimilarMap = dynamic(() => import('./SimilarMap'), {
+    ssr: false,
+    loading: () => (
+        <div className="flex h-72 w-full items-center justify-center rounded-lg border border-border bg-muted/30">
+            <div className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+    ),
+});
 
 interface SimilarPageProps {
     companyId: string;
@@ -13,29 +26,32 @@ interface SimilarPageProps {
 export default function SimilarPage({ companyId, handleFetch }: SimilarPageProps) {
 
     const [companyData, setCompanyData] = useState<CompanyData[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-
-    const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
-        if (companyData.length > 0) { return; }
-        setIsLoading(true);
-        try {
-            const payload = {
-                company_id: companyId,
-                limit: 5,
-                cursor: cursorValue
-            };
-            const response = await getSimilarCompanyAction(payload);
-            setCompanyData(response.data.results);
-        } catch (error) {
-            toast.error('Failed to fetch companies');
-        } finally {
-            setIsLoading(false);
-        }
-    }, [])
+    const [isLoading, setIsLoading] = useState(true);
+    const [mapPoints, setMapPoints] = useState<SimilarMapPoint[]>([]);
 
     useEffect(() => {
-        fetchCompanies(null);
-    }, [fetchCompanies]);
+        let active = true;
+        (async () => {
+            try {
+                const response = await getSimilarCompanyAction({ company_id: companyId, limit: 5, cursor: null });
+                if (active) setCompanyData(response.data.results);
+            } catch {
+                if (active) toast.error('Failed to fetch companies');
+            } finally {
+                if (active) setIsLoading(false);
+            }
+        })();
+        // Map is supplementary — fail quietly and just show the list.
+        (async () => {
+            try {
+                const res = await axios.get('/api/similar-map', { params: { companyId, limit: 5 } });
+                if (active) setMapPoints(res.data.data ?? []);
+            } catch {
+                // ignore
+            }
+        })();
+        return () => { active = false; };
+    }, [companyId]);
 
     // const handleNext = () => {
     //     if (!hasNextPage) return;
@@ -55,6 +71,11 @@ export default function SimilarPage({ companyId, handleFetch }: SimilarPageProps
 
     return (
         <div className="flex-1 overflow-auto">
+            {mapPoints.length > 0 && (
+                <div className="mb-4">
+                    <SimilarMap points={mapPoints} onSelect={handleFetch} />
+                </div>
+            )}
             {/* <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Showing {companyData?.length} of {totalResults.toLocaleString()} results</span>
             </div> */}

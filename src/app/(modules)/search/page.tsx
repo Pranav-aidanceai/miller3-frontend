@@ -16,6 +16,51 @@ import { RootState } from '@/store/store';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateExportCredits } from '@/store/slices/authSlice';
 
+const TableSkeleton = ({ perPage }: { perPage: number }) => (
+  <tbody>
+    {Array.from({ length: perPage > 10 ? 10 : perPage }).map((_, i) => (
+      <tr key={i} className="border-b border-border">
+        <td className="px-4 py-3">
+          <div className="h-4 w-40 rounded bg-muted animate-pulse mb-1" />
+          <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+        </td>
+        <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted animate-pulse" /></td>
+        <td className="px-4 py-3 text-right"><div className="h-4 w-12 rounded bg-muted animate-pulse ml-auto" /></td>
+        <td className="px-4 py-3 text-right"><div className="h-4 w-16 rounded bg-muted animate-pulse ml-auto" /></td>
+        <td className="px-4 py-3"><div className="flex justify-center gap-1">
+          <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
+          <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
+          <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
+        </div></td>
+      </tr>
+    ))}
+  </tbody>
+);
+
+const CardSkeleton = () => (
+  <>
+    {Array.from({ length: 6 }).map((_, i) => (
+      <div key={i} className="flex flex-col rounded-lg border border-border bg-card p-4 gap-3">
+        <div className="flex items-start justify-between">
+          <div className="h-10 w-10 rounded-lg bg-muted animate-pulse" />
+          <div className="flex gap-1">
+            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
+            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
+            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
+          </div>
+        </div>
+        <div className="h-4 w-36 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-24 rounded bg-muted animate-pulse" />
+        <div className="flex gap-2">
+          <div className="h-4 w-14 rounded-full bg-muted animate-pulse" />
+          <div className="h-4 w-16 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-14 rounded bg-muted animate-pulse" />
+        </div>
+      </div>
+    ))}
+  </>
+);
+
 export default function SearchPage() {
 
   const initialFilters = {
@@ -52,76 +97,110 @@ export default function SearchPage() {
   const [hasNextPage, setHasNextPage] = useState<string | null>(null);
   const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [currentCursor, setCurrentCursor] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [exportPayload, setExportPayload] = useState<ExportPayload | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
   const [isExporting, setIsExporting] = useState(false);
   const searchQuery = useDebounce(nameQ, 500).toLowerCase();
 
+  // Builds the search + export payloads for a given cursor. Pure (no state),
+  // so it can be shared by the effect and the pager handlers.
+  const buildSearch = useCallback((cursorValue: string | null): { payload: CompanySearchPayload; exportPayload: ExportPayload } => {
+    const {
+      stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
+      minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
+      demoFilter, hasEmail, hasPhone, hasWebsite
+    } = appliedFilters;
+
+    const payload: CompanySearchPayload = {
+      search_text: searchQuery || null,
+      state: stateFilter.length > 0 ? stateFilter : null,
+      city: cityFilter || null,
+      county: countyFilter || null,
+      naics_code: naicsFilter || null,
+      sic_code: sicFilter || null,
+      employee_size_min: minEmp ? parseInt(minEmp) : null,
+      employee_size_max: maxEmp ? parseInt(maxEmp) : null,
+      annual_revenue_min: minRev ? Number(minRev) : null,
+      annual_revenue_max: maxRev ? Number(maxRev) : null,
+      year_founded_min: minYear ? Number(minYear) : null,
+      year_founded_max: maxYear ? Number(maxYear) : null,
+      ownership_type: null,
+      minority_owned: demoFilter.includes('Minority-Owned') || null,
+      women_owned: demoFilter.includes('Women-Owned') || null,
+      veteran_owned: demoFilter.includes('Veteran-Owned') || null,
+      enrichment_status: null,
+      sort_by: sortBy,
+      sort_order: 'asc',
+      limit: perPage,
+      cursor: cursorValue,
+      has_mobile_number: hasPhone ? true : null,
+      has_email: hasEmail ? true : null,
+      has_website: hasWebsite ? true : null
+    };
+
+    const { limit, cursor, ...payloadWithoutPagination } = payload;
+    const exportPayload: ExportPayload = {
+      ...payloadWithoutPagination,
+      format: 'csv',
+      row_limit: limit
+    };
+    return { payload, exportPayload };
+  }, [searchQuery, perPage, appliedFilters, sortBy]);
+
   const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
     setIsLoading(true);
     try {
-      const {
-        stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
-        minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
-        demoFilter, hasEmail, hasPhone, hasWebsite
-      } = appliedFilters;
-
-      const payload: CompanySearchPayload = {
-        search_text: searchQuery || null,
-        state: stateFilter.length > 0 ? stateFilter : null,
-        city: cityFilter || null,
-        county: countyFilter || null,
-        naics_code: naicsFilter || null,
-        sic_code: sicFilter || null,
-        employee_size_min: minEmp ? parseInt(minEmp) : null,
-        employee_size_max: maxEmp ? parseInt(maxEmp) : null,
-        annual_revenue_min: minRev ? Number(minRev) : null,
-        annual_revenue_max: maxRev ? Number(maxRev) : null,
-        year_founded_min: minYear ? Number(minYear) : null,
-        year_founded_max: maxYear ? Number(maxYear) : null,
-        ownership_type: null,
-        minority_owned: demoFilter.includes('Minority-Owned') || null,
-        women_owned: demoFilter.includes('Women-Owned') || null,
-        veteran_owned: demoFilter.includes('Veteran-Owned') || null,
-        enrichment_status: null,
-        sort_by: sortBy,
-        sort_order: 'asc',
-        limit: perPage,
-        cursor: cursorValue,
-        has_mobile_number: hasPhone ? true : null,
-        has_email: hasEmail ? true : null,
-        has_website: hasWebsite ? true : null
-      };
-
-      const { limit, cursor, ...payloadWithoutPagination } = payload;
-      const exportPayload: ExportPayload = {
-        ...payloadWithoutPagination,
-        format: 'csv',
-        row_limit: limit
-      };
+      const { payload, exportPayload } = buildSearch(cursorValue);
       setExportPayload(exportPayload);
-
       const response = await searchAction(payload);
       setCompanies(response.data.results);
       setTotalResults(response.data.total);
       setHasNextPage(response.data.next_cursor || null);
       setTotalPages(response.data.total_pages);
       setNotAccessibleFields(response.data.not_accessible);
-    } catch (error) {
+    } catch {
       toast.error('Failed to fetch companies');
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, perPage, appliedFilters, sortBy]);
+  }, [buildSearch]);
 
-  useEffect(() => {
+  // Reset pagination (and show loading) whenever the query inputs change.
+  // Adjusting state during render instead of in an effect avoids cascading renders.
+  const queryKey = JSON.stringify([searchQuery, sortBy, perPage, appliedFilters]);
+  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
+  if (queryKey !== prevQueryKey) {
+    setPrevQueryKey(queryKey);
     setCursorStack([]);
     setCurrentCursor(null);
     setCurrentPage(1);
-    fetchCompanies(null);
-  }, [searchQuery, sortBy, perPage, appliedFilters, fetchCompanies]);
+    setIsLoading(true);
+  }
+
+  // Fetch the first page whenever the query inputs change.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { payload, exportPayload } = buildSearch(null);
+        const response = await searchAction(payload);
+        if (!active) return;
+        setExportPayload(exportPayload);
+        setCompanies(response.data.results);
+        setTotalResults(response.data.total);
+        setHasNextPage(response.data.next_cursor || null);
+        setTotalPages(response.data.total_pages);
+        setNotAccessibleFields(response.data.not_accessible);
+      } catch {
+        if (active) toast.error('Failed to fetch companies');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [buildSearch]);
 
   const handleExport = async () => {
     if (!exportPayload) {
@@ -341,51 +420,6 @@ export default function SearchPage() {
     );
   };
 
-  const TableSkeleton = () => (
-    <tbody>
-      {Array.from({ length: perPage > 10 ? 10 : perPage }).map((_, i) => (
-        <tr key={i} className="border-b border-border">
-          <td className="px-4 py-3">
-            <div className="h-4 w-40 rounded bg-muted animate-pulse mb-1" />
-            <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-          </td>
-          <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted animate-pulse" /></td>
-          <td className="px-4 py-3 text-right"><div className="h-4 w-12 rounded bg-muted animate-pulse ml-auto" /></td>
-          <td className="px-4 py-3 text-right"><div className="h-4 w-16 rounded bg-muted animate-pulse ml-auto" /></td>
-          <td className="px-4 py-3"><div className="flex justify-center gap-1">
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-          </div></td>
-        </tr>
-      ))}
-    </tbody>
-  );
-
-  const CardSkeleton = () => (
-    <>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex flex-col rounded-lg border border-border bg-card p-4 gap-3">
-          <div className="flex items-start justify-between">
-            <div className="h-10 w-10 rounded-lg bg-muted animate-pulse" />
-            <div className="flex gap-1">
-              <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-              <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-              <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-            </div>
-          </div>
-          <div className="h-4 w-36 rounded bg-muted animate-pulse" />
-          <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-          <div className="flex gap-2">
-            <div className="h-4 w-14 rounded-full bg-muted animate-pulse" />
-            <div className="h-4 w-16 rounded bg-muted animate-pulse" />
-            <div className="h-4 w-14 rounded bg-muted animate-pulse" />
-          </div>
-        </div>
-      ))}
-    </>
-  );
-
   return (
     <div className="flex gap-6">
       <Filters
@@ -466,7 +500,7 @@ export default function SearchPage() {
                     <th className="px-4 py-3 text-center font-medium text-muted-foreground">Contact</th>
                   </tr>
                 </thead>
-                {isLoading ? <TableSkeleton /> : (
+                {isLoading ? <TableSkeleton perPage={perPage} /> : (
                   <tbody>
                     {companies.length === 0 ? (
                       <tr>

@@ -11,6 +11,8 @@ import { useAppDispatch } from '@/store/hooks';
 import { logout, setCredentials } from '@/store/slices/authSlice';
 import { ApiError } from '@/types/common';
 import TermsModal from './auth/register/TermsOfUse';
+import ApprovalPending from './auth/ApprovalPending';
+import AccountRejected from './auth/AccountRejected';
 import axios from 'axios';
 
 export default function LoginPage() {
@@ -20,6 +22,8 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [showTouModal, setShowTouModal] = useState<boolean>(false);
+  const [showApproval, setShowApprval] = useState<boolean>(false);
+  const [showRejected, setShowRejected] = useState<boolean>(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
 
@@ -37,11 +41,23 @@ export default function LoginPage() {
       setError('');
       setServerErrors({});
       setLoading(true);
+      setServerErrors({});
       const { data, errors } = await loginAction(values.email, values.password);
       setLoading(false);
       if (errors || !data) {
         const fieldErrors: Record<string, string> = {};
         errors?.forEach((err: ApiError) => {
+
+          if (err?.code === "YOUR_ACCOUNT_IS_PENDING_ADMIN_APPROVAL.") {
+            setShowApprval(true);
+            return;
+          }
+
+          if (err?.code === "ACCOUNT_REJECTED") {
+            setShowRejected(true);
+            return;
+          }
+
           if (err.field) {
             fieldErrors[err.field] = err.message;
           } else {
@@ -65,7 +81,7 @@ export default function LoginPage() {
       await axios.post('/api/auth/user-agreement', {});
       setShowTouModal(false);
       router.push('/search');
-    } catch (error) {
+    } catch {
       setError('Failed to accept the Terms of Use. Please try again.');
     }
   }

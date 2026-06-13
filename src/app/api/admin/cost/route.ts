@@ -1,19 +1,11 @@
-import axios, { AxiosError } from 'axios';
-import { cookies } from 'next/headers';
+import { AxiosError } from 'axios';
+import AXIOS from '@/lib/axios';
 import { NextResponse } from 'next/server';
-const API_URL = process.env.API_BASE_URL;
 
 export async function GET() {
     try {
-
-        const response = await axios.get(`${API_URL}/api/v1/tou`);
-
-        return NextResponse.json({
-            data: response.data
-        }, {
-            status: response.status || 200
-        })
-
+        const response = await AXIOS.get('/api/v1/admin/cost-center');
+        return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
         console.error("error", error)
         if (error instanceof AxiosError) {
@@ -38,24 +30,15 @@ export async function GET() {
     }
 }
 
-export async function POST(_request: Request) {
+export async function PATCH(request: Request) {
     try {
-
-        const cookieStore = await cookies();
-        const response = await axios.post(`${API_URL}/api/v1/auth/tou/accept`, {}, {
-            headers: {
-                Authorization: `Bearer ${cookieStore.get(
-                    'access_token'
-                )?.value}`,
-            }
-        });
-
-        return NextResponse.json({
-            data: response.data
-        }, {
-            status: response.status || 200
-        })
-
+        const { searchParams } = new URL(request.url);
+        const threshold = searchParams.get('threshold');
+        const payload = {
+            threshold: threshold
+        }
+        const response = await AXIOS.patch(`/api/v1/admin/cost-center/hard-stop`, payload);
+        return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
         console.error("error", error)
         if (error instanceof AxiosError) {

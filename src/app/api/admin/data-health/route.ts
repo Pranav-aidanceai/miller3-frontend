@@ -1,24 +1,11 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import AXIOS from '@/lib/axios';
 import { NextResponse } from 'next/server';
-const API_URL = process.env.API_BASE_URL;
 
-export async function POST(req: Request) {
+export async function GET() {
     try {
-        const data = await req.json();
-
-        const payload = {
-            email: data.email,
-            otp: data.otp
-        }
-
-        const response = await axios.post(`${API_URL}/api/v1/auth/reset-password/verify-otp`, payload);
-
-        return NextResponse.json({
-            data: response.data
-        }, {
-            status: response.status || 200
-        })
-
+        const response = await AXIOS.get('/api/v1/admin/data-health');
+        return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
         console.error("error", error)
         if (error instanceof AxiosError) {

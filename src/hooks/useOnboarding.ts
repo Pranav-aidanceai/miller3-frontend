@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Driver, driver, DriveStep } from 'driver.js';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setOnboardingSeen } from '@/store/slices/authSlice';
@@ -11,11 +11,8 @@ export function useOnboarding() {
   const dispatch = useAppDispatch();
   const router = useRouter();
   const has_seen_onboarding = useAppSelector(state => state.auth.has_seen_onboarding);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // True only after client-side hydration, without a cascading effect render.
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   const handleOnboardingComplete = async () => {
     const { errors, data } = await onboardingAction();
@@ -157,7 +154,6 @@ export function useOnboarding() {
     if (has_seen_onboarding) {
       return;
     }
-    let driverObj: Driver;
 
     const handleNavigation = async (direction: 'next' | 'prev') => {
       const currentStepIndex = driverObj.getState()?.activeIndex || 0;
@@ -196,7 +192,7 @@ export function useOnboarding() {
       }
     };
 
-    driverObj = driver({
+    const driverObj: Driver = driver({
       allowClose: true,
       overlayOpacity: 0.5,
       showProgress: true,

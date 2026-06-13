@@ -1,18 +1,16 @@
-import axios, { AxiosError } from 'axios';
+import AXIOS from '@/lib/axios';
+import { AxiosError } from 'axios';
 import { NextResponse } from 'next/server';
 const API_URL = process.env.API_BASE_URL;
 
-export async function POST(req: Request) {
+export async function GET(request: Request) {
     try {
-        const data = await req.json();
-
-        const payload = {
-            email: data.email,
-            otp: data.otp
-        }
-
-        const response = await axios.post(`${API_URL}/api/v1/auth/reset-password/verify-otp`, payload);
-
+        const { searchParams } = new URL(request.url);
+        const params: Record<string, string> = {};
+        const company_id = searchParams.get('companyId');
+        const limit = searchParams.get('limit');
+        if (limit) params.limit = limit;
+        const response = await AXIOS.get(`${API_URL}/api/v1/companies/${company_id}/similar/map`, { params });
         return NextResponse.json({
             data: response.data
         }, {
