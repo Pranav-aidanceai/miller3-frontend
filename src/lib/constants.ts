@@ -14,11 +14,10 @@ export const mainNav = [
   { to: '/search', icon: Search, label: 'Search' },
   { to: '/ai-search', icon: Sparkles, label: 'AI Search' },
   { to: '/query-history', icon: History, label: 'Query History' },
-  // { to: '/exports', icon: Download, label: 'Exports' },
-  // { to: '/enrichment', icon: Zap, label: 'Enrichment' },
 ];
 
 export const adminNav = [
+  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/users', icon: Users, label: 'Users' },
   // { to: '/admin/errors', icon: AlertTriangle, label: 'Errors' },

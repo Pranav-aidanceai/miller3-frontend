@@ -13,7 +13,7 @@ export async function PATCH(request: Request) {
         const response = await AXIOS.patch(`/api/v1/admin/users/${user_id}/role`, payload);
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
-        console.error("error", error)
+        console.log("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {

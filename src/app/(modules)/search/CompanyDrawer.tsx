@@ -3,14 +3,16 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
-import { X, Copy, AlertCircle, Info } from 'lucide-react';
+import { X, Copy, AlertCircle, Info, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCompanyAction } from './searchServices';
+import { getCompanyAction, singleEnrichAction } from './searchServices';
 import { CompanyData } from '@/types/search';
 import SimilarPage from './Similar';
 import { ApiErrorResponse } from '@/types/common';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
+import { useDispatch } from 'react-redux';
+import { updateEnrichmentCredits } from '@/store/slices/authSlice';
 
 // Leaflet relies on `window`, so load the map only on the client.
 const LocationMap = dynamic(() => import('./LocationMap'), {
@@ -139,8 +141,7 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                     <span className="rounded-pill bg-muted px-2 py-0.5 text-xs">{companyData?.year_founded}</span>
                                 )}
                             </div>
-                            {(companyData?.last_enriched_at || companyData?.last_enriched_label) && <p className='text-xs mt-2 text-red-500'>{companyData?.last_enriched_label} {companyData?.last_enriched_at}</p>}
-                            {/* <div className="mt-2 flex flex-wrap gap-2">
+                            <div className="mt-2 flex flex-wrap gap-2">
                                 <button
                                     type="button"
                                     disabled={enriching}
@@ -149,7 +150,7 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                 >
                                     <Zap className="h-4 w-4" /> {enriching ? 'Enriching...' : 'Enrich'}
                                 </button>
-                            </div> */}
+                            </div>
                         </div>
                         <button onClick={onClose} className="rounded-md p-1 hover:bg-accent"><X className="h-5 w-5" /></button>
                     </div>
@@ -197,10 +198,10 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Firmographics</h3>
-                                <Field notAccessible={companyData?.not_accessible} label="Legal Name"  fieldKey="company_name"    value={companyData?.company_name} />
-                                <Field notAccessible={companyData?.not_accessible} label="NAICS"       fieldKey="naics_code"      value={companyData?.naics_code   ?? 'NA'} mono />
-                                <Field notAccessible={companyData?.not_accessible} label="SIC"         fieldKey="sic_code"        value={companyData?.sic_code     ?? 'NA'} mono />
-                                <Field notAccessible={companyData?.not_accessible} label="Employees"   fieldKey="employee_size"   value={companyData?.employee_size ?? 'NA'} />
+                                <Field label="Legal Name" fieldKey="company_name" value={companyData?.company_name} />
+                                <Field label="NAICS" fieldKey="naics_code" value={companyData?.naics_code ?? 'NA'} mono />
+                                <Field label="SIC" fieldKey="sic_code" value={companyData?.sic_code ?? 'NA'} mono />
+                                <Field label="Employees" fieldKey="employee_size" value={companyData?.employee_size ?? 'NA'} />
                                 <Field
                                     notAccessible={companyData?.not_accessible}
                                     label="Revenue"
@@ -209,21 +210,21 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                         ? `$${companyData.annual_revenue.toLocaleString()}`
                                         : 'NA'}
                                 />
-                                <Field notAccessible={companyData?.not_accessible} label="Founded"     fieldKey="year_founded"    value={companyData?.year_founded} />
-                                <Field notAccessible={companyData?.not_accessible} label="Ownership"   fieldKey="ownership_type"  value={companyData?.ownership_type || 'Not specified'} />
+                                <Field label="Founded" fieldKey="year_founded" value={companyData?.year_founded} />
+                                <Field label="Ownership" fieldKey="ownership_type" value={companyData?.ownership_type || 'Not specified'} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Contact</h3>
-                                <Field notAccessible={companyData?.not_accessible} label="Phone"   fieldKey="phone"   value={companyData?.phone} />
-                                <Field notAccessible={companyData?.not_accessible} label="Email"   fieldKey="email"   value={companyData?.email} />
-                                <Field notAccessible={companyData?.not_accessible} label="Website" fieldKey="website" value={companyData?.website} />
+                                <Field label="Phone" fieldKey="phone" value={companyData?.phone} />
+                                <Field label="Email" fieldKey="email" value={companyData?.email} />
+                                <Field label="Website" fieldKey="website" value={companyData?.website} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Location</h3>
-                                <Field notAccessible={companyData?.not_accessible} label="City"    fieldKey="city"     value={companyData?.city} />
-                                <Field notAccessible={companyData?.not_accessible} label="State"   fieldKey="state"    value={companyData?.state} />
-                                <Field notAccessible={companyData?.not_accessible} label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
-                                <Field notAccessible={companyData?.not_accessible} label="County"  fieldKey="county"   value={companyData?.county} />
+                                <Field label="City" fieldKey="city" value={companyData?.city} />
+                                <Field label="State" fieldKey="state" value={companyData?.state} />
+                                <Field label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
+                                <Field label="County" fieldKey="county" value={companyData?.county} />
                             </div>
                         </div>
                     )}

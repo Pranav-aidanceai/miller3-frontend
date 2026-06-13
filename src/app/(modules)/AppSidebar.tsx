@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout, toggleSidebar } from '@/store/slices/authSlice';
-import { adminNav, mainNav, roleBadgeColor } from '@/lib/constants';
+import { mainNav, roleBadgeColor } from '@/lib/constants';
 import { logoutAction } from '../auth/authServices';
 import { toast } from 'sonner';
 import { usePathname, useRouter } from 'next/navigation';
@@ -16,7 +16,7 @@ export function AppSidebar() {
     const router = useRouter();
     const pathName = usePathname();
     const user = useAppSelector(state => state.auth.user)
-    const role = useAppSelector(state => state.auth.role)
+    // const role = useAppSelector(state => state.auth.role)
     const sidebarCollapsed = useAppSelector(state => state.auth.sidebarCollapsed);
     const isAdmin = role === 'ADMIN';
 
@@ -82,7 +82,7 @@ export function AppSidebar() {
                 )}
                 {mainNav.map(item => <NavItem key={item.to} {...item} />)}
 
-                {isAdmin && (
+                {/* {isAdmin && (
                     <>
                         <div className="my-3 border-t border-border" />
                         {!sidebarCollapsed && (
@@ -90,7 +90,7 @@ export function AppSidebar() {
                         )}
                         {adminNav.map(item => <NavItem key={item.to} {...item} />)}
                     </>
-                )}
+                )} */}
             </nav>
 
             <div className="border-t border-border p-3">

@@ -18,7 +18,7 @@ export async function submitQueryAction(query: string) {
                 "Authorization": `Bearer ${token}`
             }
         });
-        return { data: response.data, error: null }
+        return { data: response.data, error: null, headers: response.headers["x-ai-search-credits-remaining"] }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
             return {

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Search, X, Grid3X3, List, ChevronDown, Loader2, Info, Phone, Mail, Globe, Download } from 'lucide-react';
+import { Search, X, Grid3X3, List, ChevronDown, Loader2, Download, ArrowUpDown, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompanyDrawer } from './CompanyDrawer';
 import Filters from './Filters';
@@ -12,9 +12,12 @@ import { Company, CompanySearchPayload, ExportPayload } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 import ExportModal from './ExportModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RootState } from '@/store/store';
 import { useDispatch, useSelector } from 'react-redux';
 import { updateExportCredits } from '@/store/slices/authSlice';
+import { CardSkeleton, ContactIcons, MaskedCell, TableSkeleton } from './helper';
 
 const TableSkeleton = ({ perPage }: { perPage: number }) => (
   <tbody>
@@ -85,6 +88,10 @@ export default function SearchPage() {
   const dispatch = useDispatch();
   const [nameQ, setNameQ] = useState('');
   const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('');
+  const [sortOpen, setSortOpen] = useState(false);
+  const [pendingSortBy, setPendingSortBy] = useState('');
+  const [pendingSortOrder, setPendingSortOrder] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'card'>('card');
   const [perPage, setPerPage] = useState(25);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -98,6 +105,7 @@ export default function SearchPage() {
   const [cursorStack, setCursorStack] = useState<string[]>([]);
   const [currentCursor, setCurrentCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [exportPayload, setExportPayload] = useState<ExportPayload | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
@@ -113,32 +121,32 @@ export default function SearchPage() {
       demoFilter, hasEmail, hasPhone, hasWebsite
     } = appliedFilters;
 
-    const payload: CompanySearchPayload = {
-      search_text: searchQuery || null,
-      state: stateFilter.length > 0 ? stateFilter : null,
-      city: cityFilter || null,
-      county: countyFilter || null,
-      naics_code: naicsFilter || null,
-      sic_code: sicFilter || null,
-      employee_size_min: minEmp ? parseInt(minEmp) : null,
-      employee_size_max: maxEmp ? parseInt(maxEmp) : null,
-      annual_revenue_min: minRev ? Number(minRev) : null,
-      annual_revenue_max: maxRev ? Number(maxRev) : null,
-      year_founded_min: minYear ? Number(minYear) : null,
-      year_founded_max: maxYear ? Number(maxYear) : null,
-      ownership_type: null,
-      minority_owned: demoFilter.includes('Minority-Owned') || null,
-      women_owned: demoFilter.includes('Women-Owned') || null,
-      veteran_owned: demoFilter.includes('Veteran-Owned') || null,
-      enrichment_status: null,
-      sort_by: sortBy,
-      sort_order: 'asc',
-      limit: perPage,
-      cursor: cursorValue,
-      has_mobile_number: hasPhone ? true : null,
-      has_email: hasEmail ? true : null,
-      has_website: hasWebsite ? true : null
-    };
+      const payload: CompanySearchPayload = {
+        search_text: searchQuery || null,
+        state: stateFilter.length > 0 ? stateFilter : null,
+        city: cityFilter || null,
+        county: countyFilter || null,
+        naics_code: naicsFilter || null,
+        sic_code: sicFilter || null,
+        employee_size_min: minEmp ? parseInt(minEmp) : null,
+        employee_size_max: maxEmp ? parseInt(maxEmp) : null,
+        annual_revenue_min: minRev ? Number(minRev) : null,
+        annual_revenue_max: maxRev ? Number(maxRev) : null,
+        year_founded_min: minYear ? Number(minYear) : null,
+        year_founded_max: maxYear ? Number(maxYear) : null,
+        ownership_type: null,
+        minority_owned: demoFilter.includes('Minority-Owned') || null,
+        women_owned: demoFilter.includes('Women-Owned') || null,
+        veteran_owned: demoFilter.includes('Veteran-Owned') || null,
+        enrichment_status: null,
+        sort_by: sortBy,
+        sort_order: (sortOrder || 'asc') as 'asc' | 'desc',
+        limit: perPage,
+        cursor: cursorValue,
+        has_mobile_number: hasPhone ? true : null,
+        has_email: hasEmail ? true : null,
+        has_website: hasWebsite ? true : null
+      };
 
     const { limit, cursor, ...payloadWithoutPagination } = payload;
     const exportPayload: ExportPayload = {
@@ -165,42 +173,14 @@ export default function SearchPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [buildSearch]);
+  }, [searchQuery, perPage, appliedFilters, sortBy, sortOrder]);
 
-  // Reset pagination (and show loading) whenever the query inputs change.
-  // Adjusting state during render instead of in an effect avoids cascading renders.
-  const queryKey = JSON.stringify([searchQuery, sortBy, perPage, appliedFilters]);
-  const [prevQueryKey, setPrevQueryKey] = useState(queryKey);
-  if (queryKey !== prevQueryKey) {
-    setPrevQueryKey(queryKey);
+  useEffect(() => {
     setCursorStack([]);
     setCurrentCursor(null);
     setCurrentPage(1);
-    setIsLoading(true);
-  }
-
-  // Fetch the first page whenever the query inputs change.
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const { payload, exportPayload } = buildSearch(null);
-        const response = await searchAction(payload);
-        if (!active) return;
-        setExportPayload(exportPayload);
-        setCompanies(response.data.results);
-        setTotalResults(response.data.total);
-        setHasNextPage(response.data.next_cursor || null);
-        setTotalPages(response.data.total_pages);
-        setNotAccessibleFields(response.data.not_accessible);
-      } catch {
-        if (active) toast.error('Failed to fetch companies');
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [buildSearch]);
+    fetchCompanies(null);
+  }, [searchQuery, sortBy, sortOrder, perPage, appliedFilters, fetchCompanies]);
 
   const handleExport = async () => {
     if (!exportPayload) {
@@ -268,6 +248,35 @@ export default function SearchPage() {
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const allSelected = companies.length > 0 && companies.every(c => selectedIds.has(c.id));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) companies.forEach(c => next.delete(c.id));
+      else companies.forEach(c => next.add(c.id));
+      return next;
+    });
+  };
+
+  const handleBatchEnrich = async () => {
+    const records = companies
+      .filter(c => selectedIds.has(c.id))
+      .map(c => ({
+        company_name: c.company_name,
+        location: [c.city, c.state].filter(Boolean).join(', '),
+      }));
+    console.log({ records });
   };
 
   const handleNext = () => {
@@ -451,14 +460,72 @@ export default function SearchPage() {
             <button onClick={() => setViewMode('card')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'card' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Card view"><Grid3X3 className="h-4 w-4" /></button>
             <button onClick={() => setViewMode('table')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'table' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Table view"><List className="h-4 w-4" /></button>
           </div>
-          <div className="relative">
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 pr-8 text-sm appearance-none cursor-pointer">
-              <option value="created_at">Name A–Z</option>
-              <option value="annual_revenue">Revenue ↓</option>
-              <option value="employee_size">Employees ↓</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          </div>
+          <Popover open={sortOpen} onOpenChange={(open: boolean) => {
+            if (open) { setPendingSortBy(sortBy); setPendingSortOrder(sortOrder); }
+            setSortOpen(open);
+          }}>
+            <PopoverTrigger asChild>
+              <button className={cn(
+                'flex items-center gap-1.5 h-10 rounded-md border px-3 text-sm cursor-pointer transition-colors',
+                sortBy ? 'border-primary bg-primary/10 text-primary' : 'border-input bg-background hover:bg-accent'
+              )}>
+                <ArrowUpDown className="h-4 w-4" />
+                Sort
+                {sortBy && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0" align="end">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <span className="text-sm font-semibold">Sort</span>
+                <button onClick={() => setSortOpen(false)} className="text-muted-foreground hover:text-foreground cursor-pointer">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Sort column</label>
+                  <Select value={pendingSortBy} onValueChange={setPendingSortBy}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Select column" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="company_name">Name</SelectItem>
+                      <SelectItem value="annual_revenue">Revenue</SelectItem>
+                      <SelectItem value="employee_size">Employees</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">Sort order</label>
+                  <Select value={pendingSortOrder} onValueChange={setPendingSortOrder}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Select order" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="asc">Ascending</SelectItem>
+                      <SelectItem value="desc">Descending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+                <button
+                  onClick={() => { setPendingSortBy(''); setPendingSortOrder(''); setSortBy(''); setSortOrder(''); setSortOpen(false); }}
+                  disabled={!pendingSortBy && !pendingSortOrder && !sortBy}
+                  className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Clear filters
+                </button>
+                <button
+                  onClick={() => { setSortBy(pendingSortBy); setSortOrder(pendingSortOrder); setSortOpen(false); }}
+                  disabled={!pendingSortBy || !pendingSortOrder}
+                  className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Apply
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <button
             data-tooltip-id="export-tip"
@@ -474,8 +541,20 @@ export default function SearchPage() {
             id="export-tip"
             place="bottom"
             content={role === 'FREE' ? 'Please upgrade to export search results' : 'Export search results'}
-            className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
           />
+
+          <button
+            type="button"
+            onClick={handleBatchEnrich}
+            disabled={selectedIds.size <= 1}
+            className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
+              'disabled:cursor-not-allowed disabled:opacity-50'
+            )}
+          >
+            <Zap className="h-4 w-4" />Batch Enrich{selectedIds.size > 1 && ` (${selectedIds.size})`}
+          </button>
+
         </div>
 
         {/* Results count */}
@@ -493,6 +572,14 @@ export default function SearchPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 cursor-pointer accent-primary"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">NAICS</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Employees</th>
@@ -504,7 +591,7 @@ export default function SearchPage() {
                   <tbody>
                     {companies.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-16 text-center text-muted-foreground">
+                        <td colSpan={6} className="py-16 text-center text-muted-foreground">
                           <p className="text-lg font-medium">No companies match your filters</p>
                           <p className="mt-1 text-sm">Try loosening your criteria or switching to AI Search</p>
                         </td>
@@ -512,6 +599,14 @@ export default function SearchPage() {
                     ) : companies.map(c => (
                       <tr key={c.id} onClick={() => setSelectedCompany(c)}
                         className="border-b border-border cursor-pointer transition-colors hover:bg-accent/50">
+                        <td className="px-4 py-3 w-10" onClick={e => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(c.id)}
+                            onChange={() => toggleSelect(c.id)}
+                            className="h-4 w-4 cursor-pointer accent-primary"
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <p className="font-medium">{c.company_name}</p>
                           <p className="text-xs text-muted-foreground">{c.city}, {c.state}</p>
@@ -522,6 +617,7 @@ export default function SearchPage() {
                             displayValue={c.naics_code}
                             mono
                             tooltipPlace="right"
+                            notAccessibleFields={notAccessibleFields}
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -530,6 +626,7 @@ export default function SearchPage() {
                             displayValue={c.employee_size != null ? c.employee_size.toLocaleString() : null}
                             align="right"
                             tooltipPlace="top"
+                            notAccessibleFields={notAccessibleFields}
                           />
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -538,10 +635,11 @@ export default function SearchPage() {
                             displayValue={c.annual_revenue != null ? `$${c.annual_revenue.toLocaleString()}` : null}
                             align="right"
                             tooltipPlace="top"
+                            notAccessibleFields={notAccessibleFields}
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex justify-center"><ContactIcons c={c} /></div>
+                          <div className="flex justify-center"><ContactIcons c={c} notAccessibleFields={notAccessibleFields} /></div>
                         </td>
                       </tr>
                     ))}
@@ -560,41 +658,54 @@ export default function SearchPage() {
                 <p className="text-lg font-medium">No companies match your filters</p>
               </div>
             ) : companies.map(c => (
-              <button type="button" key={c.id} onClick={() => setSelectedCompany(c)}
+              <div key={c.id} onClick={() => setSelectedCompany(c)}
                 className="flex flex-col rounded-lg border border-border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-md cursor-pointer">
                 <div className="flex items-start justify-between">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
                     {c.company_name.charAt(0)}
                   </div>
-                  <ContactIcons c={c} />
+                  <div onClick={e => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(c.id)}
+                      onChange={() => toggleSelect(c.id)}
+                      className="h-4 w-4 cursor-pointer accent-primary"
+                    />
+                  </div>
                 </div>
                 <p className="mt-3 font-semibold">{c.company_name}</p>
                 <p className="text-xs text-muted-foreground">{c.city}, {c.state}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-pill bg-muted px-2 py-0.5 text-[10px]">
-                    <MaskedCell
-                      fieldKey="naics_code"
-                      displayValue={c.naics_code}
-                      mono
-                      tooltipPlace="bottom"
-                    />
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    <MaskedCell
-                      fieldKey="employee_size"
-                      displayValue={c.employee_size != null ? c.employee_size.toLocaleString() : null}
-                      tooltipPlace="bottom"
-                    />
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    <MaskedCell
-                      fieldKey="annual_revenue"
-                      displayValue={c.annual_revenue != null ? `$${c.annual_revenue.toLocaleString()}` : null}
-                      tooltipPlace="bottom"
-                    />
-                  </span>
+                <div className="mt-3 flex flex-wrap items-center justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-pill bg-muted px-2 py-0.5 text-[10px]">
+                      <MaskedCell
+                        fieldKey="naics_code"
+                        displayValue={c.naics_code}
+                        mono
+                        tooltipPlace="bottom"
+                        notAccessibleFields={notAccessibleFields}
+                      />
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      <MaskedCell
+                        fieldKey="employee_size"
+                        displayValue={c.employee_size != null ? c.employee_size.toLocaleString() : null}
+                        tooltipPlace="bottom"
+                        notAccessibleFields={notAccessibleFields}
+                      />
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      <MaskedCell
+                        fieldKey="annual_revenue"
+                        displayValue={c.annual_revenue != null ? `$${c.annual_revenue.toLocaleString()}` : null}
+                        tooltipPlace="bottom"
+                        notAccessibleFields={notAccessibleFields}
+                      />
+                    </span>
+                  </div>
+                  <ContactIcons c={c} notAccessibleFields={notAccessibleFields} />
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}

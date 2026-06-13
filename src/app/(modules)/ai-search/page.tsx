@@ -6,6 +6,9 @@ import { getTemplateAction, submitQueryAction } from './aisearch-services';
 import { ApiError } from '@/types/common';
 import { useFormik } from 'formik';
 import { CompanyDrawer } from '../search/CompanyDrawer';
+import { useSearchParams} from 'next/navigation';
+import { useDispatch } from 'react-redux';
+import { updateAiSearchCredits } from "@/store/slices/authSlice"
 
 type Template = {
   id: number;
@@ -24,6 +27,9 @@ type AIResult = {
 
 export default function AISearchPage() {
 
+  const dispatch = useDispatch();
+  const searchParams = useSearchParams();
+  const q = searchParams.get('q');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +62,15 @@ export default function AISearchPage() {
       query: '',
     },
     onSubmit: async (values) => {
+      console.log("api called")
       setResults([]);
       setGeneratedSql(null);
       setThinking(true);
       setError(null);
       const query = values.query.trim();
       formik.resetForm();
-      const { data, errors } = await submitQueryAction(query);
+      const { data, errors, headers } = await submitQueryAction(query);
+      dispatch(updateAiSearchCredits(headers))
       if (errors) {
         setThinking(false);
         errors.forEach((err: { error: ApiError }) => {
@@ -76,9 +84,16 @@ export default function AISearchPage() {
     }
   })
 
+  useEffect(() => {
+    if (q) {
+      formik.setValues({ query: q });
+      formik.handleSubmit();
+    }
+  }, [q])
+
   return (
-    <div className='w-full h-full flex justify-center'>
-      <div className="mx-auto max-w-4xl relative top-2/12">
+    <div className='w-full h-full flex justify-center max-h-[90vh] overflow-auto py-10 px-5'>
+      <div className="mx-auto max-w-7xl max-h-5/6">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold">AI Search</h1>
           <p className="text-muted-foreground mt-1">Describe what you&apos;re looking for in plain English</p>
@@ -94,14 +109,18 @@ export default function AISearchPage() {
             placeholder="e.g. Find companies in the software industry with revenue greater than $10M"
             className="w-full min-w-4xl rounded-lg border border-input bg-background p-4 pr-24 text-sm outline-none focus:ring-2 focus:ring-ring resize-none min-h-20"
             rows={3}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }}
-            disabled
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                formik.handleSubmit();
+              }
+            }}
           />
           <button
             type="button"
+            disabled={formik.values.query.trim() === '' || thinking}
             data-tour="ai-search-button"
             className="absolute right-3 bottom-3 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
-            disabled
             onClick={() => formik.handleSubmit()}
           >
             <Sparkles className="h-4 w-4" /> Search
@@ -117,7 +136,7 @@ export default function AISearchPage() {
           {templates.map(template => (
             <button
               key={template.id}
-              disabled
+              disabled={thinking}
               onClick={() => {
                 formik.setValues({ query: template.query })
                 formik.handleSubmit();
@@ -147,7 +166,7 @@ export default function AISearchPage() {
 
         {/* Results */}
         {results.length > 0 && (
-          <div className="mt-6 animate-fade-in">
+          <div className="mt-6 animate-fade-in mb-4">
             <button onClick={() => setShowSql(!showSql)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
               {showSql ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               Generated SQL

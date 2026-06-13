@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
     try {
-        const response = await AXIOS.get('/api/v1/admin/data-health');
+        const response = await AXIOS.get('/api/v1/query-history/me');
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
         console.log("error", error)
