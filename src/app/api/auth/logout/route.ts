@@ -4,7 +4,7 @@ import AXIOS from '@/lib/axios';
 const expiredCookie = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict' as const,
+    sameSite: 'lax' as const,
     path: '/',
     maxAge: 0,
 };
