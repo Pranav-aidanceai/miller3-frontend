@@ -1,4 +1,5 @@
 import { refreshTokenAction } from "@/app/auth/authServices";
+import { cookies } from "next/headers";
 import axios from "axios";
 
 const API_URL = process.env.API_BASE_URL;
@@ -9,6 +10,15 @@ const AXIOS = axios.create({
     "Content-Type": "application/json",
   },
   withCredentials: true,
+});
+
+AXIOS.interceptors.request.use(async (config) => {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("access_token")?.value;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 AXIOS.interceptors.response.use(
