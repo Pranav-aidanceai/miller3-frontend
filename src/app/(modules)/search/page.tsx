@@ -19,51 +19,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { updateExportCredits } from '@/store/slices/authSlice';
 import { CardSkeleton, ContactIcons, MaskedCell, TableSkeleton } from './helper';
 
-const TableSkeleton = ({ perPage }: { perPage: number }) => (
-  <tbody>
-    {Array.from({ length: perPage > 10 ? 10 : perPage }).map((_, i) => (
-      <tr key={i} className="border-b border-border">
-        <td className="px-4 py-3">
-          <div className="h-4 w-40 rounded bg-muted animate-pulse mb-1" />
-          <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-        </td>
-        <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted animate-pulse" /></td>
-        <td className="px-4 py-3 text-right"><div className="h-4 w-12 rounded bg-muted animate-pulse ml-auto" /></td>
-        <td className="px-4 py-3 text-right"><div className="h-4 w-16 rounded bg-muted animate-pulse ml-auto" /></td>
-        <td className="px-4 py-3"><div className="flex justify-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-          <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-          <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-        </div></td>
-      </tr>
-    ))}
-  </tbody>
-);
-
-const CardSkeleton = () => (
-  <>
-    {Array.from({ length: 6 }).map((_, i) => (
-      <div key={i} className="flex flex-col rounded-lg border border-border bg-card p-4 gap-3">
-        <div className="flex items-start justify-between">
-          <div className="h-10 w-10 rounded-lg bg-muted animate-pulse" />
-          <div className="flex gap-1">
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-          </div>
-        </div>
-        <div className="h-4 w-36 rounded bg-muted animate-pulse" />
-        <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-        <div className="flex gap-2">
-          <div className="h-4 w-14 rounded-full bg-muted animate-pulse" />
-          <div className="h-4 w-16 rounded bg-muted animate-pulse" />
-          <div className="h-4 w-14 rounded bg-muted animate-pulse" />
-        </div>
-      </div>
-    ))}
-  </>
-);
-
 export default function SearchPage() {
 
   const initialFilters = {
@@ -112,8 +67,6 @@ export default function SearchPage() {
   const [isExporting, setIsExporting] = useState(false);
   const searchQuery = useDebounce(nameQ, 500).toLowerCase();
 
-  // Builds the search + export payloads for a given cursor. Pure (no state),
-  // so it can be shared by the effect and the pager handlers.
   const buildSearch = useCallback((cursorValue: string | null): { payload: CompanySearchPayload; exportPayload: ExportPayload } => {
     const {
       stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
@@ -155,7 +108,7 @@ export default function SearchPage() {
       row_limit: limit
     };
     return { payload, exportPayload };
-  }, [searchQuery, perPage, appliedFilters, sortBy]);
+  }, [searchQuery, perPage, appliedFilters, sortBy, sortOrder]);
 
   const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
     setIsLoading(true);
@@ -173,14 +126,16 @@ export default function SearchPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, perPage, appliedFilters, sortBy, sortOrder]);
+  }, [buildSearch]);
 
   useEffect(() => {
-    setCursorStack([]);
-    setCurrentCursor(null);
-    setCurrentPage(1);
-    fetchCompanies(null);
-  }, [searchQuery, sortBy, sortOrder, perPage, appliedFilters, fetchCompanies]);
+    (async () => {
+      setCursorStack([]);
+      setCurrentCursor(null);
+      setCurrentPage(1);
+      await fetchCompanies(null);
+    })();
+  }, [fetchCompanies]);
 
   const handleExport = async () => {
     if (!exportPayload) {
@@ -276,6 +231,8 @@ export default function SearchPage() {
         company_name: c.company_name,
         location: [c.city, c.state].filter(Boolean).join(', '),
       }));
+    // TODO: wire up batch enrich endpoint with the selected records.
+    // eslint-disable-next-line no-console
     console.log({ records });
   };
 
@@ -295,138 +252,6 @@ export default function SearchPage() {
     setCurrentCursor(prevCursor);
     setCurrentPage(prev => prev - 1);
     fetchCompanies(prevCursor);
-  };
-
-  /**
-   * Returns masked JSX if `fieldKey` is in notAccessibleFields.
-   * If not locked: shows `displayValue` when truthy, else falls back to `fallback` (default 'NA').
-   */
-  const MaskedCell = ({
-    fieldKey,
-    displayValue,
-    mono = false,
-    align = 'left',
-    fallback = 'NA',
-    tooltipPlace = 'top',
-  }: {
-    fieldKey: string;
-    displayValue: string | number | null | undefined;
-    mono?: boolean;
-    align?: 'left' | 'right' | 'center';
-    fallback?: string;
-    tooltipPlace?: 'top' | 'bottom' | 'left' | 'right';
-  }) => {
-    const isLocked = notAccessibleFields.includes(fieldKey);
-    const tooltipId = `upgrade-tip-${fieldKey}`;
-    const alignClass = align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start';
-
-    if (isLocked) {
-      return (
-        <span className={cn('flex items-center gap-1', alignClass)}>
-          <span className={cn('tracking-widest text-muted-foreground/50 select-none', mono && 'font-mono')}>
-            ••••
-          </span>
-          <span
-            data-tooltip-id={tooltipId}
-            data-tooltip-content="Please upgrade to see this field"
-            className="inline-flex items-center text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-            aria-label="Upgrade to view this field"
-          >
-            <Info className="h-3 w-3" />
-          </span>
-          <Tooltip
-            id={tooltipId}
-            place={tooltipPlace}
-            className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-          />
-        </span>
-      );
-    }
-
-    return (
-      <span className={cn(mono && 'font-mono')}>
-        {displayValue ?? fallback}
-      </span>
-    );
-  };
-
-  const ContactIcons = ({ c }: { c: Company }) => {
-    // green = has value, yellow = locked (in notAccessibleFields), red = null/missing
-    const getState = (hasData: string | null, fieldKey: string): 'green' | 'yellow' | 'red' => {
-      if (notAccessibleFields.includes(fieldKey)) return 'yellow';
-      if (!hasData) return 'red';
-      return 'green';
-    };
-
-    const colorMap = {
-      green: 'text-emerald-500',
-      yellow: 'text-amber-400',
-      red: 'text-rose-500',
-    };
-
-    const titleMap = {
-      phone: {
-        green: 'Mobile number available',
-        yellow: 'Please upgrade to access mobile number',
-        red: 'No mobile number available',
-      },
-      email: {
-        green: 'Email available',
-        yellow: 'Please upgrade to access email',
-        red: 'No email available',
-      },
-      website: {
-        green: 'Website available',
-        yellow: 'Please upgrade to access website',
-        red: 'No website available',
-      },
-    };
-
-    const phoneState = getState(c.phone, 'phone');
-    const emailState = getState(c.email, 'email');
-    const websiteState = getState(c.website, 'website');
-
-    // Unique tooltip ids per row to avoid conflicts when multiple rows render
-    const phoneTooltipId = `contact-phone-${c.id}`;
-    const emailTooltipId = `contact-email-${c.id}`;
-    const websiteTooltipId = `contact-website-${c.id}`;
-
-    return (
-      <div className="flex items-center gap-1.5">
-        {/* Phone */}
-        <span data-tooltip-id={phoneTooltipId} className="inline-flex cursor-default">
-          <Phone className={cn('h-3.5 w-3.5', colorMap[phoneState])} strokeWidth={2} />
-        </span>
-        <Tooltip
-          id={phoneTooltipId}
-          place="top"
-          content={titleMap.phone[phoneState]}
-          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-        />
-
-        {/* Email */}
-        <span data-tooltip-id={emailTooltipId} className="inline-flex cursor-default">
-          <Mail className={cn('h-3.5 w-3.5', colorMap[emailState])} strokeWidth={2} />
-        </span>
-        <Tooltip
-          id={emailTooltipId}
-          place="top"
-          content={titleMap.email[emailState]}
-          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-        />
-
-        {/* Website / Globe */}
-        <span data-tooltip-id={websiteTooltipId} className="inline-flex cursor-default">
-          <Globe className={cn('h-3.5 w-3.5', colorMap[websiteState])} strokeWidth={2} />
-        </span>
-        <Tooltip
-          id={websiteTooltipId}
-          place="top"
-          content={titleMap.website[websiteState]}
-          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-        />
-      </div>
-    );
   };
 
   return (

@@ -2,12 +2,19 @@ import { AxiosError } from 'axios';
 import AXIOS from '@/lib/axios';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
-        const response = await AXIOS.get('/api/v1/query-history/me');
+        const { searchParams } = new URL(request.url);
+        const response = await AXIOS.get('/api/v1/query-history', {
+            params: {
+                query_type: searchParams.get('query_type') ?? undefined,
+                page: searchParams.get('page') ?? undefined,
+                limit: searchParams.get('limit') ?? undefined,
+            },
+        });
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {

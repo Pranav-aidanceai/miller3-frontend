@@ -165,7 +165,7 @@ export default function AdminUsersPage() {
     };
 
     return (
-        <div className="p-6 h-full max-h-[90vh] overflow-auto">
+        <div className="px-6 pt-3 h-full max-h-screen overflow-auto">
             <h1 className="text-2xl font-bold">User Management</h1>
 
             {/* Toolbar */}

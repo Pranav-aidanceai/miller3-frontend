@@ -2,12 +2,19 @@ import { AxiosError } from 'axios';
 import AXIOS from '@/lib/axios';
 import { NextResponse } from 'next/server';
 
-export async function PATCH(request: Request) {
+export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const user_id = searchParams.get("user_id");
-        const reason = searchParams.get("reason");
-        const response = await AXIOS.patch(`/api/v1/admin/users/${user_id}/deactivate`, { reason });
+        const response = await AXIOS.get('/api/v1/admin/search-oversight', {
+            params: {
+                limit: searchParams.get('limit') ?? undefined,
+                cursor: searchParams.get('cursor') ?? undefined,
+                type: searchParams.get('type') ?? undefined,
+                user: searchParams.get('user') ?? undefined,
+                from: searchParams.get('from') ?? undefined,
+                to: searchParams.get('to') ?? undefined,
+            },
+        });
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
         console.error("error", error)

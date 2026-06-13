@@ -16,7 +16,7 @@ export async function PATCH(request: Request) {
         const response = await AXIOS.patch(`/api/v1/admin/users/${data?.user_id}/quotas`, payload);
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {

@@ -13,6 +13,7 @@ import { ApiError } from '@/types/common';
 import TermsModal from './auth/register/TermsOfUse';
 import ApprovalPending from './auth/ApprovalPending';
 import AccountRejected from './auth/AccountRejected';
+import AccountDeactivated from './auth/AccountDeactivated';
 import axios from 'axios';
 
 export default function LoginPage() {
@@ -24,6 +25,7 @@ export default function LoginPage() {
   const [showTouModal, setShowTouModal] = useState<boolean>(false);
   const [showApproval, setShowApprval] = useState<boolean>(false);
   const [showRejected, setShowRejected] = useState<boolean>(false);
+  const [showDeactivated, setShowDeactivated] = useState<boolean>(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
 
@@ -55,6 +57,11 @@ export default function LoginPage() {
 
           if (err?.code === "ACCOUNT_REJECTED") {
             setShowRejected(true);
+            return;
+          }
+
+          if (err?.code === "ACCOUNT_INACTIVE") {
+            setShowDeactivated(true);
             return;
           }
 
@@ -184,6 +191,9 @@ export default function LoginPage() {
             }
           }}
         />}
+      {showApproval && <ApprovalPending onClose={() => setShowApprval(false)} />}
+      {showRejected && <AccountRejected onClose={() => setShowRejected(false)} />}
+      {showDeactivated && <AccountDeactivated onClose={() => setShowDeactivated(false)} />}
     </>
   );
 }

@@ -11,7 +11,7 @@ interface CostResponse {
         serper_credits_remaining: number;
         serper_creds_used: number;
         serper_total_cost: number;
-    };
+    } | null;
     openai: {
         input_tokens: number;
         output_tokens: number;
@@ -19,14 +19,14 @@ interface CostResponse {
         input_cost: number;
         output_cost: number;
         total_cost: number;
-    };
+    } | null;
     enrichment: {
         count: number;
-    };
+    } | null;
     grand_total_spend: number;
 }
 
-const usd = (n: number) => `$${n.toFixed(4)}`;
+const usd = (n: number) => `$${n?.toFixed(4)}`;
 
 export default function AdminCostsPage() {
     const [data, setData] = useState<CostResponse | null>(null);
@@ -107,8 +107,8 @@ export default function AdminCostsPage() {
         }
     };
 
-    const serperTotal = data ? data.serper.serper_credits_remaining + data.serper.serper_creds_used : 0;
-    const serperPercentUsed = data && serperTotal > 0 ? (data.serper.serper_creds_used / serperTotal) * 100 : 0;
+    const serperTotal = data?.serper ? data.serper.serper_credits_remaining + data.serper.serper_creds_used : 0;
+    const serperPercentUsed = data?.serper && serperTotal > 0 ? (data.serper.serper_creds_used / serperTotal) * 100 : 0;
 
     return (
         <div className="p-6">
@@ -161,48 +161,54 @@ export default function AdminCostsPage() {
                         </div>
 
                         {/* Serper */}
-                        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xl font-medium text-muted-foreground">Serper Credits</p>
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
-                                    <Zap className="h-4 w-4 text-blue-500" />
+                        {data.serper && (
+                            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xl font-medium text-muted-foreground">Serper Credits</p>
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
+                                        <Zap className="h-4 w-4 text-blue-500" />
+                                    </div>
                                 </div>
+                                <p className="mt-3 text-3xl font-bold text-blue-500">{data.serper.serper_credits_remaining.toLocaleString()}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">of {serperTotal.toLocaleString()} total</p>
+                                <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
+                                    <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min(100, serperPercentUsed)}%` }} />
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">{serperPercentUsed.toFixed(1)}% used · {usd(data.serper.serper_total_cost)} spent</p>
                             </div>
-                            <p className="mt-3 text-3xl font-bold text-blue-500">{data.serper.serper_credits_remaining.toLocaleString()}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">of {serperTotal.toLocaleString()} total</p>
-                            <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
-                                <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${Math.min(100, serperPercentUsed)}%` }} />
-                            </div>
-                            <p className="mt-1 text-xs text-muted-foreground">{serperPercentUsed.toFixed(1)}% used · {usd(data.serper.serper_total_cost)} spent</p>
-                        </div>
+                        )}
 
                         {/* OpenAI */}
-                        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xl font-medium text-muted-foreground">OpenAI</p>
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
-                                    <Cpu className="h-4 w-4 text-violet-500" />
+                        {data.openai && (
+                            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xl font-medium text-muted-foreground">OpenAI</p>
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
+                                        <Cpu className="h-4 w-4 text-violet-500" />
+                                    </div>
+                                </div>
+                                <p className="mt-3 text-3xl font-bold text-violet-500">{usd(data.openai.total_cost)}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">{data.openai.total_tokens.toLocaleString()} tokens</p>
+                                <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                                    <div className="flex justify-between"><span>Input ({data.openai.input_tokens.toLocaleString()})</span><span className="font-mono">{usd(data.openai.input_cost)}</span></div>
+                                    <div className="flex justify-between"><span>Output ({data.openai.output_tokens.toLocaleString()})</span><span className="font-mono">{usd(data.openai.output_cost)}</span></div>
                                 </div>
                             </div>
-                            <p className="mt-3 text-3xl font-bold text-violet-500">{usd(data.openai.total_cost)}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{data.openai.total_tokens.toLocaleString()} tokens</p>
-                            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                                <div className="flex justify-between"><span>Input ({data.openai.input_tokens.toLocaleString()})</span><span className="font-mono">{usd(data.openai.input_cost)}</span></div>
-                                <div className="flex justify-between"><span>Output ({data.openai.output_tokens.toLocaleString()})</span><span className="font-mono">{usd(data.openai.output_cost)}</span></div>
-                            </div>
-                        </div>
+                        )}
 
                         {/* Enrichment */}
-                        <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xl font-medium text-muted-foreground">Enrichment</p>
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
-                                    <Database className="h-4 w-4 text-amber-500" />
+                        {data.enrichment && (
+                            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xl font-medium text-muted-foreground">Enrichment</p>
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                                        <Database className="h-4 w-4 text-amber-500" />
+                                    </div>
                                 </div>
+                                <p className="mt-3 text-3xl font-bold text-amber-500">{data.enrichment.count.toLocaleString()}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">total enrichments</p>
                             </div>
-                            <p className="mt-3 text-3xl font-bold text-amber-500">{data.enrichment.count.toLocaleString()}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">total enrichments</p>
-                        </div>
+                        )}
                     </div>
 
                     {/* Hard-stop threshold (editable) */}

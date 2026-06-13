@@ -1,6 +1,6 @@
 'use client'
 
-import { Sparkles, ArrowRight, Check, CircleCheck } from 'lucide-react';
+import { Sparkles, ArrowRight, Check, CircleCheck, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { tiers } from '@/lib/constants';
@@ -84,6 +84,29 @@ export default function OnboardingPage({ onTierSelect, selectedTier, onSubmit, s
             )}
 
             {step === 2 && (
+                <div className="animate-fade-in relative flex w-full max-w-md flex-col items-center rounded-lg border border-input bg-background px-6 py-10 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Clock className="h-8 w-8" />
+                    </div>
+
+                    <h2 className="mt-5 text-xl font-semibold">Approval Pending</h2>
+
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                        Your account is currently under review by an administrator.
+                        You&apos;ll be able to sign in once your access has been
+                        reviewed and approved.
+                    </p>
+
+                    <button
+                        onClick={() => router.push('/')}
+                        className="mt-6 flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98] cursor-pointer"
+                    >
+                        Back to Login <ArrowRight className="h-4 w-4" />
+                    </button>
+                </div>
+            )}
+
+            {step === 3 && (
                 <div className="animate-fade-in text-center">
                     <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
                         <Check className="h-8 w-8 text-success" />
@@ -98,7 +121,7 @@ export default function OnboardingPage({ onTierSelect, selectedTier, onSubmit, s
 
             {/* Progress dots */}
             <div className="mt-12 flex gap-2">
-                {[0, 1, 2].map(i => (
+                {[0, 1, 2, 3].map(i => (
                     <div key={i} className={cn('h-2 w-2 rounded-full transition-all', i === step ? 'bg-primary w-6' : 'bg-muted')} />
                 ))}
             </div>

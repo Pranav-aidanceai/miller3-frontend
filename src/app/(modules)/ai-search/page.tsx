@@ -18,12 +18,16 @@ type Template = {
 };
 
 type AIResult = {
-  id: number;
+  id: string;
   company_name: string;
-  city: string;
+  city: string | null;
+  state: string | null;
+  naics_code: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
   employee_size: string;
 };
-
 
 export default function AISearchPage() {
 
@@ -62,7 +66,6 @@ export default function AISearchPage() {
       query: '',
     },
     onSubmit: async (values) => {
-      console.log("api called")
       setResults([]);
       setGeneratedSql(null);
       setThinking(true);
@@ -89,6 +92,8 @@ export default function AISearchPage() {
       formik.setValues({ query: q });
       formik.handleSubmit();
     }
+    // Only re-run when the `q` query param changes; formik is stable here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q])
 
   return (
@@ -176,32 +181,56 @@ export default function AISearchPage() {
             )}
 
             <p className="text-sm text-muted-foreground mb-3">{results.length} results</p>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Location</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Employees</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map(c => (
-                    <tr
-                      key={c.id}
-                      onClick={() => setSelectedCompany(c)}
-                      className="border-b border-border cursor-pointer transition-colors hover:bg-accent/50"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{c?.company_name}</p>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs">{c?.city}</td>
-                      <td className="px-4 py-3 text-right">{c?.employee_size}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const formatLocation = (c: AIResult) => [c.city, c.state].filter(Boolean).join(', ');
+              type Column = {
+                key: string;
+                header: string;
+                align: 'left' | 'right';
+                show: boolean;
+                render: (c: AIResult) => React.ReactNode;
+                cellClass?: string;
+              };
+              const columns: Column[] = ([
+                { key: 'company', header: 'Company', align: 'left', show: true, render: c => <p className="font-medium">{c.company_name}</p> },
+                { key: 'location', header: 'Location', align: 'left', show: results.some(c => formatLocation(c)), render: c => formatLocation(c) || '—' },
+                { key: 'naics_code', header: 'NAICS Code', align: 'left', show: results.some(c => c.naics_code), render: c => c.naics_code || '—', cellClass: 'font-mono text-xs' },
+                { key: 'phone', header: 'Phone', align: 'left', show: results.some(c => c.phone), render: c => c.phone || '—' },
+                { key: 'email', header: 'Email', align: 'left', show: results.some(c => c.email), render: c => c.email || '—' },
+                { key: 'website', header: 'Website', align: 'left', show: results.some(c => c.website), render: c => c.website || '—' },
+              ] as Column[]).filter(col => col.show);
+
+              return (
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        {columns.map(col => (
+                          <th key={col.key} className={`px-4 py-3 font-medium text-muted-foreground ${col.align === 'right' ? 'text-right' : 'text-left'}`}>
+                            {col.header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map(c => (
+                        <tr
+                          key={c.id}
+                          onClick={() => setSelectedCompany(c)}
+                          className="border-b border-border cursor-pointer transition-colors hover:bg-accent/50"
+                        >
+                          {columns.map(col => (
+                            <td key={col.key} className={`px-4 py-3 ${col.align === 'right' ? 'text-right' : ''} ${col.cellClass ?? ''}`}>
+                              {col.render(c)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         )}
 

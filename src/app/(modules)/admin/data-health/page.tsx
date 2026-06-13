@@ -204,13 +204,13 @@ export default function AdminDataHealthPage() {
                                             <span className="text-sm font-medium">{item.label}</span>
                                         </div>
                                         <span className="text-sm text-muted-foreground">
-                                            {item.field.count.toLocaleString()} / {item.field.total.toLocaleString()} ({(item.field.pct * 100).toFixed(2)}%)
+                                            {item.field.count.toLocaleString()} / {item.field.total.toLocaleString()} ({item.field.pct.toFixed(2)}%)
                                         </span>
                                     </div>
                                     <div className="h-2 rounded-full bg-muted overflow-hidden">
                                         <div
                                             className={`h-full rounded-full ${item.bgColor}`}
-                                            style={{ width: `${item.field.pct * 100}%` }}
+                                            style={{ width: `${Math.min(100, item.field.pct)}%` }}
                                         />
                                     </div>
                                 </div>

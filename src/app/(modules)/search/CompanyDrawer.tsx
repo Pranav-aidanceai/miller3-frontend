@@ -14,7 +14,20 @@ import 'react-tooltip/dist/react-tooltip.css';
 import { useDispatch } from 'react-redux';
 import { updateEnrichmentCredits } from '@/store/slices/authSlice';
 
-// Leaflet relies on `window`, so load the map only on the client.
+const ENRICHMENT_STALE_DAYS = 90;
+
+function formatEnrichedAt(iso: string): { text: string; isStale: boolean } {
+    const d = new Date(iso);
+    const now = new Date();
+    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const isToday = d.toDateString() === now.toDateString();
+    const text = isToday
+        ? `Today at ${time}`
+        : `${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at ${time}`;
+    const ageDays = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+    return { text, isStale: ageDays > ENRICHMENT_STALE_DAYS };
+}
+
 const LocationMap = dynamic(() => import('./LocationMap'), {
     ssr: false,
     loading: () => (
@@ -24,10 +37,7 @@ const LocationMap = dynamic(() => import('./LocationMap'), {
     ),
 });
 
-/**
- * Renders a field row. If the field key is present in `notAccessible`,
- * the value is replaced with masked "xxxx" text and an upgrade tooltip is shown.
- */
+
 function Field({
     label,
     value,
@@ -86,10 +96,12 @@ function Field({
 
 export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
 
+    const dispatch = useDispatch();
     const [tab, setTab] = useState<'overview' | 'similar' | 'location' | 'activity'>('overview');
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [enriching, setEnriching] = useState<boolean>(false);
 
     const fetchCompany = async (id: string) => {
         setLoading(true);
@@ -121,6 +133,28 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
         return () => { active = false; };
     }, [id]);
 
+    const handleEnrich = async () => {
+        setEnriching(true);
+        const payload = {
+            company_id: id,
+            company_name: companyData?.company_name || '',
+            location: [companyData?.city, companyData?.state, companyData?.zip_code].filter(Boolean).join(', ')
+        };
+        const { data, errors } = await singleEnrichAction(payload);
+        if (errors) {
+            setEnriching(false);
+            toast.error(errors[0].message || 'Enrich failed', {
+                duration: 5000,
+                className: '!bg-destructive !text-white !border-destructive'
+            });
+        } else if (data?.status === "SUCCESS") {
+            setEnriching(false);
+            dispatch(updateEnrichmentCredits(data.headers));
+            fetchCompany(id);
+            toast.success('Company enriched successfully');
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={onClose} />
@@ -141,6 +175,14 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                     <span className="rounded-pill bg-muted px-2 py-0.5 text-xs">{companyData?.year_founded}</span>
                                 )}
                             </div>
+                            {companyData?.last_enriched_label && (
+                                companyData?.last_enriched_at ? (() => {
+                                    const { text, isStale } = formatEnrichedAt(companyData.last_enriched_at);
+                                    return <p className={isStale ? 'text-destructive' : 'text-success'}>Last enriched at {text}</p>;
+                                })() : (
+                                    <p className='text-destructive'>{companyData?.last_enriched_label}</p>
+                                )
+                            )}
                             <div className="mt-2 flex flex-wrap gap-2">
                                 <button
                                     type="button"

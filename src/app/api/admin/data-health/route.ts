@@ -7,7 +7,7 @@ export async function GET() {
         const response = await AXIOS.get('/api/v1/admin/data-health');
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {

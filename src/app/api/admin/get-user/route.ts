@@ -5,12 +5,11 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const params: Record<string, string> = {};
         const user_id = searchParams.get('user_id');
         const response = await AXIOS.get(`/api/v1/admin/users/${user_id}`);
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
-        console.log("error", error)
+        console.error("error", error)
         if (error instanceof AxiosError) {
             let errorData = error?.response?.data;
             if (typeof errorData === 'object') {

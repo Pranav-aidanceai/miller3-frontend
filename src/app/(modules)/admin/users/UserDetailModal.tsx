@@ -73,12 +73,11 @@ const statusBadge: Record<string, string> = {
     rejected: 'bg-destructive/10 text-destructive',
 };
 
-type ActionKey = 'approve' | 'reject' | 'deactivate' | 'reactivate';
+type ActionKey = 'accept' | 'reject' | 'deactivate' | 'reactivate';
 
 interface ActionDef {
     key: ActionKey;
     label: string;
-    endpoint: string;
     icon: typeof UserCheck;
     variant: 'primary' | 'destructive';
     confirm?: boolean;
@@ -89,16 +88,16 @@ interface ActionDef {
 }
 
 const ACTIONS: Record<ActionKey, ActionDef> = {
-    approve: { key: 'approve', label: 'Accept user', endpoint: '/api/admin/approve', icon: UserCheck, variant: 'primary', success: 'User accepted' },
-    reject: { key: 'reject', label: 'Reject user', endpoint: '/api/admin/reject', icon: UserX, variant: 'destructive', confirm: true, requiresReason: true, reasonLabel: 'Reason for rejection', reasonPlaceholder: 'Explain why this user is being rejected', success: 'User rejected' },
-    deactivate: { key: 'deactivate', label: 'Deactivate user', endpoint: '/api/admin/deactivate', icon: Ban, variant: 'destructive', confirm: true, requiresReason: true, reasonLabel: 'Reason for deactivation', reasonPlaceholder: 'Explain why this user is being deactivated', success: 'User deactivated' },
-    reactivate: { key: 'reactivate', label: 'Reactivate user', endpoint: '/api/admin/reactivate', icon: RotateCcw, variant: 'primary', confirm: true, requiresReason: true, reasonLabel: 'Reason for reactivation', reasonPlaceholder: 'Explain why this user is being reactivated', success: 'User reactivated' },
+    accept: { key: 'accept', label: 'Accept user', icon: UserCheck, variant: 'primary', success: 'User accepted' },
+    reject: { key: 'reject', label: 'Reject user', icon: UserX, variant: 'destructive', confirm: true, requiresReason: true, reasonLabel: 'Reason for rejection', reasonPlaceholder: 'Explain why this user is being rejected', success: 'User rejected' },
+    deactivate: { key: 'deactivate', label: 'Deactivate user', icon: Ban, variant: 'destructive', confirm: true, requiresReason: true, reasonLabel: 'Reason for deactivation', reasonPlaceholder: 'Explain why this user is being deactivated', success: 'User deactivated' },
+    reactivate: { key: 'reactivate', label: 'Reactivate user', icon: RotateCcw, variant: 'primary', confirm: true, requiresReason: true, reasonLabel: 'Reason for reactivation', reasonPlaceholder: 'Explain why this user is being reactivated', success: 'User reactivated' },
 };
 
 // Which actions are available for a given account status.
 const STATUS_ACTIONS: Record<string, ActionKey[]> = {
-    pending: ['approve', 'reject'],
-    rejected: ['approve'],
+    pending: ['accept', 'reject'],
+    rejected: ['accept'],
     active: ['deactivate'],
     inactive: ['reactivate'],
 };
@@ -246,9 +245,9 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
         }
         setActionLoading(action.key);
         try {
-            const params: Record<string, string> = { user_id: user.id };
-            if (action.requiresReason) params.reason = reason;
-            await axios.patch(action.endpoint, null, { params });
+            await axios.patch('/api/admin/user-status',
+                { action: action.key, reason: action.requiresReason ? reason : undefined },
+                { params: { user_id: user.id } });
             toast.success(action.success);
             onUpdated?.();
             onClose();
