@@ -28,8 +28,8 @@ const TYPES = ['structured', 'ai'] as const;
 type SearchType = typeof TYPES[number];
 
 const TYPE_LABELS: Record<SearchType, string> = {
-    structured: '🔍 Structured',
-    ai: '✨ AI',
+    structured: 'Structured',
+    ai: 'AI',
 };
 
 const PRESET_LIMITS = [20, 50, 100] as const;
@@ -60,8 +60,6 @@ export default function SearchOversightPage() {
 
     const [limit, setLimit] = useState(20);
     const [typeFilter, setTypeFilter] = useState<SearchType | null>(null);
-    const [userInput, setUserInput] = useState('');
-    const userFilter = useDebounce(userInput.trim(), 400);
     const [from, setFrom] = useState('');
     const [to, setTo] = useState('');
 
@@ -84,7 +82,6 @@ export default function SearchOversightPage() {
                 const params: Record<string, string | number> = { limit };
                 if (cursor) params.cursor = cursor;
                 if (typeFilter) params.type = typeFilter;
-                if (userFilter) params.user = userFilter;
                 if (from) params.from = new Date(from).toISOString();
                 if (to) params.to = new Date(to).toISOString();
                 const res = await axios.get('/api/admin/search-oversight', { params });
@@ -107,7 +104,7 @@ export default function SearchOversightPage() {
             }
         })();
         return () => { active = false; };
-    }, [limit, cursor, typeFilter, userFilter, from, to]);
+    }, [limit, cursor, typeFilter, from, to]);
 
     const resetToFirstPage = () => {
         setCursor(null);
@@ -145,7 +142,7 @@ export default function SearchOversightPage() {
         return `${date}, ${time}`;
     };
 
-    const hasFilters = typeFilter || userInput || from || to;
+    const hasFilters = typeFilter || from || to;
     const today = new Date().toISOString().split('T')[0];
 
     return (
@@ -153,17 +150,6 @@ export default function SearchOversightPage() {
             <h1 className="shrink-0 text-2xl font-bold">Search Oversight</h1>
 
             <div className="flex shrink-0 flex-wrap items-center gap-3">
-                {/* User ID */}
-                <div className="relative w-full max-w-xs">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                        type="text"
-                        value={userInput}
-                        onChange={(e) => { setUserInput(e.target.value); resetToFirstPage(); }}
-                        placeholder="Filter by user email"
-                        className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
-                    />
-                </div>
 
                 {/* Type filter */}
                 <Popover open={typePopoverOpen} onOpenChange={setTypePopoverOpen}>
@@ -222,7 +208,7 @@ export default function SearchOversightPage() {
 
                 {hasFilters && (
                     <button
-                        onClick={() => { setTypeFilter(null); setUserInput(''); setFrom(''); setTo(''); resetToFirstPage(); }}
+                        onClick={() => { setTypeFilter(null); setFrom(''); setTo(''); resetToFirstPage(); }}
                         className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground cursor-pointer"
                     >
                         <X className="h-4 w-4" /> Clear filters

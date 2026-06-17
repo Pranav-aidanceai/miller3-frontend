@@ -16,10 +16,16 @@ interface RoleDefaults {
 
 interface CustomQuotas {
     enabled: boolean;
-    search_quota_daily: number | null;
-    export_quota_daily: number | null;
+    search_quota_monthly: number | null;
+    export_quota_monthly: number | null;
     export_row_cap: number | null;
     enrichment_quota_monthly: number | null;
+}
+
+interface CreditLeft {
+    ai_search: number,
+    enrichment: number,
+    export: number
 }
 
 interface GetUserResponse {
@@ -32,6 +38,7 @@ interface GetUserResponse {
     role_defaults: RoleDefaults;
     custom_quotas: CustomQuotas;
     override_reason: string | null;
+    credits_left: CreditLeft
 }
 
 const ROLES = ['free', 'standard', 'premium', 'admin'] as const;
@@ -45,17 +52,15 @@ const roleBadge: Record<string, string> = {
     free: 'bg-muted text-muted-foreground',
 };
 
-const DEFAULT_LABELS: Record<keyof RoleDefaults, string> = {
-    searches: 'Searches',
-    exports: 'Exports',
-    export_rows: 'Export Rows',
-    enrichments: 'Enrichments',
+const CREDIT_LABELS: Record<keyof CreditLeft, string> = {
+    ai_search: 'AI Search',
+    enrichment: 'Enrichment',
+    export: 'Export',
 };
 
 const QUOTA_FIELDS: { key: keyof CustomQuotas; label: string }[] = [
-    { key: 'search_quota_daily', label: 'Search quota (daily)' },
-    { key: 'export_quota_daily', label: 'Export quota (daily)' },
-    { key: 'export_row_cap', label: 'Export row cap' },
+    { key: 'search_quota_monthly', label: 'Search quota (monthly)' },
+    { key: 'export_quota_monthly', label: 'Export quota (monthly)' },
     { key: 'enrichment_quota_monthly', label: 'Enrichment quota (monthly)' },
 ];
 
@@ -121,9 +126,8 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
     const [savingQuotas, setSavingQuotas] = useState(false);
     const [reasonError, setReasonError] = useState(false);
     const [overrideValues, setOverrideValues] = useState<Record<string, string>>({
-        search_quota_daily: '',
-        export_quota_daily: '',
-        export_row_cap: '',
+        search_quota_monthly: '',
+        export_quota_monthly: '',
         enrichment_quota_monthly: '',
         reason: '',
     });
@@ -143,9 +147,8 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
             setRole(data.role);
             setOverrideEnabled(data.custom_quotas.enabled);
             setOverrideValues({
-                search_quota_daily: data.custom_quotas.search_quota_daily?.toString() ?? '',
-                export_quota_daily: data.custom_quotas.export_quota_daily?.toString() ?? '',
-                export_row_cap: data.custom_quotas.export_row_cap?.toString() ?? '',
+                search_quota_monthly: data.custom_quotas.search_quota_monthly?.toString() ?? '',
+                export_quota_monthly: data.custom_quotas.export_quota_monthly?.toString() ?? '',
                 enrichment_quota_monthly: data.custom_quotas.enrichment_quota_monthly?.toString() ?? '',
                 reason: data.override_reason ?? '',
             });
@@ -171,9 +174,8 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
                 setRole(data.role);
                 setOverrideEnabled(data.custom_quotas.enabled);
                 setOverrideValues({
-                    search_quota_daily: data.custom_quotas.search_quota_daily?.toString() ?? '',
-                    export_quota_daily: data.custom_quotas.export_quota_daily?.toString() ?? '',
-                    export_row_cap: data.custom_quotas.export_row_cap?.toString() ?? '',
+                    search_quota_monthly: data.custom_quotas.search_quota_monthly?.toString() ?? '',
+                    export_quota_monthly: data.custom_quotas.export_quota_monthly?.toString() ?? '',
                     enrichment_quota_monthly: data.custom_quotas.enrichment_quota_monthly?.toString() ?? '',
                     reason: data.override_reason ?? '',
                 });
@@ -220,9 +222,8 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
             await axios.patch('/api/admin/update-credits', {
                 user_id: user.id,
                 enabled: overrideEnabled,
-                search_quota_daily: overrideValues.search_quota_daily ? Number(overrideValues.search_quota_daily) : null,
-                export_quota_daily: overrideValues.export_quota_daily ? Number(overrideValues.export_quota_daily) : null,
-                export_row_cap: overrideValues.export_row_cap ? Number(overrideValues.export_row_cap) : null,
+                search_quota_monthly: overrideValues.search_quota_monthly ? Number(overrideValues.search_quota_monthly) : null,
+                export_quota_monthly: overrideValues.export_quota_monthly ? Number(overrideValues.export_quota_monthly) : null,
                 enrichment_quota_monthly: overrideValues.enrichment_quota_monthly ? Number(overrideValues.enrichment_quota_monthly) : null,
                 override_reason: overrideValues.reason.trim() || null,
             });
@@ -428,16 +429,19 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
                                 </div>
                             </section>
 
-                            {/* Role defaults */}
+                            {/* Credits left */}
                             <section>
-                                <h3 className="mb-2 text-sm font-semibold text-muted-foreground uppercase">Role Defaults ({user.role})</h3>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                    {(Object.keys(DEFAULT_LABELS) as (keyof RoleDefaults)[]).map(k => (
-                                        <div key={k} className="rounded-lg border border-border bg-muted/30 px-3 py-2">
-                                            <p className="text-xs text-muted-foreground">{DEFAULT_LABELS[k]}</p>
-                                            <p className="font-medium font-mono">{user.role_defaults[k] >= 999999 ? '∞' : user.role_defaults[k]}</p>
-                                        </div>
-                                    ))}
+                                <h3 className="mb-2 text-sm font-semibold text-muted-foreground uppercase">Credits Left</h3>
+                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                    {(Object.keys(CREDIT_LABELS) as (keyof CreditLeft)[]).map(k => {
+                                        const value = user.credits_left?.[k];
+                                        return (
+                                            <div key={k} className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                                                <p className="text-xs text-muted-foreground">{CREDIT_LABELS[k]}</p>
+                                                <p className="font-medium font-mono">{value == null ? '—' : value >= 999999 ? '∞' : value}</p>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </section>
 

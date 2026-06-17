@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 
 interface QueryHistoryItem {
   query_type: 'ai' | 'structured';
@@ -17,6 +19,8 @@ interface QueryHistoryItem {
 export default function QueryHistoryPage() {
 
   const router = useRouter();
+  const role = useSelector((state: RootState) => state.auth.role);
+  const isAdmin = role === 'ADMIN';
   const [userQueries, setUserQueries] = useState<QueryHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,12 +54,11 @@ export default function QueryHistoryPage() {
   }, [page, perPage]);
 
   return (
-    <div className="flex flex-col p-5" style={{ height: 'calc(100vh - 3.5rem)' }}>
+    <div className="flex flex-col p-5" style={{ height: 'calc(100vh - 3rem)' }}>
       {/* Static header */}
       <h1 className="shrink-0 text-2xl font-bold">Query History</h1>
 
-      {/* Scrollable body */}
-      <div className="mt-6 flex-1 overflow-auto">
+      <div className="mt-4 flex-1 overflow-auto">
         {loading && (
           <div data-tour="query-history-list" className="grid gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -101,7 +104,7 @@ export default function QueryHistoryPage() {
                   <p className="font-medium text-sm truncate">{q.raw_input}</p>
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
-                      {q.query_type === 'ai' ? '✨ AI' : '🔍 Structured'}
+                      {q.query_type === 'ai' ? 'AI' : 'Structured'}
                     </span>
                     <span>{q.result_count} result{q.result_count !== 1 ? 's' : ''}</span>
                     <span>{(() => {
@@ -128,8 +131,8 @@ export default function QueryHistoryPage() {
         )}
       </div>
 
-      {/* Static pagination footer */}
-      {!error && totalPages > 1 && (
+      {/* Static pagination footer — admins only */}
+      {isAdmin && !error && totalPages > 1 && (
         <div className="shrink-0 mt-4 flex items-center justify-between border-t border-border pt-4">
           <div className="flex items-center gap-2">
             <div className="relative">

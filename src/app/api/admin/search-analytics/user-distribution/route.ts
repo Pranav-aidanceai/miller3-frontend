@@ -2,18 +2,15 @@ import { AxiosError } from 'axios';
 import AXIOS from '@/lib/axios';
 import { NextResponse } from 'next/server';
 
-export async function PATCH(request: Request) {
+export async function GET(request: Request) {
     try {
-        const data = await request.json();
-        const payload = {
-            enabled: data.enabled,
-            search_quota_monthly: data.search_quota_monthly,
-            export_quota_monthly: data.export_quota_monthly,
-            export_row_cap: data.export_row_cap,
-            enrichment_quota_monthly: data.enrichment_quota_monthly,
-            override_reason: data.override_reason
-        }
-        const response = await AXIOS.patch(`/api/v1/admin/users/${data?.user_id}/quotas`, payload);
+        const { searchParams } = new URL(request.url);
+        const response = await AXIOS.get('/api/v1/admin/search-analytics/user-distribution', {
+            params: {
+                role: searchParams.get('role') ?? undefined,
+                status: searchParams.get('status') ?? undefined,
+            },
+        });
         return NextResponse.json({ data: response.data }, { status: 200 });
     } catch (error: unknown) {
         console.error("error", error)

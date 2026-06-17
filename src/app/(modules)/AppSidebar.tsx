@@ -3,9 +3,11 @@
 import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout, toggleSidebar } from '@/store/slices/authSlice';
 import { adminNav, mainNav, roleBadgeColor } from '@/lib/constants';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { usePathname, useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -19,6 +21,17 @@ export function AppSidebar() {
     const role = useAppSelector(state => state.auth.role)
     const sidebarCollapsed = useAppSelector(state => state.auth.sidebarCollapsed);
     const isAdmin = role === 'ADMIN';
+
+    const [profileOpen, setProfileOpen] = useState(false);
+    const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const openProfile = () => {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        setProfileOpen(true);
+    };
+    const closeProfile = () => {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        closeTimer.current = setTimeout(() => setProfileOpen(false), 120);
+    };
 
     const NavItem = ({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) => {
         const active = pathName === to || (to !== '/' && pathName.startsWith(to + '/'));
@@ -98,19 +111,62 @@ export function AppSidebar() {
 
             <div className="border-t border-border p-3">
                 {user && (
-                    <div className={cn('flex items-center gap-3', sidebarCollapsed && 'justify-center')}>
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase">
-                            {user.name.charAt(0)}
-                        </div>
-                        {!sidebarCollapsed && (
+                    sidebarCollapsed ? (
+                        <Popover open={profileOpen} onOpenChange={setProfileOpen}>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    onMouseEnter={openProfile}
+                                    onMouseLeave={closeProfile}
+                                    className="mx-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase cursor-pointer"
+                                    aria-label="Profile"
+                                >
+                                    {user.name.charAt(0)}
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                side="right"
+                                align="end"
+                                sideOffset={12}
+                                onOpenAutoFocus={(e) => e.preventDefault()}
+                                onMouseEnter={openProfile}
+                                onMouseLeave={closeProfile}
+                                className="w-56 gap-0 p-0"
+                            >
+                                <div className="flex items-center gap-3 p-3">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase">
+                                        {user.name.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium">{user.name}</p>
+                                        <span className={cn('mt-0.5 inline-block rounded-pill px-1.5 py-0.5 text-[10px] font-semibold uppercase', roleBadgeColor[user.role])}>
+                                            {user.role}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="border-t border-border p-1">
+                                    <button
+                                        type="button"
+                                        onClick={handleLogout}
+                                        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-destructive transition-colors cursor-pointer"
+                                    >
+                                        <LogOut className="h-4 w-4" />
+                                        Sign out
+                                    </button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                    ) : (
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary uppercase">
+                                {user.name.charAt(0)}
+                            </div>
                             <div className="flex-1 min-w-0">
                                 <p className="truncate text-sm font-medium">{user.name}</p>
                                 <span className={cn('inline-block rounded-pill px-1.5 py-0.5 text-[10px] font-semibold uppercase', roleBadgeColor[user.role])}>
                                     {user.role}
                                 </span>
                             </div>
-                        )}
-                        {!sidebarCollapsed && (
                             <div className="flex gap-1">
                                 {/* <Link href="/settings" className="rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors" aria-label="Settings">
                                     <Settings className="h-4 w-4" />
@@ -119,8 +175,8 @@ export function AppSidebar() {
                                     <LogOut className="h-4 w-4" />
                                 </button>
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )
                 )}
             </div>
         </aside>

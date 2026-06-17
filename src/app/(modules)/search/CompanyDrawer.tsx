@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { X, Copy, AlertCircle, Info, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCompanyAction, singleEnrichAction } from './searchServices';
+import { getCompanyAction, getSimilarCompanyAction, singleEnrichAction } from './searchServices';
 import { CompanyData } from '@/types/search';
 import SimilarPage from './Similar';
 import { ApiErrorResponse } from '@/types/common';
@@ -44,14 +44,17 @@ function Field({
     mono,
     fieldKey,
     notAccessible,
+    link,
 }: {
     label: string;
     value: string | number | null | undefined;
     mono?: boolean;
     fieldKey?: string;
     notAccessible?: string[];
+    link?: boolean;
 }) {
     const isLocked = fieldKey !== undefined && notAccessible?.includes(fieldKey);
+    const href = link && value ? (/^https?:\/\//i.test(String(value)) ? String(value) : `https://${value}`) : null;
 
     // Unique tooltip anchor id per field to avoid conflicts
     const tooltipId = `upgrade-tooltip-${fieldKey ?? label.replace(/\s+/g, '-').toLowerCase()}`;
@@ -85,6 +88,16 @@ function Field({
                         className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
                     />
                 </span>
+            ) : href ? (
+                <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn('text-sm font-medium text-right text-primary hover:underline break-all', mono && 'font-mono')}
+                >
+                    {value}
+                </a>
             ) : (
                 <span className={cn('text-sm font-medium text-right', mono && 'font-mono')}>
                     {value || 'NA'}
@@ -102,6 +115,10 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [enriching, setEnriching] = useState<boolean>(false);
+
+    const [similar, setSimilar] = useState<CompanyData[]>([]);
+    const [similarLoading, setSimilarLoading] = useState(false);
+    const similarFetchedFor = useRef<string | null>(null);
 
     const fetchCompany = async (id: string) => {
         setLoading(true);
@@ -132,6 +149,36 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
         })();
         return () => { active = false; };
     }, [id]);
+
+    // Lazily fetch the similar-companies list once the user opens the similar
+    // tab, keyed to the company currently shown so it refreshes when the user
+    // drills into a different company. (The location map fetches its own pins.)
+    useEffect(() => {
+        const cid = companyData?.company_id;
+        if (!cid) return;
+        if (tab !== 'similar') return;
+        if (similarFetchedFor.current === cid) return;
+        similarFetchedFor.current = cid;
+        let active = true;
+        (async () => {
+            setSimilarLoading(true);
+            try {
+                const response = await getSimilarCompanyAction({ company_id: cid, limit: 5, cursor: null });
+                if (active) setSimilar(response.data.results ?? []);
+            } catch {
+                if (active) toast.error('Failed to fetch similar companies');
+            } finally {
+                if (active) setSimilarLoading(false);
+            }
+        })();
+        return () => { active = false; };
+    }, [tab, companyData?.company_id]);
+
+    // Load a different company into the drawer (from a similar pin or list card).
+    const loadCompany = (cid: string) => {
+        setTab('overview');
+        fetchCompany(cid);
+    };
 
     const handleEnrich = async () => {
         setEnriching(true);
@@ -259,7 +306,7 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Contact</h3>
                                 <Field label="Phone" fieldKey="phone" value={companyData?.phone} />
                                 <Field label="Email" fieldKey="email" value={companyData?.email} />
-                                <Field label="Website" fieldKey="website" value={companyData?.website} />
+                                <Field label="Website" fieldKey="website" value={companyData?.website} link />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Location</h3>
@@ -271,21 +318,20 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                         </div>
                     )}
                     {tab === 'similar' && (
-                        <SimilarPage companyId={id} handleFetch={(id: string) => {
-                            setTab('overview');
-                            fetchCompany(id);
-                        }} />
+                        <SimilarPage companies={similar} isLoading={similarLoading} onSelect={loadCompany} />
                     )}
                     {tab === 'location' && (
                         <div className="space-y-4">
                             {companyData?.latitude != null && companyData?.longitude != null ? (
                                 <LocationMap
+                                    companyId={companyData.company_id}
                                     lat={companyData.latitude}
                                     lng={companyData.longitude}
                                     companyName={companyData.company_name}
                                     address={[companyData.city, companyData.state, companyData.zip_code]
                                         .filter(Boolean)
                                         .join(', ')}
+                                    onSelectSimilar={loadCompany}
                                 />
                             ) : (
                                 <div className="flex h-72 w-full items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 text-sm text-muted-foreground">

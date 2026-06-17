@@ -4,6 +4,7 @@ import { Users, Search, Zap, AlertTriangle, DollarSign, RefreshCw } from 'lucide
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import AnalyticsSection from './AnalyticsSection';
 
 interface DashboardData {
   total_users: number;
@@ -99,7 +100,7 @@ export default function AdminDashboard() {
   }, []);
 
   return (
-    <div className="p-6">
+    <div className="h-full overflow-y-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Admin Dashboard</h1>
@@ -149,6 +150,8 @@ export default function AdminDashboard() {
           );
         })}
       </div>
+
+      <AnalyticsSection />
     </div>
   );
 }

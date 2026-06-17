@@ -15,6 +15,11 @@ interface ExportModalProps {
     setExportFormat: (value: 'csv' | 'json') => void;
     isExporting: boolean;
     handleExport: () => void;
+    /** When provided, renders a row-count input gated by the user's export credits. */
+    rowLimit?: number;
+    setRowLimit?: (value: number) => void;
+    /** Maximum rows the user is allowed to export (e.g. remaining export credits). */
+    maxRows?: number;
 }
 
 export default function ExportModal({
@@ -24,10 +29,22 @@ export default function ExportModal({
     setExportFormat,
     isExporting,
     handleExport,
+    rowLimit,
+    setRowLimit,
+    maxRows,
 }: ExportModalProps) {
 
     const role = useSelector((state: RootState) => state.auth.role);
     const hasJsonAccess = role === 'ADMIN' || role === 'PREMIUM';
+    const showRowLimit = setRowLimit !== undefined && rowLimit !== undefined;
+    const rowError =
+        showRowLimit
+            ? rowLimit < 1
+                ? 'Enter a row count of at least 1.'
+                : maxRows !== undefined && rowLimit > maxRows
+                    ? `You only have ${maxRows} export credit${maxRows === 1 ? '' : 's'} left.`
+                    : null
+            : null;
 
     if (!showExportModal) return null;
 
@@ -146,6 +163,34 @@ export default function ExportModal({
                     </div>
                 </div>
 
+                {/* Row Count */}
+                {showRowLimit && (
+                    <div className="mt-6 space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground">
+                            Number of rows
+                        </label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={maxRows}
+                            value={rowLimit}
+                            disabled={isExporting}
+                            onChange={(e) => setRowLimit?.(Number(e.target.value))}
+                            className={`h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 ${rowError
+                                ? 'border-destructive focus:ring-destructive/30'
+                                : 'border-input focus:ring-ring'
+                                }`}
+                        />
+                        {rowError ? (
+                            <p className="text-xs text-destructive">{rowError}</p>
+                        ) : maxRows !== undefined ? (
+                            <p className="text-xs text-muted-foreground">
+                                {maxRows} export credit{maxRows === 1 ? '' : 's'} remaining
+                            </p>
+                        ) : null}
+                    </div>
+                )}
+
                 {/* Footer */}
                 <div className="mt-6 flex justify-end gap-3">
                     <button
@@ -158,8 +203,8 @@ export default function ExportModal({
 
                     <button
                         onClick={handleExport}
-                        disabled={isExporting}
-                        className="flex h-10 min-w-30 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:opacity-90 cursor-pointer disabled:opacity-50"
+                        disabled={isExporting || rowError !== null}
+                        className="flex h-10 min-w-30 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isExporting ? (
                             <>
