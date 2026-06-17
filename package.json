@@ -9,15 +9,18 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "analyze": "cross-env ANALYZE=true next build --webpack"
   },
   "dependencies": {
     "@highcharts/react": "^5.1.0",
+    "@next/bundle-analyzer": "^16.2.9",
     "@reduxjs/toolkit": "^2.11.2",
     "axios": "^1.15.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cookies-next": "^6.1.1",
+    "cross-env": "^10.1.0",
     "driver.js": "^1.4.0",
     "formik": "^2.4.9",
     "highcharts": "^13.0.0",

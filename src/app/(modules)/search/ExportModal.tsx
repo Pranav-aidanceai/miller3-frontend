@@ -36,7 +36,7 @@ export default function ExportModal({
 
     const role = useSelector((state: RootState) => state.auth.role);
     const hasJsonAccess = role === 'ADMIN' || role === 'PREMIUM';
-    const showRowLimit = setRowLimit !== undefined && rowLimit !== undefined;
+    const showRowLimit = role !== 'ADMIN' && setRowLimit !== undefined && rowLimit !== undefined;
     const rowError =
         showRowLimit
             ? rowLimit < 1
@@ -113,10 +113,11 @@ export default function ExportModal({
                             type="button"
                             disabled={!hasJsonAccess || isExporting}
                             onClick={() => hasJsonAccess && setExportFormat('json')}
-                            className={`group relative rounded-xl border p-4 text-left transition-all duration-200 overflow-hidden ${exportFormat === 'json' && hasJsonAccess
-                                ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20 cursor-pointer'
-                                : 'border-border hover:border-primary/40 hover:bg-accent/50 cursor-not-allowed'
-                                } ${!hasJsonAccess ? 'cursor-not-allowed' : ''}`}
+                            className={`group relative rounded-xl border p-4 text-left transition-all duration-200 overflow-hidden ${hasJsonAccess ? 'cursor-pointer' : 'cursor-not-allowed'
+                                } ${exportFormat === 'json' && hasJsonAccess
+                                    ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                                    : 'border-border hover:border-primary/40 hover:bg-accent/50'
+                                }`}
                         >
                             {/* Locked Overlay */}
                             {!hasJsonAccess && (
@@ -170,12 +171,14 @@ export default function ExportModal({
                             Number of rows
                         </label>
                         <input
-                            type="number"
-                            min={1}
-                            max={maxRows}
+                            type="text"
+                            inputMode="numeric"
                             value={rowLimit}
                             disabled={isExporting}
-                            onChange={(e) => setRowLimit?.(Number(e.target.value))}
+                            onChange={(e) => {
+                                const digitsOnly = e.target.value.replace(/\D/g, '');
+                                setRowLimit?.(digitsOnly === '' ? 0 : Number(digitsOnly));
+                            }}
                             className={`h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 ${rowError
                                 ? 'border-destructive focus:ring-destructive/30'
                                 : 'border-input focus:ring-ring'
