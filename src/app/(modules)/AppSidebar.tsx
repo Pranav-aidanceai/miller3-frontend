@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogOut, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
@@ -23,6 +23,8 @@ export function AppSidebar() {
     const isAdmin = role === 'ADMIN';
 
     const [profileOpen, setProfileOpen] = useState(false);
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const openProfile = () => {
         if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -53,6 +55,7 @@ export function AppSidebar() {
     };
 
     const handleLogout = async () => {
+        setIsLoggingOut(true);
         try {
             await axios.post('/api/auth/logout');
             dispatch(logout());
@@ -66,6 +69,8 @@ export function AppSidebar() {
                 position: 'bottom-right',
                 className: '!bg-destructive !text-white !border-destructive',
             });
+            setIsLoggingOut(false);
+            setShowLogoutModal(false);
         }
     };
 
@@ -147,7 +152,7 @@ export function AppSidebar() {
                                 <div className="border-t border-border p-1">
                                     <button
                                         type="button"
-                                        onClick={handleLogout}
+                                        onClick={() => { setProfileOpen(false); setShowLogoutModal(true); }}
                                         className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-destructive transition-colors cursor-pointer"
                                     >
                                         <LogOut className="h-4 w-4" />
@@ -171,7 +176,7 @@ export function AppSidebar() {
                                 {/* <Link href="/settings" className="rounded-md p-1.5 text-muted-foreground hover:text-foreground transition-colors" aria-label="Settings">
                                     <Settings className="h-4 w-4" />
                                 </Link> */}
-                                <button onClick={handleLogout} className="rounded-md p-1.5 text-muted-foreground hover:text-destructive transition-colors cursor-pointer" aria-label="Log out">
+                                <button onClick={() => setShowLogoutModal(true)} className="rounded-md p-1.5 text-muted-foreground hover:text-destructive transition-colors cursor-pointer" aria-label="Log out">
                                     <LogOut className="h-4 w-4" />
                                 </button>
                             </div>
@@ -179,6 +184,48 @@ export function AppSidebar() {
                     )
                 )}
             </div>
+
+            {showLogoutModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="relative w-full max-w-sm rounded-2xl border border-border/50 bg-background p-6 shadow-2xl">
+                        <div className="mb-6 flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                                <LogOut className="h-5 w-5 text-destructive" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-semibold">Sign out</h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Are you sure you want to log out of your account?
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowLogoutModal(false)}
+                                disabled={isLoggingOut}
+                                className="h-10 min-w-24 rounded-lg border border-border px-4 text-sm font-medium transition-colors cursor-pointer hover:bg-accent disabled:opacity-50"
+                            >
+                                No
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                disabled={isLoggingOut}
+                                className="flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg bg-destructive px-4 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isLoggingOut ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Logging out...
+                                    </>
+                                ) : (
+                                    'Yes'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </aside>
     );
 }
