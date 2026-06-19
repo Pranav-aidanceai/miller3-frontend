@@ -1,4 +1,4 @@
-import { Moon, Sun, Bell, Command } from 'lucide-react';
+import { Moon, Sun, Command } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { useAppSelector } from '@/store/hooks';
@@ -87,9 +87,9 @@ export function TopBar() {
                 </div>
 
                 {/* Notifications */}
-                <button className="relative rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" aria-label="Notifications">
+                {/* <button className="relative rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors" aria-label="Notifications">
                     <Bell className="h-4 w-4" />
-                </button>
+                </button> */}
 
                 {/* Theme */}
                 <button

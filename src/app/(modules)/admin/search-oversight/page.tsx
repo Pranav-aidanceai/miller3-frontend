@@ -3,9 +3,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
-import { ListFilter, ChevronDown, Check, Search, X } from 'lucide-react';
+import { ListFilter, ChevronDown, Check, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useDebounce } from '@/hooks/useDebounce';
 
 interface SearchLog {
     type: 'ai' | 'structured';

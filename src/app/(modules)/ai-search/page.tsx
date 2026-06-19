@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Download, Loader2, Sparkles } from 'lucide-react';
@@ -46,6 +46,7 @@ export default function AISearchPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   const [results, setResults] = useState<AIResult[]>([]);
   const [generatedSql, setGeneratedSql] = useState<string | null>(null);
@@ -86,14 +87,16 @@ export default function AISearchPage() {
       setGeneratedSql(null);
       setThinking(true);
       setError(null);
+      setErrorCode(null);
       const query = values.query.trim();
       formik.resetForm();
       const { data, errors, headers } = await submitQueryAction(query);
       dispatch(updateAiSearchCredits(headers))
       if (errors) {
         setThinking(false);
-        errors.forEach((err: { error: ApiError }) => {
+        errors.forEach((err: { error: ApiError & { error_code?: string } }) => {
           setError(err.error.detail)
+          setErrorCode(err.error.error_code ?? null)
         })
       } else {
         setThinking(false);
@@ -170,13 +173,17 @@ export default function AISearchPage() {
     }
   };
 
+  // Keep the latest formik instance in a ref so the `q` effect depends only on `q`.
+  const formikRef = useRef(formik);
+  useEffect(() => {
+    formikRef.current = formik;
+  });
+
   useEffect(() => {
     if (q) {
-      formik.setValues({ query: q });
-      formik.handleSubmit();
+      formikRef.current.setValues({ query: q });
+      formikRef.current.handleSubmit();
     }
-    // Only re-run when the `q` query param changes; formik is stable here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q])
 
   const formatLocation = (c: AIResult) => [c.city, c.state].filter(Boolean).join(', ');
@@ -276,7 +283,17 @@ export default function AISearchPage() {
         </div>
 
         {error && (
-          <div className="mt-4 shrink-0 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>
+          <div className="mt-4 shrink-0 flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            <span>{error}</span>
+            {errorCode === 'HTTP_402' && (
+              <a
+                href="mailto:admin@miller3.com?subject=Request for more AI search credits"
+                className="shrink-0 rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-destructive/90"
+              >
+                Contact Admin for more credits
+              </a>
+            )}
+          </div>
         )}
 
         {/* Thinking */}

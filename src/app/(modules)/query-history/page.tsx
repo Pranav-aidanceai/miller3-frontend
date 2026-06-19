@@ -10,11 +10,13 @@ import { RootState } from "@/store/store";
 
 interface QueryHistoryItem {
   query_type: 'ai' | 'structured';
-  raw_input: string;
+  raw_input: string | null;
   result_count: number;
   created_at: string;
   user_email: string | null;
 }
+
+type Scope = 'personal' | 'all';
 
 export default function QueryHistoryPage() {
 
@@ -27,6 +29,7 @@ export default function QueryHistoryPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(0);
+  const [scope, setScope] = useState<Scope>('personal');
 
   useEffect(() => {
     let active = true;
@@ -34,7 +37,9 @@ export default function QueryHistoryPage() {
       setLoading(true);
       setError(null);
       try {
-        const response = await axios.get('/api/query-history', { params: { page, limit: perPage } });
+        const response = await axios.get('/api/query-history', {
+          params: { page, limit: perPage, scope: isAdmin ? scope : undefined },
+        });
         if (!active) return;
         const data = response?.data?.data;
         setUserQueries(data?.items ?? []);
@@ -51,12 +56,27 @@ export default function QueryHistoryPage() {
       }
     })();
     return () => { active = false; };
-  }, [page, perPage]);
+  }, [page, perPage, scope, isAdmin]);
 
   return (
     <div className="flex flex-col p-5" style={{ height: 'calc(100vh - 3rem)' }}>
       {/* Static header */}
-      <h1 className="shrink-0 text-2xl font-bold">Query History</h1>
+      <div className="shrink-0 flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Query History</h1>
+        {isAdmin && (
+          <div className="relative">
+            <select
+              value={scope}
+              onChange={e => { setScope(e.target.value as Scope); setPage(1); }}
+              className="h-9 rounded-md border border-input bg-background px-3 pr-8 text-sm appearance-none cursor-pointer"
+            >
+              <option value="personal">Personal</option>
+              <option value="all">All</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          </div>
+        )}
+      </div>
 
       <div className="mt-4 flex-1 overflow-auto">
         {loading && (
@@ -101,7 +121,7 @@ export default function QueryHistoryPage() {
                 className="rounded-lg border border-border bg-card p-4 flex items-start justify-between gap-4"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm truncate">{q.raw_input}</p>
+                  <p className="font-medium text-sm truncate">{q.raw_input ?? 'Structured search'}</p>
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       {q.query_type === 'ai' ? 'AI' : 'Structured'}
@@ -113,18 +133,21 @@ export default function QueryHistoryPage() {
                       const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(':', ' ');
                       return `${date}, ${time}`;
                     })()}</span>
+                    {q.user_email && <span className="text-primary">{q.user_email}</span>}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  data-tour="query-replay-button"
-                  className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent transition-colors cursor-pointer"
-                  onClick={() => {
-                    router.push(`/ai-search?q=${encodeURIComponent(q.raw_input)}`);
-                  }}
-                >
-                  Replay
-                </button>
+                {q.raw_input && (
+                  <button
+                    type="button"
+                    data-tour="query-replay-button"
+                    className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent transition-colors cursor-pointer"
+                    onClick={() => {
+                      router.push(`/ai-search?q=${encodeURIComponent(q.raw_input!)}`);
+                    }}
+                  >
+                    Replay
+                  </button>
+                )}
               </div>
             ))}
           </div>

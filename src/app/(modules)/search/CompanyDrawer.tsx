@@ -190,7 +190,42 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
         const { data, errors } = await singleEnrichAction(payload);
         if (errors) {
             setEnriching(false);
-            toast.error(errors[0].message || 'Enrich failed', {
+            const firstError = errors[0];
+            const errorCode = firstError?.error?.error_code;
+            const detail = firstError?.error?.detail || firstError?.message || 'Enrich failed';
+
+            if (errorCode === 'HTTP_402') {
+                toast.custom((toastId) => (
+                    <div className="relative flex w-full flex-col gap-3 rounded-lg border border-destructive bg-destructive p-4 text-white shadow-lg">
+                        <button
+                            type="button"
+                            aria-label="Close"
+                            onClick={() => toast.dismiss(toastId)}
+                            className="absolute right-2 top-2 rounded p-0.5 text-white/80 transition-colors hover:text-white"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                        <div className="flex items-start gap-3 pr-5">
+                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                            <p className="text-sm font-medium leading-snug">
+                                You&apos;ve reached your monthly enrichment credit limit. Contact your admin to request more credits.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                window.location.href = 'mailto:admin@miller3.com?subject=Request for more enrichment credits';
+                            }}
+                            className="w-fit rounded-md bg-black/30 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-black/40"
+                        >
+                            Contact admin for more credits
+                        </button>
+                    </div>
+                ), { duration: Infinity });
+                return;
+            }
+
+            toast.error(detail, {
                 duration: 5000,
                 className: '!bg-destructive !text-white !border-destructive'
             });
