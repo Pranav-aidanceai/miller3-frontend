@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Search, X, Grid3X3, List, Loader2, Download, Zap, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { CompanyDrawer } from './CompanyDrawer';
 import Filters from './Filters';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchAction } from './searchServices';
+import { isSessionExpiring } from '@/lib/session';
 import { Company, CompanySearchPayload, ExportPayload } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
@@ -122,7 +123,7 @@ export default function SearchPage() {
       setTotalPages(response.data.total_pages);
       setNotAccessibleFields(response.data.not_accessible);
     } catch {
-      toast.error('Failed to fetch companies');
+      if (!isSessionExpiring()) toast.error('Failed to fetch companies');
     } finally {
       setIsLoading(false);
     }
@@ -135,6 +136,15 @@ export default function SearchPage() {
       setCurrentPage(1);
       await fetchCompanies(null);
     })();
+  }, [fetchCompanies]);
+
+  // Keep the active page's cursor in a ref so async callers (the drawer's
+  // single-enrich, the batch-enrich WebSocket toast) can refetch whatever page
+  // the user is currently viewing — not the page they were on when they started.
+  const currentCursorRef = useRef(currentCursor);
+  useEffect(() => { currentCursorRef.current = currentCursor; }, [currentCursor]);
+  const refreshSearch = useCallback(() => {
+    fetchCompanies(currentCursorRef.current);
   }, [fetchCompanies]);
 
   const allSelected = companies.length > 0 && companies.every(c => selectedIds.has(c.id));
@@ -226,13 +236,13 @@ export default function SearchPage() {
           <Tooltip
             id="export-tip"
             place="bottom"
-            content={role === 'FREE' ? 'Please upgrade to export search results' : 'Export search results'}
+            content={role === 'FREE' ? 'Please upgrade to export companies' : 'Export search companies'}
             className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
           />
 
           <button
             type="button"
-            onClick={() => enrich(companies, selectedIds, () => setSelectedIds(new Set()))}
+            onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refreshSearch)}
             disabled={selectedIds.size <= 1 || isEnriching}
             className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
               'disabled:cursor-not-allowed disabled:opacity-50'
@@ -249,18 +259,36 @@ export default function SearchPage() {
           <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
             {isLoading
               ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching companies...</>
-              : <span>Showing {companies.length} of {totalResults.toLocaleString()} results</span>
+              : <span>Showing {companies.length} of {totalResults.toLocaleString()} companies</span>
             }
           </div>
-          <button
-            type="button"
-            onClick={() => fetchCompanies()}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-3">
+            {viewMode === 'card' && companies.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                disabled={isLoading}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  readOnly
+                  className="h-4 w-4 cursor-pointer accent-primary"
+                />
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fetchCompanies(currentCursor)}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {viewMode === 'table' && (
@@ -301,7 +329,7 @@ export default function SearchPage() {
         )}
       </div>
 
-      {selectedCompany && <CompanyDrawer id={selectedCompany.id} onClose={() => setSelectedCompany(null)} />}
+      {selectedCompany && <CompanyDrawer id={selectedCompany.id} onClose={() => setSelectedCompany(null)} onEnriched={refreshSearch} />}
 
       {showExportModal && (
         <ExportModal

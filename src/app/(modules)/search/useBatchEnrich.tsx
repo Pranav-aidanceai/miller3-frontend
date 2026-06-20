@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Company } from '@/types/search';
+import axios from 'axios';
 import BatchEnrichToast from './BatchEnrichToast';
+import { parseApiError, isCreditError, showCreditLimitToast } from './apiError';
+import { isSessionExpiring } from '@/lib/session';
 
 interface BatchEnrichResult {
     batch_id: string;
@@ -15,13 +17,11 @@ export function useBatchEnrich() {
     const [isEnriching, setIsEnriching] = useState(false);
 
     const enrich = async (
-        companies: Company[],
         selectedIds: Set<string>,
         onSuccess?: () => void,
+        onComplete?: () => void,
     ) => {
-        const records = companies
-            .filter(c => selectedIds.has(c.id))
-            .map(c => ({ company_id: c.id }));
+        const records = Array.from(selectedIds).map(id => ({ company_id: id }));
 
         if (records.length === 0) {
             toast.error('Select at least one company to enrich');
@@ -30,32 +30,9 @@ export function useBatchEnrich() {
 
         setIsEnriching(true);
         try {
-            const response = await fetch('/api/batch-enrichment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ records }),
-            });
+            const response = await axios.post('/api/batch-enrichment', { records });
 
-            const body = await response.json().catch(() => null);
-
-            if (!response.ok) {
-                let detail = 'Batch enrichment failed. Please try again.';
-                if (body?.error) {
-                    try {
-                        const parsed = typeof body.error === 'string' ? JSON.parse(body.error) : body.error;
-                        if (parsed?.detail) detail = parsed.detail;
-                    } catch {
-                        if (typeof body.error === 'string') detail = body.error;
-                    }
-                }
-                toast.error(detail, {
-                    duration: 5000,
-                    className: '!bg-destructive !text-white !border-destructive',
-                });
-                return;
-            }
-
-            const data: BatchEnrichResult | undefined = body?.data;
+            const data: BatchEnrichResult | undefined = response.data?.data;
             if (!data?.ws_url) {
                 toast.error('Enrichment started but no progress channel was returned.');
                 return;
@@ -69,13 +46,33 @@ export function useBatchEnrich() {
                         toastId={id}
                         wsUrl={data.ws_url}
                         total={data.total_records ?? records.length}
+                        onComplete={onComplete}
                     />
                 ),
                 { duration: Infinity, dismissible: false },
             );
             onSuccess?.();
-        } catch {
-            toast.error('Batch enrichment failed. Please try again.');
+        } catch (error) {
+            // A 403 (account deactivated) is handled by the global deactivation
+            // modal via SessionGuard's interceptor — don't stack an error toast.
+            if (isSessionExpiring()) return;
+
+            const body = axios.isAxiosError(error) ? error.response?.data : null;
+            const { detail, code } = parseApiError(body, 'Batch enrichment failed. Please try again.');
+
+            if (isCreditError(code)) {
+                showCreditLimitToast({
+                    detail,
+                    fallbackMessage: "You've reached your monthly enrichment credit limit. Contact your admin to request more credits.",
+                    mailtoSubject: 'Request for more enrichment credits',
+                });
+                return;
+            }
+
+            toast.error(detail, {
+                duration: 5000,
+                className: '!bg-destructive !text-white !border-destructive',
+            });
         } finally {
             setIsEnriching(false);
         }

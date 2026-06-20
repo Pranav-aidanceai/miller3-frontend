@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle2, Loader2, XCircle, X } from 'lucide-react';
@@ -11,6 +11,9 @@ interface BatchEnrichToastProps {
     toastId: string | number;
     wsUrl: string;
     total: number;
+    /** Fired once when the batch reaches a successful terminal state, so the
+     *  caller can refresh the search list to reflect new enrichment statuses. */
+    onComplete?: () => void;
 }
 
 /**
@@ -38,7 +41,12 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | unde
     return undefined;
 }
 
-export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal }: BatchEnrichToastProps) {
+export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, onComplete }: BatchEnrichToastProps) {
+    // Held in a ref so the WebSocket effect doesn't re-run (and reconnect) when
+    // the parent passes a new callback identity on re-render.
+    const onCompleteRef = useRef(onComplete);
+    useEffect(() => { onCompleteRef.current = onComplete; });
+
     const [phase, setPhase] = useState<Phase>('connecting');
     const [total, setTotal] = useState(initialTotal);
     const [processed, setProcessed] = useState(0);
@@ -80,6 +88,9 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal }
             if (next === 'completed') {
                 setProcessed(totalCount);
                 setPercent(100);
+                // Refresh the search list so the newly enriched rows show their
+                // updated status.
+                onCompleteRef.current?.();
                 // Leave the success state visible briefly, then clear it.
                 window.setTimeout(() => toast.dismiss(toastId), 4000);
             }

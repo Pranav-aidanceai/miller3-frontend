@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { X, Copy, AlertCircle, Info, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCompanyAction, getSimilarCompanyAction, singleEnrichAction } from './searchServices';
+import { isSessionExpiring } from '@/lib/session';
 import { CompanyData } from '@/types/search';
 import SimilarPage from './Similar';
 import { ApiErrorResponse } from '@/types/common';
@@ -107,7 +108,7 @@ function Field({
     );
 }
 
-export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void }) {
+export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose: () => void; onEnriched?: () => void }) {
 
     const dispatch = useDispatch();
     const [tab, setTab] = useState<'overview' | 'similar' | 'location' | 'activity'>('overview');
@@ -166,7 +167,7 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                 const response = await getSimilarCompanyAction({ company_id: cid, limit: 5, cursor: null });
                 if (active) setSimilar(response.data.results ?? []);
             } catch {
-                if (active) toast.error('Failed to fetch similar companies');
+                if (active && !isSessionExpiring()) toast.error('Failed to fetch similar companies');
             } finally {
                 if (active) setSimilarLoading(false);
             }
@@ -225,14 +226,19 @@ export function CompanyDrawer({ id, onClose }: { id: string; onClose: () => void
                 return;
             }
 
-            toast.error(detail, {
-                duration: 5000,
-                className: '!bg-destructive !text-white !border-destructive'
-            });
+            if (!isSessionExpiring()) {
+                toast.error(detail, {
+                    duration: 5000,
+                    className: '!bg-destructive !text-white !border-destructive'
+                });
+            }
         } else if (data?.status === "SUCCESS") {
             setEnriching(false);
             dispatch(updateEnrichmentCredits(data.headers));
             fetchCompany(id);
+            // Refresh the underlying search list so the row reflects the new
+            // enrichment status without the user having to reload.
+            onEnriched?.();
             toast.success('Company enriched successfully');
         }
     };

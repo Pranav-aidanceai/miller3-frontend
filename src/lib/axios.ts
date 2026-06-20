@@ -30,19 +30,24 @@ AXIOS.interceptors.response.use(
       originalRequest._retry = true;
       try {
         const response = await refreshTokenAction();
+        // This instance runs server-side (the request interceptor reads cookies
+        // via next/headers), so `window` does not exist here. On a failed refresh
+        // just reject and let the client redirect to login.
         if (response.errors) {
-          window.location.href = '/';
           return Promise.reject(response.errors);
         }
         return AXIOS(originalRequest);
       } catch (refreshError) {
-        window.location.href = "/";
         return Promise.reject(refreshError);
       }
     }
 
+    // Rethrow the original AxiosError so route handlers can read
+    // `error.response.status` (e.g. forward a 403 to the client) and
+    // `error.response.data`. Throwing the bare `error.response.data` here
+    // loses the status code and breaks every `instanceof AxiosError` check.
     if (error.response) {
-      throw error.response.data;
+      throw error;
     } else {
       throw new Error("Network Error");
     }

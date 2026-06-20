@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
-import { ListFilter, ChevronDown, Check, Search } from 'lucide-react';
+import { ListFilter, ChevronDown, Check, Search, RefreshCw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useDebounce } from '@/hooks/useDebounce';
 import UserDetailModal from './UserDetailModal';
@@ -166,7 +166,18 @@ export default function AdminUsersPage() {
 
     return (
         <div className="px-6 pt-3 h-full max-h-screen overflow-auto">
-            <h1 className="text-2xl font-bold">User Management</h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">User Management</h1>
+                <button
+                    type="button"
+                    onClick={fetchUsers}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                    <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+                    Refresh
+                </button>
+            </div>
 
             {/* Toolbar */}
             <div className="mt-4 flex flex-wrap items-center gap-3">

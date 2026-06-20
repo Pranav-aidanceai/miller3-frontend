@@ -1,31 +1,9 @@
-'use server'
-
-import AXIOS from "@/lib/axios";
 import { CompanySearchPayload } from "@/types/search";
 import axios from "axios";
-import { cookies } from "next/headers";
 
 export async function searchAction(payload: CompanySearchPayload) {
     try {
-        const cookieStore = await cookies();
-        const params = new URLSearchParams();
-
-        Object.entries(payload).forEach(([key, value]) => {
-            if (value !== null && value !== '' && value !== undefined) {
-                if (Array.isArray(value)) {
-                    value.forEach(v => params.append(key, String(v)));
-                } else {
-                    params.append(key, String(value));
-                }
-            }
-        });
-
-        const response = await AXIOS.get(`/api/v1/search`, {
-            params,
-            headers: {
-                "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
-            }
-        });
+        const response = await axios.post(`/api/search`, payload);
         return { data: response.data, error: null }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
@@ -40,27 +18,20 @@ export async function searchAction(payload: CompanySearchPayload) {
 
 export async function getCompanyAction(id: string) {
     try {
-        const cookieStore = await cookies();
-        const response = await AXIOS.get(`/api/v1/companies/${id}`, {
-            headers: {
-                "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
-            }
-        });
+        const response = await axios.get(`/api/companies/${id}`);
         return { data: response.data, error: null }
     } catch (error: unknown) {
-        return { data: null, error: error };
+        if (axios.isAxiosError(error)) {
+            return { data: null, error: error.response?.data ?? { detail: 'Fetch company failed' } };
+        }
+        return { data: null, error: { detail: 'Something went wrong' } };
     }
 }
 
 export async function getSimilarCompanyAction(payload: { company_id: string, limit: number, cursor: string | null }) {
     try {
-        const cookieStore = await cookies();
-        const params = { limit: payload.limit, cursor: payload.cursor };
-        const response = await AXIOS.get(`/api/v1/companies/${payload.company_id}/similar`, {
-            params,
-            headers: {
-                "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
-            }
+        const response = await axios.get(`/api/companies/${payload.company_id}/similar`, {
+            params: { limit: payload.limit, cursor: payload.cursor }
         });
         return { data: response.data, error: null }
     } catch (error: unknown) {
@@ -74,20 +45,22 @@ export async function getSimilarCompanyAction(payload: { company_id: string, lim
     }
 }
 
-export async function singleEnrichAction(payload: { company_name: string, location: string }) {
+export async function singleEnrichAction(payload: { company_id?: string, company_name: string, location: string }) {
     try {
-        const cookieStore = await cookies();
-        const response = await AXIOS.post(`/api/v1/enrichment/single`, payload, {
-            headers: {
-                "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
-            }
-        });
-        return { data: {status: 'SUCCESS', data: response.data, headers: response.headers["x-enrichment-credits-remaining"]}, error: null }
+        const response = await axios.post(`/api/enrichment/single`, payload);
+        return {
+            data: {
+                status: 'SUCCESS',
+                data: response.data,
+                headers: response.headers["x-enrichment-credits-remaining"]
+            },
+            error: null
+        }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
             return {
                 data: null,
-                errors: error.response?.data ?? [{ message: 'Enrichment failed' }]
+                errors: [{ error: error.response?.data, message: 'Enrichment failed' }]
             }
         }
         return { data: null, errors: [{ error: error, message: 'Something went wrong' }] }

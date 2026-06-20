@@ -16,8 +16,6 @@ interface QueryHistoryItem {
   user_email: string | null;
 }
 
-type Scope = 'personal' | 'all';
-
 export default function QueryHistoryPage() {
 
   const router = useRouter();
@@ -29,7 +27,6 @@ export default function QueryHistoryPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(0);
-  const [scope, setScope] = useState<Scope>('personal');
 
   useEffect(() => {
     let active = true;
@@ -38,7 +35,7 @@ export default function QueryHistoryPage() {
       setError(null);
       try {
         const response = await axios.get('/api/query-history', {
-          params: { page, limit: perPage, scope: isAdmin ? scope : undefined },
+          params: { page, limit: perPage },
         });
         if (!active) return;
         const data = response?.data?.data;
@@ -56,26 +53,13 @@ export default function QueryHistoryPage() {
       }
     })();
     return () => { active = false; };
-  }, [page, perPage, scope, isAdmin]);
+  }, [page, perPage]);
 
   return (
     <div className="flex flex-col p-5" style={{ height: 'calc(100vh - 3rem)' }}>
       {/* Static header */}
       <div className="shrink-0 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Query History</h1>
-        {isAdmin && (
-          <div className="relative">
-            <select
-              value={scope}
-              onChange={e => { setScope(e.target.value as Scope); setPage(1); }}
-              className="h-9 rounded-md border border-input bg-background px-3 pr-8 text-sm appearance-none cursor-pointer"
-            >
-              <option value="personal">Personal</option>
-              <option value="all">All</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          </div>
-        )}
       </div>
 
       <div className="mt-4 flex-1 overflow-auto">
