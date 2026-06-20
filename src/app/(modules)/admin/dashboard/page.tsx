@@ -4,6 +4,7 @@ import { Users, Search, Zap, AlertTriangle, DollarSign, RefreshCw } from 'lucide
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { getErrorMessage } from '@/lib/apiError';
 import AnalyticsSection from './AnalyticsSection';
 
 interface DashboardData {
@@ -69,11 +70,7 @@ export default function AdminDashboard() {
       const res = await axios.get('/api/admin/dashboard');
       setData(res.data.data);
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.error || 'Failed to load dashboard data');
-      } else {
-        setError('Failed to load dashboard data');
-      }
+      setError(getErrorMessage(err, 'Failed to load dashboard data'));
     } finally {
       setLoading(false);
     }
@@ -87,11 +84,7 @@ export default function AdminDashboard() {
         if (active) setData(res.data.data);
       } catch (err: unknown) {
         if (!active) return;
-        if (axios.isAxiosError(err)) {
-          setError(err.response?.data?.error || 'Failed to load dashboard data');
-        } else {
-          setError('Failed to load dashboard data');
-        }
+        setError(getErrorMessage(err, 'Failed to load dashboard data'));
       } finally {
         if (active) setLoading(false);
       }

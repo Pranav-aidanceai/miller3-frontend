@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Loader2, RefreshCw, type LucideIcon } from 'lucide-react';
+import { getErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
 import { Chart, type ChartOptions } from '@highcharts/react';
 import type * as Highcharts from 'highcharts';
@@ -234,11 +235,7 @@ export default function AnalyticsChart({
         setError(null);
       } catch (err: unknown) {
         if (ignore) return;
-        if (axios.isAxiosError(err)) {
-          setError(err.response?.data?.error || 'Failed to load chart');
-        } else {
-          setError('Failed to load chart');
-        }
+        setError(getErrorMessage(err, 'Failed to load chart'));
       } finally {
         if (!ignore) setLoading(false);
       }

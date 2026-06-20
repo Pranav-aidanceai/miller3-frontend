@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { ListFilter, ChevronDown, Check, Search, RefreshCw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useDebounce } from '@/hooks/useDebounce';
+import { getErrorMessage } from '@/lib/apiError';
 import UserDetailModal from './UserDetailModal';
 
 interface AdminUser {
@@ -93,11 +94,7 @@ export default function AdminUsersPage() {
             setUsers(payload.users ?? []);
             setTotal(payload.total ?? 0);
         } catch (err: unknown) {
-            if (axios.isAxiosError(err)) {
-                setError(err.response?.data?.error || 'Failed to load users');
-            } else {
-                setError('Failed to load users');
-            }
+            setError(getErrorMessage(err, 'Failed to load users'));
         } finally {
             setLoading(false);
         }
@@ -118,11 +115,7 @@ export default function AdminUsersPage() {
                 setTotal(payload.total ?? 0);
             } catch (err: unknown) {
                 if (!active) return;
-                if (axios.isAxiosError(err)) {
-                    setError(err.response?.data?.error || 'Failed to load users');
-                } else {
-                    setError('Failed to load users');
-                }
+                setError(getErrorMessage(err, 'Failed to load users'));
             } finally {
                 if (active) setLoading(false);
             }

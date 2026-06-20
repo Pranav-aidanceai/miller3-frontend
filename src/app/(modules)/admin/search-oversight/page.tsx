@@ -5,6 +5,7 @@ import axios from 'axios';
 import { cn } from '@/lib/utils';
 import { ListFilter, ChevronDown, Check, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { getErrorMessage } from '@/lib/apiError';
 
 interface SearchLog {
     type: 'ai' | 'structured';
@@ -32,25 +33,6 @@ const TYPE_LABELS: Record<SearchType, string> = {
 };
 
 const PRESET_LIMITS = [20, 50, 100] as const;
-
-const FALLBACK_ERROR = 'Failed to load search logs';
-
-function parseError(raw: unknown): string {
-    if (!raw) return FALLBACK_ERROR;
-    let value: unknown = raw;
-    if (typeof raw === 'string') {
-        try {
-            value = JSON.parse(raw);
-        } catch {
-            return raw;
-        }
-    }
-    if (value && typeof value === 'object') {
-        const obj = value as { detail?: string; error?: { detail?: string } };
-        return obj.error?.detail || obj.detail || FALLBACK_ERROR;
-    }
-    return FALLBACK_ERROR;
-}
 
 export default function SearchOversightPage() {
     const [searches, setSearches] = useState<SearchLog[]>([]);
@@ -93,11 +75,7 @@ export default function SearchOversightPage() {
                 setPrevCursor(data.prev_cursor ?? null);
             } catch (err: unknown) {
                 if (!active) return;
-                if (axios.isAxiosError(err)) {
-                    setError(parseError(err.response?.data?.error));
-                } else {
-                    setError('Failed to load search logs');
-                }
+                setError(getErrorMessage(err, 'Failed to load search logs'));
             } finally {
                 if (active) setLoading(false);
             }

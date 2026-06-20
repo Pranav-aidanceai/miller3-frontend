@@ -13,12 +13,15 @@ const LOGOUT_DELAY_SECONDS = Number(process.env.NEXT_PUBLIC_LOGOUT_DELAY_SECONDS
 export function SessionGuard() {
     const dispatch = useAppDispatch();
     const router = useRouter();
-    const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
+    // `isAuthenticated` is not persisted by redux-persist, so it's false after a
+    // page refresh even for logged-in users. Key off the persisted `user` instead
+    // so the guard still recognizes an active session post-refresh.
+    const user = useAppSelector((s) => s.auth.user);
     const [expired, setExpired] = useState(false);
-    const authRef = useRef(isAuthenticated);
+    const loggedInRef = useRef(!!user);
     useEffect(() => {
-        authRef.current = isAuthenticated;
-    }, [isAuthenticated]);
+        loggedInRef.current = !!user;
+    }, [user]);
 
     // Let any code path (axios interceptor below, or the fetch-based export /
     // batch-enrichment hooks) open the modal via triggerSessionExpired().
@@ -36,7 +39,7 @@ export function SessionGuard() {
                 const isSessionEndpoint =
                     url.includes('/api/auth/') || url.includes('/api/delete-cookie');
 
-                if (status === 403 && !isSessionEndpoint && authRef.current) {
+                if (status === 403 && !isSessionEndpoint && loggedInRef.current) {
                     triggerSessionExpired();
                 }
                 return Promise.reject(error);

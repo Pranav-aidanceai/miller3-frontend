@@ -6,6 +6,7 @@ import { X, Save, Loader2, Shield, Gauge, UserCheck, UserX, Ban, RotateCcw, Aler
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getErrorMessage } from '@/lib/apiError';
 
 interface RoleDefaults {
     searches: number;
@@ -153,11 +154,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
                 reason: data.override_reason ?? '',
             });
         } catch (err: unknown) {
-            if (axios.isAxiosError(err)) {
-                setError(err.response?.data?.error || 'Failed to load user details');
-            } else {
-                setError('Failed to load user details');
-            }
+            setError(getErrorMessage(err, 'Failed to load user details'));
         } finally {
             setLoading(false);
         }
@@ -181,11 +178,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
                 });
             } catch (err: unknown) {
                 if (!active) return;
-                if (axios.isAxiosError(err)) {
-                    setError(err.response?.data?.error || 'Failed to load user details');
-                } else {
-                    setError('Failed to load user details');
-                }
+                setError(getErrorMessage(err, 'Failed to load user details'));
             } finally {
                 if (active) setLoading(false);
             }
@@ -203,8 +196,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
             fetchUser();
             onUpdated?.();
         } catch (err: unknown) {
-            const msg = axios.isAxiosError(err) ? err.response?.data?.error : null;
-            toast.error(msg || 'Failed to update role');
+            toast.error(getErrorMessage(err, 'Failed to update role'));
         } finally {
             setSavingRole(false);
         }
@@ -230,8 +222,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
             toast.success(`Quotas updated for ${user.name}`);
             onUpdated?.();
         } catch (err: unknown) {
-            const msg = axios.isAxiosError(err) ? err.response?.data?.error : null;
-            toast.error(msg || 'Failed to update quotas');
+            toast.error(getErrorMessage(err, 'Failed to update quotas'));
         } finally {
             setSavingQuotas(false);
         }
@@ -253,8 +244,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
             onUpdated?.();
             onClose();
         } catch (err: unknown) {
-            const msg = axios.isAxiosError(err) ? err.response?.data?.error : null;
-            toast.error(msg || `Failed to ${action.label.toLowerCase()}`);
+            toast.error(getErrorMessage(err, `Failed to ${action.label.toLowerCase()}`));
             setActionLoading(null);
             setConfirming(null);
         }

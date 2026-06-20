@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
 import { DollarSign, Zap, Cpu, Database, ShieldAlert, Pencil, Check, X, Loader2, RefreshCw } from 'lucide-react';
+import { getErrorMessage } from '@/lib/apiError';
 
 interface CostResponse {
     hard_stop_threshold: number;
@@ -42,11 +43,7 @@ export default function AdminCostsPage() {
             const res = await axios.get('/api/admin/cost');
             setData(res.data.data);
         } catch (err: unknown) {
-            if (axios.isAxiosError(err)) {
-                setError(err.response?.data?.error || 'Failed to load cost data');
-            } else {
-                setError('Failed to load cost data');
-            }
+            setError(getErrorMessage(err, 'Failed to load cost data'));
         } finally {
             setLoading(false);
         }
@@ -66,11 +63,7 @@ export default function AdminCostsPage() {
                 if (active) setData(res.data.data);
             } catch (err: unknown) {
                 if (!active) return;
-                if (axios.isAxiosError(err)) {
-                    setError(err.response?.data?.error || 'Failed to load cost data');
-                } else {
-                    setError('Failed to load cost data');
-                }
+                setError(getErrorMessage(err, 'Failed to load cost data'));
             } finally {
                 if (active) setLoading(false);
             }
@@ -97,11 +90,7 @@ export default function AdminCostsPage() {
             setData(prev => (prev ? { ...prev, hard_stop_threshold: value } : prev));
             setEditing(false);
         } catch (err: unknown) {
-            if (axios.isAxiosError(err)) {
-                setError(err.response?.data?.error || 'Failed to update threshold');
-            } else {
-                setError('Failed to update threshold');
-            }
+            setError(getErrorMessage(err, 'Failed to update threshold'));
         } finally {
             setSaving(false);
         }

@@ -1,6 +1,7 @@
 'use client';
 
 import { Activity, TrendingUp, Database, Phone, Mail, Globe, RefreshCw } from 'lucide-react';
+import { getErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
@@ -34,11 +35,7 @@ export default function AdminDataHealthPage() {
             const res = await axios.get('/api/admin/data-health');
             setData(res.data.data);
         } catch (err: unknown) {
-            if (axios.isAxiosError(err)) {
-                setError(err.response?.data?.error || 'Failed to load data health metrics');
-            } else {
-                setError('Failed to load data health metrics');
-            }
+            setError(getErrorMessage(err, 'Failed to load data health metrics'));
         } finally {
             setLoading(false);
         }
@@ -52,11 +49,7 @@ export default function AdminDataHealthPage() {
                 if (active) setData(res.data.data);
             } catch (err: unknown) {
                 if (!active) return;
-                if (axios.isAxiosError(err)) {
-                    setError(err.response?.data?.error || 'Failed to load data health metrics');
-                } else {
-                    setError('Failed to load data health metrics');
-                }
+                setError(getErrorMessage(err, 'Failed to load data health metrics'));
             } finally {
                 if (active) setLoading(false);
             }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import axios from 'axios';
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw, type LucideIcon } from 'lucide-react';
+import { getErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
 import FilterPopover, { type FilterDef } from './FilterPopover';
 
@@ -82,11 +83,7 @@ export default function AnalyticsTable<T>({
         setError(null);
       } catch (err: unknown) {
         if (ignore) return;
-        if (axios.isAxiosError(err)) {
-          setError(err.response?.data?.error || 'Failed to load data');
-        } else {
-          setError('Failed to load data');
-        }
+        setError(getErrorMessage(err, 'Failed to load data'));
       } finally {
         if (!ignore) setLoading(false);
       }

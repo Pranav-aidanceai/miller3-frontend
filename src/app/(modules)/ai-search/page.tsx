@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getTemplateAction, submitQueryAction } from './aisearch-services';
-import { ApiError } from '@/types/common';
+import { isCreditError, showCreditLimitToast } from '../search/apiError';
+import { isSessionExpiring } from '@/lib/session';
 import { useFormik } from 'formik';
 import { CompanyDrawer } from '../search/CompanyDrawer';
 import ExportModal from '../search/ExportModal';
@@ -148,7 +149,25 @@ export default function AISearchPage() {
       setLoading(true);
       const { data, errors } = await getTemplateAction();
       setLoading(false);
-      if (!errors) setTemplates(data);
+      if (errors) {
+        // A 403 (account deactivated) is handled by the global deactivation modal.
+        if (isSessionExpiring()) return;
+        const { message, code } = errors[0];
+        if (isCreditError(code)) {
+          showCreditLimitToast({
+            detail: message,
+            fallbackMessage: "You've reached your monthly AI search credit limit. Contact your admin to request more credits.",
+            mailtoSubject: 'Request for more AI search credits',
+          });
+        } else {
+          toast.error(message, {
+            duration: 5000,
+            className: '!bg-destructive !text-white !border-destructive',
+          });
+        }
+        return;
+      }
+      setTemplates(data);
     };
     fetchTemplates();
   }, []);
@@ -188,7 +207,7 @@ export default function AISearchPage() {
       if (errors) {
         let detail = 'AI search failed';
         let code: string | null = null;
-        errors.forEach((err: { error: ApiError & { error_code?: string } }) => {
+        errors.forEach((err: { error: { detail: string; error_code: string | null } }) => {
           detail = err.error.detail;
           code = err.error.error_code ?? null;
         });

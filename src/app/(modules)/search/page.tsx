@@ -185,7 +185,7 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-3">
       <Filters
         filters={appliedFilters}
         setFilters={setAppliedFilters}
@@ -193,7 +193,7 @@ export default function SearchPage() {
         initialFilters={initialFilters}
       />
 
-      <div className="flex-1 overflow-auto p-4 md:p-6" style={{ height: 'calc(100vh - 3.5rem)' }}>
+      <div className="flex-1 overflow-auto p-4 md:py-6 px-1" style={{ height: 'calc(100vh - 3.5rem)' }}>
 
         {/* Top bar */}
         <div className="flex flex-wrap items-center gap-3 mb-4">

@@ -4,6 +4,7 @@ import axios from "axios";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
+import { getErrorMessage } from "@/lib/apiError";
 import { cn } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
@@ -43,11 +44,7 @@ export default function QueryHistoryPage() {
         setTotalPages(data?.total_pages ?? 0);
       } catch (err: unknown) {
         if (!active) return;
-        if (err instanceof axios.AxiosError) {
-          setError(err.response?.data?.error ?? 'Failed to load query history');
-        } else {
-          setError('Failed to load query history');
-        }
+        setError(getErrorMessage(err, 'Failed to load query history'));
       } finally {
         if (active) setLoading(false);
       }

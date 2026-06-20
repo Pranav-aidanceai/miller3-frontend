@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import axios from 'axios'
+import { getErrorMessage } from '@/lib/apiError'
 
 interface TermsModalProps {
   onAccept: () => void
@@ -34,10 +35,7 @@ export default function TermsModal({ onAccept, onClose }: TermsModalProps) {
 
         if (active) setContent(markdown)
       } catch (err) {
-        const message = axios.isAxiosError(err)
-          ? (err.response?.data?.error ?? 'Failed to load terms')
-          : (err instanceof Error ? err.message : 'Failed to load terms')
-        if (active) setError(message)
+        if (active) setError(getErrorMessage(err, 'Failed to load terms'))
       } finally {
         if (active) setLoading(false)
       }
