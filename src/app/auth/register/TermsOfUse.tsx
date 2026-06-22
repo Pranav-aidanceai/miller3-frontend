@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import axios from 'axios'
+import { getErrorMessage } from '@/lib/apiError'
 
 interface TermsModalProps {
   onAccept: () => void
@@ -21,13 +23,11 @@ export default function TermsModal({ onAccept, onClose }: TermsModalProps) {
 
     const fetchAgreement = async () => {
       try {
-        const res = await fetch('/api/auth/user-agreement')
-        const json = await res.json()
-        if (!res.ok) throw new Error(json?.error || 'Failed to load terms')
+        const res = await axios.get('/api/auth/user-agreement')
 
         // The route wraps the upstream response as { data: ... }. The markdown
         // may be the string itself or nested under a common key.
-        const payload = json?.data
+        const payload = res.data?.data
         const markdown =
           typeof payload === 'string'
             ? payload
@@ -35,7 +35,7 @@ export default function TermsModal({ onAccept, onClose }: TermsModalProps) {
 
         if (active) setContent(markdown)
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Failed to load terms')
+        if (active) setError(getErrorMessage(err, 'Failed to load terms'))
       } finally {
         if (active) setLoading(false)
       }

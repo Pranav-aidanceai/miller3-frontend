@@ -7,6 +7,8 @@ import * as yup from 'yup';
 import { resetPasswordAction } from '../authServices';
 import { ApiError } from '@/types/common';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
+import { getErrorMessage } from '@/lib/apiError';
 import { Eye, EyeOff, Check } from 'lucide-react';
 
 const OTP_LENGTH = 6;
@@ -93,25 +95,6 @@ function OtpInput({ value, onChange, disabled }: { value: string; onChange: (otp
 }
 
 
-function extractError(payload: unknown, fallback: string): string {
-  if (payload && typeof payload === 'object' && 'error' in payload) {
-    const err = (payload as { error: unknown }).error;
-    if (typeof err === 'string') {
-      try {
-        const parsed = JSON.parse(err);
-        if (parsed && typeof parsed === 'object') {
-          if (typeof parsed.detail === 'string') return parsed.detail;
-          if (Array.isArray(parsed.errors) && parsed.errors[0]?.message) return parsed.errors[0].message;
-        }
-      } catch {
-        return err;
-      }
-      return err;
-    }
-  }
-  return fallback;
-}
-
 export default function ForgotPasswordPage() {
 
   const router = useRouter();
@@ -149,19 +132,13 @@ export default function ForgotPasswordPage() {
       setError('');
       setLoading(true);
       try {
-        const res = await fetch('/api/auth/verify-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailFormik.values.email, otp: values.otp.trim() })
+        await axios.post('/api/auth/verify-otp', {
+          email: emailFormik.values.email,
+          otp: values.otp.trim(),
         });
-        const payload = await res.json();
-        if (!res.ok) {
-          setError(extractError(payload, 'Invalid or expired code'));
-          return;
-        }
         setStep('password');
-      } catch {
-        setError('Something went wrong. Please try again.');
+      } catch (err) {
+        setError(getErrorMessage(err, 'Invalid or expired code'));
       } finally {
         setLoading(false);
       }
@@ -183,19 +160,13 @@ export default function ForgotPasswordPage() {
       setError('');
       setLoading(true);
       try {
-        const res = await fetch('/api/auth/confirm-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: emailFormik.values.email, new_password: values.password })
+        await axios.post('/api/auth/confirm-password', {
+          email: emailFormik.values.email,
+          new_password: values.password,
         });
-        const payload = await res.json();
-        if (!res.ok) {
-          setError(extractError(payload, 'Failed to reset password'));
-          return;
-        }
         setStep('done');
-      } catch {
-        setError('Something went wrong. Please try again.');
+      } catch (err) {
+        setError(getErrorMessage(err, 'Failed to reset password'));
       } finally {
         setLoading(false);
       }

@@ -1,20 +1,41 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { Search, X, Grid3X3, List, ChevronDown, Loader2, Info, Phone, Mail, Globe, Download } from 'lucide-react';
+import { Search, X, Grid3X3, List, Loader2, Download, Zap, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompanyDrawer } from './CompanyDrawer';
 import Filters from './Filters';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchAction } from './searchServices';
-import { Company, CompanySearchPayload, ExportPayload } from '@/types/search';
+import { isSessionExpiring } from '@/lib/session';
+import { Company, CompanySearchPayload } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 import ExportModal from './ExportModal';
 import { RootState } from '@/store/store';
-import { useDispatch, useSelector } from 'react-redux';
-import { updateExportCredits } from '@/store/slices/authSlice';
+import { useSelector } from 'react-redux';
+import CompanyTable from './CompanyTable';
+import CompanyCards from './CompanyCards';
+import SearchPagination from './SearchPagination';
+import SortPopover from './SortPopover';
+import { useExport } from './useExport';
+import { useBatchEnrich } from './useBatchEnrich';
+
+// Persist enough of the search state to restore the exact page the user was on
+// across a browser refresh. The cursor is only valid for a specific query, so
+// the filters/sort/search that produced it are persisted alongside it.
+const SEARCH_STATE_KEY = 'miller3:search-state';
+
+function loadSearchState(): Record<string, unknown> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(SEARCH_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function SearchPage() {
 
@@ -37,158 +58,140 @@ export default function SearchPage() {
   };
 
   const role = useSelector((state: RootState) => state.auth.role);
-  const dispatch = useDispatch();
-  const [nameQ, setNameQ] = useState('');
-  const [sortBy, setSortBy] = useState('');
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('card');
-  const [perPage, setPerPage] = useState(25);
+  const [persisted] = useState(loadSearchState);
+  const [nameQ, setNameQ] = useState((persisted?.nameQ as string) ?? '');
+  const [sortBy, setSortBy] = useState((persisted?.sortBy as string) ?? '');
+  const [sortOrder, setSortOrder] = useState((persisted?.sortOrder as string) ?? '');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>((persisted?.viewMode as 'table' | 'card') ?? 'card');
+  const [perPage, setPerPage] = useState((persisted?.perPage as number) ?? 25);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [notAccessibleFields, setNotAccessibleFields] = useState<string[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [appliedFilters, setAppliedFilters] = useState(initialFilters);
+  const [currentPage, setCurrentPage] = useState((persisted?.currentPage as number) ?? 1);
+  const [appliedFilters, setAppliedFilters] = useState((persisted?.appliedFilters as typeof initialFilters) ?? initialFilters);
   const [hasNextPage, setHasNextPage] = useState<string | null>(null);
-  const [cursorStack, setCursorStack] = useState<string[]>([]);
-  const [currentCursor, setCurrentCursor] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [exportPayload, setExportPayload] = useState<ExportPayload | null>(null);
+  const [cursorStack, setCursorStack] = useState<string[]>((persisted?.cursorStack as string[]) ?? []);
+  const [currentCursor, setCurrentCursor] = useState<string | null>((persisted?.currentCursor as string | null) ?? null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
-  const [isExporting, setIsExporting] = useState(false);
   const searchQuery = useDebounce(nameQ, 500).toLowerCase();
+
+  const { isExporting, exportData } = useExport();
+  const { isEnriching, enrich } = useBatchEnrich();
+
+  const buildSearch = useCallback((cursorValue: string | null): CompanySearchPayload => {
+    const {
+      stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
+      minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
+      demoFilter, hasEmail, hasPhone, hasWebsite
+    } = appliedFilters;
+
+    const payload: CompanySearchPayload = {
+      search_text: searchQuery || null,
+      state: stateFilter.length > 0 ? stateFilter : null,
+      city: cityFilter || null,
+      county: countyFilter || null,
+      naics_code: naicsFilter || null,
+      sic_code: sicFilter || null,
+      employee_size_min: minEmp ? parseInt(minEmp) : null,
+      employee_size_max: maxEmp ? parseInt(maxEmp) : null,
+      annual_revenue_min: minRev ? Number(minRev) : null,
+      annual_revenue_max: maxRev ? Number(maxRev) : null,
+      year_founded_min: minYear ? Number(minYear) : null,
+      year_founded_max: maxYear ? Number(maxYear) : null,
+      ownership_type: null,
+      minority_owned: demoFilter.includes('Minority-Owned') || null,
+      women_owned: demoFilter.includes('Women-Owned') || null,
+      veteran_owned: demoFilter.includes('Veteran-Owned') || null,
+      enrichment_status: null,
+      sort_by: sortBy,
+      sort_order: (sortOrder || 'asc') as 'asc' | 'desc',
+      limit: perPage,
+      cursor: cursorValue,
+      has_mobile_number: hasPhone ? true : null,
+      has_email: hasEmail ? true : null,
+      has_website: hasWebsite ? true : null
+    };
+
+    return payload;
+  }, [searchQuery, perPage, appliedFilters, sortBy, sortOrder]);
 
   const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
     setIsLoading(true);
     try {
-      const {
-        stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
-        minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
-        demoFilter, hasEmail, hasPhone, hasWebsite
-      } = appliedFilters;
-
-      const payload: CompanySearchPayload = {
-        search_text: searchQuery || null,
-        state: stateFilter.length > 0 ? stateFilter : null,
-        city: cityFilter || null,
-        county: countyFilter || null,
-        naics_code: naicsFilter || null,
-        sic_code: sicFilter || null,
-        employee_size_min: minEmp ? parseInt(minEmp) : null,
-        employee_size_max: maxEmp ? parseInt(maxEmp) : null,
-        annual_revenue_min: minRev ? Number(minRev) : null,
-        annual_revenue_max: maxRev ? Number(maxRev) : null,
-        year_founded_min: minYear ? Number(minYear) : null,
-        year_founded_max: maxYear ? Number(maxYear) : null,
-        ownership_type: null,
-        minority_owned: demoFilter.includes('Minority-Owned') || null,
-        women_owned: demoFilter.includes('Women-Owned') || null,
-        veteran_owned: demoFilter.includes('Veteran-Owned') || null,
-        enrichment_status: null,
-        sort_by: sortBy,
-        sort_order: 'asc',
-        limit: perPage,
-        cursor: cursorValue,
-        has_mobile_number: hasPhone ? true : null,
-        has_email: hasEmail ? true : null,
-        has_website: hasWebsite ? true : null
-      };
-
-      const { limit, cursor, ...payloadWithoutPagination } = payload;
-      const exportPayload: ExportPayload = {
-        ...payloadWithoutPagination,
-        format: 'csv',
-        row_limit: limit
-      };
-      setExportPayload(exportPayload);
-
+      const payload = buildSearch(cursorValue);
       const response = await searchAction(payload);
       setCompanies(response.data.results);
       setTotalResults(response.data.total);
       setHasNextPage(response.data.next_cursor || null);
       setTotalPages(response.data.total_pages);
       setNotAccessibleFields(response.data.not_accessible);
-    } catch (error) {
-      toast.error('Failed to fetch companies');
+    } catch {
+      if (!isSessionExpiring()) toast.error('Failed to fetch companies');
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, perPage, appliedFilters, sortBy]);
+  }, [buildSearch]);
 
+  // On the first mount, restore the page the user was on before a browser
+  // refresh by fetching with the persisted cursor. On every subsequent change
+  // to the query (search/filters/sort/perPage) reset back to the first page.
+  const didInitFetch = useRef(false);
   useEffect(() => {
+    if (!didInitFetch.current) {
+      didInitFetch.current = true;
+      fetchCompanies((persisted?.currentCursor as string | null) ?? null);
+      return;
+    }
     setCursorStack([]);
     setCurrentCursor(null);
     setCurrentPage(1);
     fetchCompanies(null);
-  }, [searchQuery, sortBy, perPage, appliedFilters, fetchCompanies]);
+  }, [fetchCompanies, persisted]);
 
-  const handleExport = async () => {
-    if (!exportPayload) {
-      toast.error('No data to export');
-      return;
-    }
-
-    setIsExporting(true);
+  // Mirror the search state into sessionStorage so a browser refresh can land
+  // the user back on the same page with the same query.
+  useEffect(() => {
     try {
-      const payload = {
-        ...exportPayload,
-        format: exportFormat,
-      };
-      const response = await fetch('/api/export', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        let detail = 'Export failed. Please try again.';
-        if (body?.error) {
-          try {
-            const parsed = typeof body.error === 'string' ? JSON.parse(body.error) : body.error;
-            if (parsed?.detail) detail = parsed.detail;
-          } catch {
-            if (typeof body.error === 'string') detail = body.error;
-          }
-        }
-        toast.error(detail, {
-          duration: 5000,
-          className: '!bg-destructive !text-white !border-destructive',
-        });
-        return;
-      }
-      const blob = await response.blob();
-      const now = new Date();
-      const dateStr = now.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      }).replace(/\//g, '-');
-      const timeStr = now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      }).replace(/:/g, '-');
-      const filename = `search_export_${dateStr}_${timeStr}.${exportFormat}`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      const remaining = parseInt(response.headers.get('x-export-credits-remaining') ?? '0');
-      dispatch(updateExportCredits(remaining));
-      toast.success(`Downloaded ${filename}`);
-      setShowExportModal(false);
+      sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
+        nameQ, sortBy, sortOrder, viewMode, perPage,
+        appliedFilters, currentPage, cursorStack, currentCursor,
+      }));
     } catch {
-      toast.error('Export failed. Please try again.');
-    } finally {
-      setIsExporting(false);
+      // Ignore quota/serialization errors — persistence is best-effort.
     }
+  }, [nameQ, sortBy, sortOrder, viewMode, perPage, appliedFilters, currentPage, cursorStack, currentCursor]);
+
+  // Keep the active page's cursor in a ref so async callers (the drawer's
+  // single-enrich, the batch-enrich WebSocket toast) can refetch whatever page
+  // the user is currently viewing — not the page they were on when they started.
+  const currentCursorRef = useRef(currentCursor);
+  useEffect(() => { currentCursorRef.current = currentCursor; }, [currentCursor]);
+  const refreshSearch = useCallback(() => {
+    fetchCompanies(currentCursorRef.current);
+  }, [fetchCompanies]);
+
+  const allSelected = companies.length > 0 && companies.every(c => selectedIds.has(c.id));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) companies.forEach(c => next.delete(c.id));
+      else companies.forEach(c => next.add(c.id));
+      return next;
+    });
   };
 
   const handleNext = () => {
@@ -209,185 +212,8 @@ export default function SearchPage() {
     fetchCompanies(prevCursor);
   };
 
-  /**
-   * Returns masked JSX if `fieldKey` is in notAccessibleFields.
-   * If not locked: shows `displayValue` when truthy, else falls back to `fallback` (default 'NA').
-   */
-  const MaskedCell = ({
-    fieldKey,
-    displayValue,
-    mono = false,
-    align = 'left',
-    fallback = 'NA',
-    tooltipPlace = 'top',
-  }: {
-    fieldKey: string;
-    displayValue: string | number | null | undefined;
-    mono?: boolean;
-    align?: 'left' | 'right' | 'center';
-    fallback?: string;
-    tooltipPlace?: 'top' | 'bottom' | 'left' | 'right';
-  }) => {
-    const isLocked = notAccessibleFields.includes(fieldKey);
-    const tooltipId = `upgrade-tip-${fieldKey}`;
-    const alignClass = align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start';
-
-    if (isLocked) {
-      return (
-        <span className={cn('flex items-center gap-1', alignClass)}>
-          <span className={cn('tracking-widest text-muted-foreground/50 select-none', mono && 'font-mono')}>
-            ••••
-          </span>
-          <span
-            data-tooltip-id={tooltipId}
-            data-tooltip-content="Please upgrade to see this field"
-            className="inline-flex items-center text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-            aria-label="Upgrade to view this field"
-          >
-            <Info className="h-3 w-3" />
-          </span>
-          <Tooltip
-            id={tooltipId}
-            place={tooltipPlace}
-            className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-          />
-        </span>
-      );
-    }
-
-    return (
-      <span className={cn(mono && 'font-mono')}>
-        {displayValue ?? fallback}
-      </span>
-    );
-  };
-
-  const ContactIcons = ({ c }: { c: Company }) => {
-    // green = has value, yellow = locked (in notAccessibleFields), red = null/missing
-    const getState = (hasData: string | null, fieldKey: string): 'green' | 'yellow' | 'red' => {
-      if (notAccessibleFields.includes(fieldKey)) return 'yellow';
-      if (!hasData) return 'red';
-      return 'green';
-    };
-
-    const colorMap = {
-      green: 'text-emerald-500',
-      yellow: 'text-amber-400',
-      red: 'text-rose-500',
-    };
-
-    const titleMap = {
-      phone: {
-        green: 'Mobile number available',
-        yellow: 'Please upgrade to access mobile number',
-        red: 'No mobile number available',
-      },
-      email: {
-        green: 'Email available',
-        yellow: 'Please upgrade to access email',
-        red: 'No email available',
-      },
-      website: {
-        green: 'Website available',
-        yellow: 'Please upgrade to access website',
-        red: 'No website available',
-      },
-    };
-
-    const phoneState = getState(c.phone, 'phone');
-    const emailState = getState(c.email, 'email');
-    const websiteState = getState(c.website, 'website');
-
-    // Unique tooltip ids per row to avoid conflicts when multiple rows render
-    const phoneTooltipId = `contact-phone-${c.id}`;
-    const emailTooltipId = `contact-email-${c.id}`;
-    const websiteTooltipId = `contact-website-${c.id}`;
-
-    return (
-      <div className="flex items-center gap-1.5">
-        {/* Phone */}
-        <span data-tooltip-id={phoneTooltipId} className="inline-flex cursor-default">
-          <Phone className={cn('h-3.5 w-3.5', colorMap[phoneState])} strokeWidth={2} />
-        </span>
-        <Tooltip
-          id={phoneTooltipId}
-          place="top"
-          content={titleMap.phone[phoneState]}
-          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-        />
-
-        {/* Email */}
-        <span data-tooltip-id={emailTooltipId} className="inline-flex cursor-default">
-          <Mail className={cn('h-3.5 w-3.5', colorMap[emailState])} strokeWidth={2} />
-        </span>
-        <Tooltip
-          id={emailTooltipId}
-          place="top"
-          content={titleMap.email[emailState]}
-          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-        />
-
-        {/* Website / Globe */}
-        <span data-tooltip-id={websiteTooltipId} className="inline-flex cursor-default">
-          <Globe className={cn('h-3.5 w-3.5', colorMap[websiteState])} strokeWidth={2} />
-        </span>
-        <Tooltip
-          id={websiteTooltipId}
-          place="top"
-          content={titleMap.website[websiteState]}
-          className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
-        />
-      </div>
-    );
-  };
-
-  const TableSkeleton = () => (
-    <tbody>
-      {Array.from({ length: perPage > 10 ? 10 : perPage }).map((_, i) => (
-        <tr key={i} className="border-b border-border">
-          <td className="px-4 py-3">
-            <div className="h-4 w-40 rounded bg-muted animate-pulse mb-1" />
-            <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-          </td>
-          <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted animate-pulse" /></td>
-          <td className="px-4 py-3 text-right"><div className="h-4 w-12 rounded bg-muted animate-pulse ml-auto" /></td>
-          <td className="px-4 py-3 text-right"><div className="h-4 w-16 rounded bg-muted animate-pulse ml-auto" /></td>
-          <td className="px-4 py-3"><div className="flex justify-center gap-1">
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-            <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-          </div></td>
-        </tr>
-      ))}
-    </tbody>
-  );
-
-  const CardSkeleton = () => (
-    <>
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex flex-col rounded-lg border border-border bg-card p-4 gap-3">
-          <div className="flex items-start justify-between">
-            <div className="h-10 w-10 rounded-lg bg-muted animate-pulse" />
-            <div className="flex gap-1">
-              <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-              <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-              <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
-            </div>
-          </div>
-          <div className="h-4 w-36 rounded bg-muted animate-pulse" />
-          <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-          <div className="flex gap-2">
-            <div className="h-4 w-14 rounded-full bg-muted animate-pulse" />
-            <div className="h-4 w-16 rounded bg-muted animate-pulse" />
-            <div className="h-4 w-14 rounded bg-muted animate-pulse" />
-          </div>
-        </div>
-      ))}
-    </>
-  );
-
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-3">
       <Filters
         filters={appliedFilters}
         setFilters={setAppliedFilters}
@@ -395,7 +221,7 @@ export default function SearchPage() {
         initialFilters={initialFilters}
       />
 
-      <div className="flex-1 overflow-auto p-4 md:p-6" style={{ height: 'calc(100vh - 3.5rem)' }}>
+      <div className="flex-1 overflow-auto p-4 md:py-6 px-1" style={{ height: 'calc(100vh - 3.5rem)' }}>
 
         {/* Top bar */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -417,219 +243,134 @@ export default function SearchPage() {
             <button onClick={() => setViewMode('card')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'card' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Card view"><Grid3X3 className="h-4 w-4" /></button>
             <button onClick={() => setViewMode('table')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'table' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Table view"><List className="h-4 w-4" /></button>
           </div>
-          <div className="relative">
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 pr-8 text-sm appearance-none cursor-pointer">
-              <option value="created_at">Name A–Z</option>
-              <option value="annual_revenue">Revenue ↓</option>
-              <option value="employee_size">Employees ↓</option>
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          </div>
+
+          <SortPopover
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            setSortBy={setSortBy}
+            setSortOrder={setSortOrder}
+          />
 
           <button
             data-tooltip-id="export-tip"
             onClick={() => setShowExportModal(true)}
-            disabled={role === 'FREE'}
+            disabled={role === 'FREE' || selectedIds.size === 0}
             className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
-              role === 'FREE' && 'cursor-not-allowed opacity-50'
+              (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50'
             )}
           >
-            <Download className="h-4 w-4" /> Export
+            <Download className="h-4 w-4" /> Export{selectedIds.size > 0 && ` (${selectedIds.size})`}
           </button>
           <Tooltip
             id="export-tip"
             place="bottom"
-            content={role === 'FREE' ? 'Please upgrade to export search results' : 'Export search results'}
-            className="!text-xs !px-2 !py-1 !rounded-md !bg-foreground !text-background"
+            content={role === 'FREE'
+              ? 'Please upgrade to export companies'
+              : selectedIds.size === 0
+                ? 'Select companies to export'
+                : 'Export selected companies'}
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
           />
+
+          <button
+            type="button"
+            data-tooltip-id="enrich-tip"
+            onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refreshSearch)}
+            disabled={selectedIds.size <= 1 || isEnriching}
+            className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
+              'disabled:cursor-not-allowed disabled:opacity-50'
+            )}
+          >
+            {isEnriching
+              ? <><Loader2 className="h-4 w-4 animate-spin" />Enriching...</>
+              : <><Zap className="h-4 w-4" />Batch Enrich{selectedIds.size > 1 && ` (${selectedIds.size})`}</>}
+          </button>
+          <Tooltip
+            id="enrich-tip"
+            place="bottom"
+            content={selectedIds.size <= 1
+              ? 'Select at least 2 companies for batch enrichment'
+              : 'Enrich selected companies'}
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+          />
+
         </div>
 
-        {/* Results count */}
-        <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-          {isLoading
-            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching companies...</>
-            : <span>Showing {companies.length} of {totalResults.toLocaleString()} results</span>
-          }
+        <div className='flex items-center justify-between'>
+          <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+            {isLoading
+              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching companies...</>
+              : <span>Showing {companies.length} of {totalResults.toLocaleString()} companies</span>
+            }
+          </div>
+          <div className="flex items-center gap-3">
+            {viewMode === 'card' && companies.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                disabled={isLoading}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  readOnly
+                  className="h-4 w-4 cursor-pointer accent-primary"
+                />
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => fetchCompanies(currentCursor)}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {/* Table View */}
         {viewMode === 'table' && (
-          <div className="rounded-lg border border-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">NAICS</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Employees</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Revenue</th>
-                    <th className="px-4 py-3 text-center font-medium text-muted-foreground">Contact</th>
-                  </tr>
-                </thead>
-                {isLoading ? <TableSkeleton /> : (
-                  <tbody>
-                    {companies.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="py-16 text-center text-muted-foreground">
-                          <p className="text-lg font-medium">No companies match your filters</p>
-                          <p className="mt-1 text-sm">Try loosening your criteria or switching to AI Search</p>
-                        </td>
-                      </tr>
-                    ) : companies.map(c => (
-                      <tr key={c.id} onClick={() => setSelectedCompany(c)}
-                        className="border-b border-border cursor-pointer transition-colors hover:bg-accent/50">
-                        <td className="px-4 py-3">
-                          <p className="font-medium">{c.company_name}</p>
-                          <p className="text-xs text-muted-foreground">{c.city}, {c.state}</p>
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          <MaskedCell
-                            fieldKey="naics_code"
-                            displayValue={c.naics_code}
-                            mono
-                            tooltipPlace="right"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <MaskedCell
-                            fieldKey="employee_size"
-                            displayValue={c.employee_size != null ? c.employee_size.toLocaleString() : null}
-                            align="right"
-                            tooltipPlace="top"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <MaskedCell
-                            fieldKey="annual_revenue"
-                            displayValue={c.annual_revenue != null ? `$${c.annual_revenue.toLocaleString()}` : null}
-                            align="right"
-                            tooltipPlace="top"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-center"><ContactIcons c={c} /></div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                )}
-              </table>
-            </div>
-          </div>
+          <CompanyTable
+            companies={companies}
+            isLoading={isLoading}
+            perPage={perPage}
+            selectedIds={selectedIds}
+            allSelected={allSelected}
+            notAccessibleFields={notAccessibleFields}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={toggleSelectAll}
+            onRowClick={setSelectedCompany}
+          />
         )}
 
-        {/* Card View */}
         {viewMode === 'card' && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {isLoading ? <CardSkeleton /> : companies.length === 0 ? (
-              <div className="col-span-full py-16 text-center text-muted-foreground">
-                <p className="text-lg font-medium">No companies match your filters</p>
-              </div>
-            ) : companies.map(c => (
-              <button type="button" key={c.id} onClick={() => setSelectedCompany(c)}
-                className="flex flex-col rounded-lg border border-border bg-card p-4 text-left transition-all hover:border-primary/40 hover:shadow-md cursor-pointer">
-                <div className="flex items-start justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                    {c.company_name.charAt(0)}
-                  </div>
-                  <ContactIcons c={c} />
-                </div>
-                <p className="mt-3 font-semibold">{c.company_name}</p>
-                <p className="text-xs text-muted-foreground">{c.city}, {c.state}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="rounded-pill bg-muted px-2 py-0.5 text-[10px]">
-                    <MaskedCell
-                      fieldKey="naics_code"
-                      displayValue={c.naics_code}
-                      mono
-                      tooltipPlace="bottom"
-                    />
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    <MaskedCell
-                      fieldKey="employee_size"
-                      displayValue={c.employee_size != null ? c.employee_size.toLocaleString() : null}
-                      tooltipPlace="bottom"
-                    />
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    <MaskedCell
-                      fieldKey="annual_revenue"
-                      displayValue={c.annual_revenue != null ? `$${c.annual_revenue.toLocaleString()}` : null}
-                      tooltipPlace="bottom"
-                    />
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
+          <CompanyCards
+            companies={companies}
+            isLoading={isLoading}
+            selectedIds={selectedIds}
+            notAccessibleFields={notAccessibleFields}
+            onToggleSelect={toggleSelect}
+            onCardClick={setSelectedCompany}
+          />
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <select
-                  value={perPage}
-                  onChange={e => setPerPage(Number(e.target.value))}
-                  className="h-9 rounded-md border border-input bg-background px-2 pr-8 text-sm appearance-none cursor-pointer"
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              </div>
-              <span className="text-xs text-muted-foreground">per page</span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                disabled={currentPage === 1 || isLoading}
-                onClick={handlePrev}
-                className="rounded-md border border-border px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-accent cursor-pointer"
-              >
-                Prev
-              </button>
-
-              {[currentPage - 1, currentPage, currentPage + 1]
-                .filter((p) => p >= 1 && (p < currentPage || p === currentPage || hasNextPage))
-                .map((p) => {
-                  const isActive = p === currentPage;
-                  return (
-                    <button
-                      key={p}
-                      disabled={isLoading}
-                      onClick={() => {
-                        if (p === currentPage - 1) handlePrev();
-                        else if (p === currentPage + 1) handleNext();
-                      }}
-                      className={cn(
-                        'min-w-8 rounded-md border px-2 py-1.5 text-sm transition-colors cursor-pointer',
-                        isActive
-                          ? 'border-primary bg-primary text-primary-foreground font-semibold pointer-events-none'
-                          : 'border-border hover:bg-accent disabled:opacity-50'
-                      )}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-
-              <button
-                disabled={!hasNextPage || isLoading}
-                onClick={handleNext}
-                className="rounded-md border border-border px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-accent cursor-pointer"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <SearchPagination
+            perPage={perPage}
+            setPerPage={setPerPage}
+            currentPage={currentPage}
+            hasNextPage={hasNextPage}
+            isLoading={isLoading}
+            onPrev={handlePrev}
+            onNext={handleNext}
+          />
         )}
       </div>
 
-      {selectedCompany && <CompanyDrawer id={selectedCompany.id} onClose={() => setSelectedCompany(null)} />}
+      {selectedCompany && <CompanyDrawer id={selectedCompany.id} onClose={() => setSelectedCompany(null)} onEnriched={refreshSearch} />}
 
       {showExportModal && (
         <ExportModal
@@ -637,7 +378,10 @@ export default function SearchPage() {
           setShowExportModal={setShowExportModal}
           exportFormat={exportFormat}
           setExportFormat={setExportFormat}
-          handleExport={handleExport}
+          handleExport={() => exportData(Array.from(selectedIds), exportFormat, () => {
+            setShowExportModal(false);
+            setSelectedIds(new Set());
+          })}
           isExporting={isExporting}
         />
       )}

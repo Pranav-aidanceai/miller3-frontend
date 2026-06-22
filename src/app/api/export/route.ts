@@ -64,7 +64,7 @@ export async function POST(req: Request) {
             );
         }
         console.error('[export] Unexpected error', error);
-        // @ts-ignore
+        // @ts-expect-error error is unknown; best-effort read of a possible `data` field
         let errorData = error?.data ?? String(error);
         if (Buffer.isBuffer(errorData)) {
             try {

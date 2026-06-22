@@ -97,30 +97,6 @@ export async function registerAction(name: string, email: string, password: stri
     }
 }
 
-export async function logoutAction() {
-    try {
-        const cookieStore = await cookies()
-        const response = await AXIOS.post('/api/v1/auth/logout', {}, {
-            headers: {
-                "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
-            }
-        })
-        if(response.status === 200) {
-            cookieStore.delete('access_token')
-            cookieStore.delete('refresh_token')
-        }
-        return { data: true, error: null }
-    } catch (error) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Logout failed' }]
-            }
-        }
-        return { data: null, errors: [{ message: 'Something went wrong' }] }
-    }
-}
-
 export async function resetPasswordAction(email: string) {
     try {
         const response = await axios.post(

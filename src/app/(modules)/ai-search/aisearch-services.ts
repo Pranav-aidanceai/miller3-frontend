@@ -1,51 +1,49 @@
-'use server'
-
-import AXIOS from "@/lib/axios";
 import axios from "axios";
-import { cookies } from "next/headers";
+
+/**
+ * Normalizes the two error body shapes the AI endpoints return into { detail, code }:
+ *   - { error_code, detail }                       (e.g. ACCOUNT_DEACTIVATED)
+ *   - { errors: [{ code, message, field }] }        (e.g. INSUFFICIENT_CREDITS)
+ */
+function parseAiError(body: unknown, fallback: string): { detail: string; code: string | null } {
+    if (body && typeof body === 'object') {
+        const b = body as {
+            error_code?: string;
+            detail?: unknown;
+            errors?: Array<{ code?: string; message?: string }>;
+        };
+        if (Array.isArray(b.errors) && b.errors[0]) {
+            return { detail: b.errors[0].message ?? fallback, code: b.errors[0].code ?? null };
+        }
+        if (typeof b.detail === 'string') {
+            return { detail: b.detail, code: b.error_code ?? null };
+        }
+    }
+    return { detail: fallback, code: null };
+}
 
 export async function submitQueryAction(query: string) {
-     try {
-        const cookieStore = await cookies();
-        const token = cookieStore.get('access_token')?.value;
-        
-        if (!token) {
-            return { data: null, errors: [{ message: 'No authentication token found' }] };
+    try {
+        const response = await axios.post(`/api/search/ai`, { query });
+        return {
+            data: response.data,
+            error: null,
+            headers: response.headers["x-ai-search-credits-remaining"]
         }
-
-        const response = await AXIOS.post(`/api/v1/search/ai`, { query }, {
-            headers: {
-                "Authorization": `Bearer ${token}`
-            }
-        });
-        return { data: response.data, error: null }
     } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data ?? [{ message: 'AI chat failed' }]
-            }
-        }
-        return { data: null, errors: [{ error: error, message: 'Something went wrong' }] }
+        const body = axios.isAxiosError(error) ? error.response?.data : null;
+        const { detail, code } = parseAiError(body, 'AI chat failed');
+        return { data: null, errors: [{ error: { detail, error_code: code } }] }
     }
 }
 
 export async function getTemplateAction() {
     try {
-        const cookieStore = await cookies();
-        const response = await AXIOS.get(`/api/v1/search/ai/templates`, {
-            headers: {
-                "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
-            }
-        });
+        const response = await axios.get(`/api/search/ai/templates`);
         return { data: response.data, error: null }
     } catch (error: unknown) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data ?? [{ message: 'Templates fetch failed' }]
-            }
-        }
-        return { data: null, errors: [{ error: error, message: 'Something went wrong' }] }
+        const body = axios.isAxiosError(error) ? error.response?.data : null;
+        const { detail, code } = parseAiError(body, 'Failed to load templates');
+        return { data: null, errors: [{ message: detail, code }] }
     }
 }

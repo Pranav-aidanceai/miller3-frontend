@@ -11,6 +11,9 @@ import { useAppDispatch } from '@/store/hooks';
 import { logout, setCredentials } from '@/store/slices/authSlice';
 import { ApiError } from '@/types/common';
 import TermsModal from './auth/register/TermsOfUse';
+import ApprovalPending from './auth/ApprovalPending';
+import AccountRejected from './auth/AccountRejected';
+import AccountDeactivated from './auth/AccountDeactivated';
 import axios from 'axios';
 
 export default function LoginForm() {
@@ -20,6 +23,9 @@ export default function LoginForm() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [showTouModal, setShowTouModal] = useState<boolean>(false);
+  const [showApproval, setShowApproval] = useState<boolean>(false);
+  const [showRejected, setShowRejected] = useState<boolean>(false);
+  const [showDeactivated, setShowDeactivated] = useState<boolean>(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
 
@@ -42,6 +48,21 @@ export default function LoginForm() {
       if (errors || !data) {
         const fieldErrors: Record<string, string> = {};
         errors?.forEach((err: ApiError) => {
+          if (err?.code === "YOUR_ACCOUNT_IS_PENDING_ADMIN_APPROVAL.") {
+            setShowApproval(true);
+            return;
+          }
+
+          if (err?.code === "ACCOUNT_REJECTED") {
+            setShowRejected(true);
+            return;
+          }
+
+          if (err?.code === "ACCOUNT_INACTIVE") {
+            setShowDeactivated(true);
+            return;
+          }
+
           if (err.field) {
             fieldErrors[err.field] = err.message;
           } else {
@@ -168,6 +189,9 @@ export default function LoginForm() {
             }
           }}
         />}
+      {showApproval && <ApprovalPending onClose={() => setShowApproval(false)} />}
+      {showRejected && <AccountRejected onClose={() => setShowRejected(false)} />}
+      {showDeactivated && <AccountDeactivated onClose={() => setShowDeactivated(false)} />}
     </>
   );
 }

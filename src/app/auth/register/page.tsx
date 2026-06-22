@@ -73,8 +73,10 @@ export default function RegisterPage() {
                     });
                     return;
                 }
-                if (data.status === 'Approved by admin') {
+                if (data.status === "APPROVAL_PENDING") {
                     setStep(2);
+                } else {
+                    setStep(3);
                 }
             } catch (error: unknown) {
                 setError(error instanceof Error ? error.message : 'An unexpected error occurred');
@@ -160,7 +162,7 @@ export default function RegisterPage() {
                                 {(serverErrors.confirm || (formik.touched.confirm && formik.errors.confirm)) && <p className="text-sm text-destructive">{serverErrors.confirm || formik.errors.confirm}</p>}
                             </div>
                             <label className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" checked={formik.values.touAccepted} onChange={formik.handleChange} name="touAccepted" className="rounded border-border cursor-pointer" />
+                                <input type="checkbox" checked={formik.values.touAccepted} onChange={() => setShowTerms(true)} name="touAccepted" className="rounded border-border cursor-pointer" />
                                 I accept the <button type="button" onClick={() => setShowTerms(true)} className="text-primary hover:underline">Terms of Use</button>
                             </label>
                             {error && <p className={cn("text-sm text-destructive", error ? 'visible' : 'invisible')}>{error}</p>}

@@ -1,11 +1,36 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import axios from 'axios';
+import { toast } from 'sonner';
+import {
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Grid3X3,
+  List,
+  Loader2,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { getTemplateAction, submitQueryAction } from './aisearch-services';
-import { ApiError } from '@/types/common';
+import { isCreditError, showCreditLimitToast } from '../search/apiError';
+import { getCompanyAction } from '../search/searchServices';
+import { isSessionExpiring } from '@/lib/session';
 import { useFormik } from 'formik';
 import { CompanyDrawer } from '../search/CompanyDrawer';
+import ExportModal from '../search/ExportModal';
+import CompanyTable from '../search/CompanyTable';
+import CompanyCards from '../search/CompanyCards';
+import { useBatchEnrich } from '../search/useBatchEnrich';
+import { Company, CompanyData } from '@/types/search';
+import { Tooltip } from 'react-tooltip';
+import 'react-tooltip/dist/react-tooltip.css';
+import { useSearchParams } from 'next/navigation';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '@/store/store';
+import { updateAiSearchCredits, updateExportCredits } from '@/store/slices/authSlice';
 
 type Template = {
   id: number;
@@ -15,185 +40,683 @@ type Template = {
 };
 
 type AIResult = {
-  id: number;
+  id: string;
   company_name: string;
-  city: string;
-  employee_size: string;
+  city: string | null;
+  state: string | null;
+  naics_code: string | null;
+  sic_code?: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  employee_size: string | number | null;
+  annual_revenue?: number | null;
+  year_founded?: number | null;
+  enrichment_status?: 'unenriched' | 'enriched' | 'pending';
 };
 
 
+const toCompany = (r: AIResult): Company => {
+  const emp =
+    r.employee_size === null || r.employee_size === undefined || r.employee_size === ''
+      ? null
+      : Number(r.employee_size);
+  return {
+    id: String(r.id),
+    company_name: r.company_name,
+    city: r.city ?? '',
+    state: r.state ?? '',
+    naics_code: r.naics_code,
+    sic_code: r.sic_code ?? null,
+    employee_size: emp != null && !Number.isNaN(emp) ? emp : null,
+    annual_revenue: r.annual_revenue ?? null,
+    year_founded: r.year_founded ?? null,
+    enrichment_status: r.enrichment_status ?? 'unenriched',
+    phone: r.phone,
+    email: r.email,
+    website: r.website,
+    has_mobile_number: !!r.phone,
+    has_email: !!r.email,
+    has_website: !!r.website,
+  };
+};
+
+// Merge freshly-fetched company data into an AI result row. Used after an
+// enrich so the row reflects its new status/contacts without re-running the AI
+// query (which would cost an AI search credit for no new rows).
+const mergeEnriched = (r: AIResult, c: CompanyData): AIResult => ({
+  ...r,
+  enrichment_status: c.enrichment_status,
+  phone: c.phone,
+  email: c.email,
+  website: c.website,
+  employee_size: c.employee_size,
+  annual_revenue: c.annual_revenue,
+  year_founded: c.year_founded,
+});
+
+type ChatEntry = {
+  id: string;
+  query: string;
+  status: 'thinking' | 'done' | 'error';
+  count?: number;
+  sql?: string | null;
+  message?: string | null;
+  error?: string;
+  errorCode?: string | null;
+};
+
 export default function AISearchPage() {
+  const dispatch = useDispatch();
+  const role = useSelector((state: RootState) => state.auth.role);
+  const searchParams = useSearchParams();
+  const q = searchParams.get('q');
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
+  const [chat, setChat] = useState<ChatEntry[]>([]);
+  const [expandedSql, setExpandedSql] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<AIResult[]>([]);
-  const [generatedSql, setGeneratedSql] = useState<string | null>(null);
-  const [showSql, setShowSql] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<AIResult | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+  const [isExporting, setIsExporting] = useState(false);
+
+  const { isEnriching, enrich } = useBatchEnrich();
+
+  const hasSearched = chat.length > 0;
+  const companies = useMemo(() => results.map(toCompany), [results]);
+
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Grow the single-line input as the query wraps, capped so it never takes over.
+  // Only show a scrollbar once we hit the cap — otherwise an empty box scrolls.
+  const autoResize = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = Math.min(el.scrollHeight, 160);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden';
+  }, []);
+
+  // Fit to a single line on mount and whenever the composer re-mounts.
+  useEffect(() => {
+    autoResize();
+  }, [autoResize, hasSearched]);
 
   useEffect(() => {
     const fetchTemplates = async () => {
       setLoading(true);
-      setError(null);
       const { data, errors } = await getTemplateAction();
+      setLoading(false);
       if (errors) {
-        setLoading(false);
-        errors?.forEach((err: ApiError) => {
-          setError(prev => prev + err.message)
-        })
-      } else {
-        setLoading(false);
-        setTemplates(data);
+        // A 403 (account deactivated) is handled by the global deactivation modal.
+        if (isSessionExpiring()) return;
+        const { message, code } = errors[0];
+        if (isCreditError(code)) {
+          showCreditLimitToast({
+            detail: message,
+            fallbackMessage: "You've reached your monthly AI search credit limit. Contact your admin to request more credits.",
+            mailtoSubject: 'Request for more AI search credits',
+          });
+        } else {
+          toast.error(message, {
+            duration: 5000,
+            className: '!bg-destructive !text-white !border-destructive',
+          });
+        }
+        return;
       }
+      setTemplates(data);
     };
     fetchTemplates();
-  }, [])
+  }, []);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chat]);
+
+  const toggleSql = (id: string) =>
+    setExpandedSql(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const runQuery = useCallback(
+    async (rawQuery: string, opts?: { silent?: boolean }) => {
+      const query = rawQuery.trim();
+      if (!query) return;
+      const silent = opts?.silent ?? false;
+
+      let entryId: string | null = null;
+      if (!silent) {
+        entryId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        setChat(prev => [...prev, { id: entryId!, query, status: 'thinking' }]);
+        setResults([]);
+        setStatusMessage(null);
+        setThinking(true);
+      }
+
+      const { data, errors, headers } = await submitQueryAction(query);
+      dispatch(updateAiSearchCredits(headers));
+      setThinking(false);
+
+      if (errors) {
+        let detail = 'AI search failed';
+        let code: string | null = null;
+        errors.forEach((err: { error: { detail: string; error_code: string | null } }) => {
+          detail = err.error.detail;
+          code = err.error.error_code ?? null;
+        });
+        if (entryId) {
+          setChat(prev =>
+            prev.map(c => (c.id === entryId ? { ...c, status: 'error', error: detail, errorCode: code } : c)),
+          );
+        }
+        return;
+      }
+
+      const rows: AIResult[] = data.results ?? [];
+      // A 200 can still be a non-answer (e.g. status "invalid_query") with an
+      // explanatory message and no rows — surface that message to the user.
+      const message: string | null = rows.length === 0 ? data.message ?? null : null;
+      setResults(rows);
+      setStatusMessage(message);
+      setSelectedIds(new Set());
+      if (entryId) {
+        setChat(prev =>
+          prev.map(c =>
+            c.id === entryId
+              ? { ...c, status: 'done', count: rows.length, sql: data.generated_sql, message }
+              : c,
+          ),
+        );
+      }
+    },
+    [dispatch],
+  );
 
   const formik = useFormik({
-    initialValues: {
-      query: '',
-    },
-    onSubmit: async (values) => {
-      setResults([]);
-      setGeneratedSql(null);
-      setThinking(true);
-      setError(null);
-      const query = values.query.trim();
+    initialValues: { query: '' },
+    onSubmit: async values => {
+      const query = values.query;
       formik.resetForm();
-      const { data, errors } = await submitQueryAction(query);
-      if (errors) {
-        setThinking(false);
-        errors.forEach((err: { error: ApiError }) => {
-          setError(err.error.detail)
-        })
-      } else {
-        setThinking(false);
-        setResults(data.results);
-        setGeneratedSql(data.generated_sql);
-      }
+      requestAnimationFrame(autoResize);
+      await runQuery(query);
+    },
+  });
+
+  // After a single enrich from the drawer, patch just that row in place using
+  // the company the drawer already fetched. Re-running the AI query here would
+  // burn an AI search credit for no new results, so we deliberately avoid it.
+  const patchEnrichedCompany = useCallback((updated?: CompanyData) => {
+    if (!updated) return;
+    setResults(prev =>
+      prev.map(r =>
+        String(r.id) === String(updated.id) || String(r.id) === String(updated.company_id)
+          ? mergeEnriched(r, updated)
+          : r,
+      ),
+    );
+  }, []);
+
+  // After a batch enrich, re-fetch only the affected companies via the cheap
+  // per-company endpoint and patch them in place — again without re-running the
+  // AI query (which would cost a credit and return the same rows).
+  const refreshEnrichedCompanies = useCallback(async (ids: string[]) => {
+    const fetched = await Promise.all(
+      ids.map(async id => {
+        const res = await getCompanyAction(id);
+        return res.error ? null : (res.data as CompanyData);
+      }),
+    );
+    const byId = new Map<string, CompanyData>();
+    for (const c of fetched) {
+      if (!c) continue;
+      byId.set(String(c.id), c);
+      byId.set(String(c.company_id), c);
     }
-  })
+    if (byId.size === 0) return;
+    setResults(prev =>
+      prev.map(r => {
+        const c = byId.get(String(r.id));
+        return c ? mergeEnriched(r, c) : r;
+      }),
+    );
+  }, []);
 
-  return (
-    <div className='w-full h-full flex justify-center'>
-      <div className="mx-auto max-w-4xl relative top-2/12">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">AI Search</h1>
-          <p className="text-muted-foreground mt-1">Describe what you&apos;re looking for in plain English</p>
-        </div>
+  const handleExport = async () => {
+    if (selectedIds.size === 0) {
+      toast.error('Select at least one company to export');
+      return;
+    }
 
-        {/* Input */}
-        <div className="relative">
-          <textarea
-            data-tour="ai-search-input"
-            name="query"
-            value={formik.values.query}
-            onChange={formik.handleChange}
-            placeholder="e.g. Find companies in the software industry with revenue greater than $10M"
-            className="w-full min-w-4xl rounded-lg border border-input bg-background p-4 pr-24 text-sm outline-none focus:ring-2 focus:ring-ring resize-none min-h-20"
-            rows={3}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } }}
-            disabled
-          />
-          <button
-            type="button"
-            data-tour="ai-search-button"
-            className="absolute right-3 bottom-3 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed active:scale-[0.98]"
-            disabled
-            onClick={() => formik.handleSubmit()}
-          >
-            <Sparkles className="h-4 w-4" /> Search
-          </button>
-        </div>
+    setIsExporting(true);
+    try {
+      const response = await axios.post(
+        '/api/ai-export',
+        { company_ids: Array.from(selectedIds), format: exportFormat },
+        { responseType: 'blob' },
+      );
+      const now = new Date();
+      const dateStr = now
+        .toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' })
+        .replace(/\//g, '-');
+      const timeStr = now
+        .toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        .replace(/:/g, '-');
+      const filename = `ai_search_export_${dateStr}_${timeStr}.${exportFormat}`;
+      const url = URL.createObjectURL(response.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      const remaining = parseInt(response.headers['x-export-credits-remaining'] ?? '0');
+      dispatch(updateExportCredits(remaining));
+      toast.success(`Downloaded ${filename}`);
+      setShowExportModal(false);
+      setSelectedIds(new Set());
+    } catch (err) {
+      let detail = 'Export failed. Please try again.';
+      if (axios.isAxiosError(err) && err.response?.data) {
+        try {
+          // Error responses arrive as a Blob because responseType is 'blob'.
+          const text =
+            err.response.data instanceof Blob
+              ? await err.response.data.text()
+              : JSON.stringify(err.response.data);
+          const body = JSON.parse(text);
+          const parsed = typeof body.error === 'string' ? JSON.parse(body.error) : body.error;
+          if (parsed?.detail) detail = parsed.detail;
+          else if (typeof body.error === 'string') detail = body.error;
+        } catch {
+          // fall back to the generic message
+        }
+      }
+      toast.error(detail, {
+        duration: 5000,
+        className: '!bg-destructive !text-white !border-destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
-        <div data-tour="ai-search-examples" className="mt-4 flex flex-wrap gap-2">
-          {loading && (
-            <div className="w-4xl flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading example queries...
+  // Keep the latest formik instance in a ref so the `q` effect depends only on `q`.
+  const formikRef = useRef(formik);
+  useEffect(() => {
+    formikRef.current = formik;
+  });
+
+  useEffect(() => {
+    if (q) {
+      formikRef.current.setValues({ query: q });
+      formikRef.current.handleSubmit();
+    }
+  }, [q]);
+
+  const allSelected = companies.length > 0 && companies.every(c => selectedIds.has(c.id));
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleSelectAll = () =>
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) companies.forEach(c => next.delete(c.id));
+      else companies.forEach(c => next.add(c.id));
+      return next;
+    });
+
+  // The chat composer — rendered centered before the first query, docked after.
+  const composer = (
+    <form onSubmit={formik.handleSubmit} className="relative w-full">
+      <textarea
+        ref={inputRef}
+        data-tour="ai-search-input"
+        name="query"
+        rows={1}
+        value={formik.values.query}
+        onChange={e => {
+          formik.handleChange(e);
+          autoResize();
+        }}
+        placeholder="Describe what you're looking for…"
+        className="w-full resize-none overflow-hidden rounded-2xl border border-input bg-background py-3.5 pl-4 pr-14 text-sm outline-none focus:ring-2 focus:ring-ring"
+        onKeyDown={e => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            formik.handleSubmit();
+          }
+        }}
+      />
+      <button
+        type="submit"
+        disabled={formik.values.query.trim() === '' || thinking}
+        data-tour="ai-search-button"
+        aria-label="Search"
+        className="absolute right-2.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 cursor-pointer"
+      >
+        {thinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+      </button>
+    </form>
+  );
+
+  // ---- Pre-search: centered hero with the composer and example prompts ----
+  if (!hasSearched) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center px-5">
+        <div className="w-full max-w-2xl">
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+              <Sparkles className="h-6 w-6 text-primary" />
             </div>
-          )}
-          {templates.map(template => (
-            <button
-              key={template.id}
-              disabled
-              onClick={() => {
-                formik.setValues({ query: template.query })
-                formik.handleSubmit();
-              }}
-              className="rounded-md cursor-pointer border border-border px-3 py-1 text-xs hover:border-primary/40 hover:bg-accent transition-colors"
-            >
-              {template.query}
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <div className="mt-6 rounded-lg border border-destruccleartive/30 bg-destructive/5 p-4 text-sm text-destructive">{error}</div>
-        )}
-
-        {/* Thinking */}
-        {thinking && (
-          <div className="mt-8 text-center">
-            <div className="flex justify-center gap-1">
-              {[0, 1, 2].map(i => (
-                <div key={i} className="h-2 w-2 rounded-full bg-primary animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
-              ))}
-            </div>
-            <p className="mt-3 text-sm text-muted-foreground">Analyzing your query...</p>
+            <h1 className="text-2xl font-bold">AI Search</h1>
+            <p className="mt-1 text-muted-foreground">
+              Describe what you&apos;re looking for in plain English
+            </p>
           </div>
-        )}
+
+          {composer}
+
+          <div data-tour="ai-search-examples" className="mt-5 flex flex-wrap justify-center gap-2">
+            {loading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Loading example queries...
+              </div>
+            )}
+            {templates.map(template => (
+              <button
+                key={template.id}
+                type="button"
+                disabled={thinking}
+                onClick={() => {
+                  formik.setValues({ query: template.query });
+                  formik.handleSubmit();
+                }}
+                className="cursor-pointer rounded-full border border-border px-3 py-1.5 text-xs transition-colors hover:border-primary/40 hover:bg-accent disabled:opacity-50"
+              >
+                {template.query}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Post-search: chat thread on the left, results table on the right ----
+  return (
+    <div className="flex h-full">
+      {/* Left: conversation + docked composer */}
+      <div className="flex h-full w-full max-w-md shrink-0 flex-col border-r border-border">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          {chat.map(entry => (
+            <div key={entry.id} className="space-y-2">
+              {/* User bubble */}
+              <div className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground">
+                  {entry.query}
+                </div>
+              </div>
+
+              {/* Assistant bubble */}
+              <div className="flex justify-start">
+                <div className="max-w-[90%] rounded-2xl rounded-bl-sm border border-border bg-card px-3.5 py-2 text-sm">
+                  {entry.status === 'thinking' && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <div className="flex gap-1">
+                        {[0, 1, 2].map(i => (
+                          <div
+                            key={i}
+                            className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"
+                            style={{ animationDelay: `${i * 0.2}s` }}
+                          />
+                        ))}
+                      </div>
+                      Analyzing your query...
+                    </div>
+                  )}
+
+                  {entry.status === 'done' && (
+                    <div className="space-y-2">
+                      {entry.count === 0 ? (
+                        <p className="text-muted-foreground">
+                          {entry.message || 'No companies matched your query.'}
+                        </p>
+                      ) : (
+                        <p>
+                          Found <span className="font-semibold">{entry.count}</span>{' '}
+                          {entry.count === 1 ? 'company' : 'companies'}.
+                        </p>
+                      )}
+                      {entry.sql && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => toggleSql(entry.id)}
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                          >
+                            {expandedSql.has(entry.id) ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            )}
+                            Generated SQL
+                          </button>
+                          {expandedSql.has(entry.id) && (
+                            <pre className="max-h-48 overflow-auto rounded-lg bg-muted p-3 text-xs font-mono">
+                              {entry.sql}
+                            </pre>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {entry.status === 'error' && (
+                    <div className="space-y-2 text-destructive">
+                      <p>{entry.error}</p>
+                      {entry.errorCode === 'HTTP_402' && (
+                        <a
+                          href="mailto:admin@miller3.com?subject=Request for more AI search credits"
+                          className="inline-block rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-destructive/90"
+                        >
+                          Contact Admin for more credits
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+
+        <div className="shrink-0 border-t border-border p-3">{composer}</div>
+      </div>
+
+      {/* Right: results table with toolbar */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Toolbar */}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border p-4">
+          <p className="text-sm text-muted-foreground">
+            {thinking && results.length === 0
+              ? 'Searching…'
+              : `${results.length} result${results.length === 1 ? '' : 's'}`}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {viewMode === 'card' && companies.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  readOnly
+                  className="h-4 w-4 cursor-pointer accent-primary"
+                />
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('card')}
+                className={cn(
+                  'rounded-md p-2 transition-colors cursor-pointer',
+                  viewMode === 'card'
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                aria-label="Card view"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={cn(
+                  'rounded-md p-2 transition-colors cursor-pointer',
+                  viewMode === 'table'
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                aria-label="Table view"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              data-tooltip-id="ai-enrich-tip"
+              onClick={() => {
+                const ids = Array.from(selectedIds);
+                enrich(selectedIds, () => setSelectedIds(new Set()), () => refreshEnrichedCompanies(ids));
+              }}
+              disabled={selectedIds.size <= 1 || isEnriching}
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isEnriching ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Enriching...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4" />
+                  Batch Enrich{selectedIds.size > 1 && ` (${selectedIds.size})`}
+                </>
+              )}
+            </button>
+            <Tooltip
+              id="ai-enrich-tip"
+              place="bottom"
+              content={selectedIds.size <= 1
+                ? 'Select at least 2 companies for batch enrichment'
+                : 'Enrich selected companies'}
+              className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+            />
+
+            <button
+              data-tooltip-id="ai-export-tip"
+              onClick={() => setShowExportModal(true)}
+              disabled={role === 'FREE' || selectedIds.size === 0}
+              className={cn(
+                'flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer',
+                (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50',
+              )}
+            >
+              <Download className="h-4 w-4" /> Export{selectedIds.size > 0 && ` (${selectedIds.size})`}
+            </button>
+            <Tooltip
+              id="ai-export-tip"
+              place="bottom"
+              content={role === 'FREE'
+                ? 'Please upgrade to export search results'
+                : selectedIds.size === 0
+                  ? 'Select companies to export'
+                  : 'Export selected companies'}
+              className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+            />
+          </div>
+        </div>
 
         {/* Results */}
-        {results.length > 0 && (
-          <div className="mt-6 animate-fade-in">
-            <button onClick={() => setShowSql(!showSql)} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4">
-              {showSql ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              Generated SQL
-            </button>
-            {showSql && (
-              <pre className="mb-4 rounded-lg bg-muted p-4 text-xs font-mono overflow-x-auto">{generatedSql}</pre>
-            )}
-
-            <p className="text-sm text-muted-foreground mb-3">{results.length} results</p>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Location</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Employees</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map(c => (
-                    <tr
-                      key={c.id}
-                      onClick={() => setSelectedCompany(c)}
-                      className="border-b border-border cursor-pointer transition-colors hover:bg-accent/50"
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-medium">{c?.company_name}</p>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs">{c?.city}</td>
-                      <td className="px-4 py-3 text-right">{c?.employee_size}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {results.length === 0 && !thinking ? (
+            <div className="flex h-full items-center justify-center text-center text-muted-foreground">
+              <div className="max-w-md">
+                <p className="text-lg font-medium">No results found</p>
+                <p className="mt-1 text-sm">{statusMessage || 'Try rephrasing your query.'}</p>
+              </div>
             </div>
-          </div>
-        )}
-
-        {!thinking && results.length === 0 && generatedSql && (
-          <div className="mt-8 text-center">
-            <p className="text-muted-foreground">No results found</p>
-          </div>
-        )}
-
-        {selectedCompany && <CompanyDrawer id={selectedCompany.id.toString()} onClose={() => setSelectedCompany(null)} />}
+          ) : viewMode === 'table' ? (
+            <CompanyTable
+              companies={companies}
+              isLoading={thinking && results.length === 0}
+              perPage={companies.length || 10}
+              selectedIds={selectedIds}
+              allSelected={allSelected}
+              notAccessibleFields={[]}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              onRowClick={setSelectedCompany}
+            />
+          ) : (
+            <CompanyCards
+              companies={companies}
+              isLoading={thinking && results.length === 0}
+              selectedIds={selectedIds}
+              notAccessibleFields={[]}
+              onToggleSelect={toggleSelect}
+              onCardClick={setSelectedCompany}
+            />
+          )}
+        </div>
       </div>
+
+      {selectedCompany && (
+        <CompanyDrawer
+          id={selectedCompany.id}
+          onClose={() => setSelectedCompany(null)}
+          onEnriched={patchEnrichedCompany}
+        />
+      )}
+
+      {showExportModal && (
+        <ExportModal
+          showExportModal={showExportModal}
+          setShowExportModal={setShowExportModal}
+          exportFormat={exportFormat}
+          setExportFormat={setExportFormat}
+          handleExport={handleExport}
+          isExporting={isExporting}
+        />
+      )}
     </div>
   );
 }

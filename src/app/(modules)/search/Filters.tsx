@@ -77,7 +77,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
                         <div className="mt-1 flex flex-wrap gap-1 max-h-24 overflow-auto">
                             {statesList.map(s => (
                                 <button key={s} onClick={() => { setDraftFilters({ ...draftFilters, stateFilter: draftFilters.stateFilter.includes(s) ? draftFilters.stateFilter.filter(x => x !== s) : [...draftFilters.stateFilter, s] }); setPage(1); }}
-                                    className={cn('rounded-pill px-2 py-0.5 text-xs font-medium transition-colors border', draftFilters.stateFilter.includes(s) ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40')}>
+                                    className={cn('rounded-pill px-2 py-0.5 text-xs font-medium transition-colors border cursor-pointer', draftFilters.stateFilter.includes(s) ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40')}>
                                     {s}
                                 </button>
                             ))}

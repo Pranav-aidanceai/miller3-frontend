@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { AppSidebar } from './AppSidebar';
 import { TopBar } from './TopBar';
 import { useOnboarding } from '@/hooks/useOnboarding';
@@ -12,12 +12,9 @@ export default function ModuleLayout({
   children: React.ReactNode;
 }>) {
   const { showOnboarding, startTour } = useOnboarding();
-  const [mounted, setMounted] = useState(false);
+  // True only after client-side hydration, without a cascading effect render.
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   const [tourStarted, setTourStarted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleStartTour = () => {
     setTourStarted(true);

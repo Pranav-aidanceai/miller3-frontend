@@ -1,7 +1,8 @@
 import {
   Crown, Gift, User, Search, LayoutDashboard,
-  Users, AlertTriangle, DollarSign, Database, Eye, 
-  Sparkles, History
+  Users, DollarSign, Database,
+  Sparkles, History,
+  Eye
 } from "lucide-react";
 
 export const tiers = [
@@ -14,17 +15,15 @@ export const mainNav = [
   { to: '/search', icon: Search, label: 'Search' },
   { to: '/ai-search', icon: Sparkles, label: 'AI Search' },
   { to: '/query-history', icon: History, label: 'Query History' },
-  // { to: '/exports', icon: Download, label: 'Exports' },
-  // { to: '/enrichment', icon: Zap, label: 'Enrichment' },
 ];
 
 export const adminNav = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/admin/users', icon: Users, label: 'Users' },
-  { to: '/admin/errors', icon: AlertTriangle, label: 'Errors' },
-  { to: '/admin/costs', icon: DollarSign, label: 'Cost Center' },
+  // { to: '/admin/errors', icon: AlertTriangle, label: 'Errors' },
+  { to: '/admin/cost-centre', icon: DollarSign, label: 'Cost Center' },
   { to: '/admin/data-health', icon: Database, label: 'Data Health' },
-  { to: '/admin/searches', icon: Eye, label: 'Search Oversight' },
+  { to: '/admin/search-oversight', icon: Eye, label: 'Search Oversight' }
 ];
 
 export const roleBadgeColor: Record<string, string> = {
@@ -34,4 +33,4 @@ export const roleBadgeColor: Record<string, string> = {
   FREE: 'bg-muted text-muted-foreground',
 };
 
-export const statesList = ['AL', 'AZ', 'CA', 'CO', 'CT', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA', 'MA', 'MD', 'MI', 'MN', 'MO', 'NC', 'NJ', 'NY', 'OH', 'OK', 'OR', 'PA', 'SC', 'TN', 'TX', 'UT', 'VA', 'WA', 'WI'];
+export const statesList = ['AL', 'AZ', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'IL', 'IN', 'KY', 'LA', 'MA', 'MD', 'MI', 'MN', 'MO', 'NC', 'NJ', 'NY', 'OH', 'OK', 'OR', 'PA', 'SC', 'TN', 'TX', 'UT', 'VA', 'WA', 'WI'];
