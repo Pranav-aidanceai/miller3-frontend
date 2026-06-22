@@ -9,7 +9,7 @@ import Filters from './Filters';
 import { useDebounce } from '@/hooks/useDebounce';
 import { searchAction } from './searchServices';
 import { isSessionExpiring } from '@/lib/session';
-import { Company, CompanySearchPayload, ExportPayload } from '@/types/search';
+import { Company, CompanySearchPayload } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 import ExportModal from './ExportModal';
@@ -21,6 +21,21 @@ import SearchPagination from './SearchPagination';
 import SortPopover from './SortPopover';
 import { useExport } from './useExport';
 import { useBatchEnrich } from './useBatchEnrich';
+
+// Persist enough of the search state to restore the exact page the user was on
+// across a browser refresh. The cursor is only valid for a specific query, so
+// the filters/sort/search that produced it are persisted alongside it.
+const SEARCH_STATE_KEY = 'miller3:search-state';
+
+function loadSearchState(): Record<string, unknown> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(SEARCH_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function SearchPage() {
 
@@ -43,24 +58,24 @@ export default function SearchPage() {
   };
 
   const role = useSelector((state: RootState) => state.auth.role);
-  const [nameQ, setNameQ] = useState('');
-  const [sortBy, setSortBy] = useState('');
-  const [sortOrder, setSortOrder] = useState('');
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('card');
-  const [perPage, setPerPage] = useState(25);
+  const [persisted] = useState(loadSearchState);
+  const [nameQ, setNameQ] = useState((persisted?.nameQ as string) ?? '');
+  const [sortBy, setSortBy] = useState((persisted?.sortBy as string) ?? '');
+  const [sortOrder, setSortOrder] = useState((persisted?.sortOrder as string) ?? '');
+  const [viewMode, setViewMode] = useState<'table' | 'card'>((persisted?.viewMode as 'table' | 'card') ?? 'card');
+  const [perPage, setPerPage] = useState((persisted?.perPage as number) ?? 25);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [notAccessibleFields, setNotAccessibleFields] = useState<string[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [appliedFilters, setAppliedFilters] = useState(initialFilters);
+  const [currentPage, setCurrentPage] = useState((persisted?.currentPage as number) ?? 1);
+  const [appliedFilters, setAppliedFilters] = useState((persisted?.appliedFilters as typeof initialFilters) ?? initialFilters);
   const [hasNextPage, setHasNextPage] = useState<string | null>(null);
-  const [cursorStack, setCursorStack] = useState<string[]>([]);
-  const [currentCursor, setCurrentCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<string[]>((persisted?.cursorStack as string[]) ?? []);
+  const [currentCursor, setCurrentCursor] = useState<string | null>((persisted?.currentCursor as string | null) ?? null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [exportPayload, setExportPayload] = useState<ExportPayload | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
   const searchQuery = useDebounce(nameQ, 500).toLowerCase();
@@ -68,7 +83,7 @@ export default function SearchPage() {
   const { isExporting, exportData } = useExport();
   const { isEnriching, enrich } = useBatchEnrich();
 
-  const buildSearch = useCallback((cursorValue: string | null): { payload: CompanySearchPayload; exportPayload: ExportPayload } => {
+  const buildSearch = useCallback((cursorValue: string | null): CompanySearchPayload => {
     const {
       stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
       minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
@@ -102,20 +117,13 @@ export default function SearchPage() {
       has_website: hasWebsite ? true : null
     };
 
-    const { limit, cursor, ...payloadWithoutPagination } = payload;
-    const exportPayload: ExportPayload = {
-      ...payloadWithoutPagination,
-      format: 'csv',
-      row_limit: limit
-    };
-    return { payload, exportPayload };
+    return payload;
   }, [searchQuery, perPage, appliedFilters, sortBy, sortOrder]);
 
   const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
     setIsLoading(true);
     try {
-      const { payload, exportPayload } = buildSearch(cursorValue);
-      setExportPayload(exportPayload);
+      const payload = buildSearch(cursorValue);
       const response = await searchAction(payload);
       setCompanies(response.data.results);
       setTotalResults(response.data.total);
@@ -129,14 +137,34 @@ export default function SearchPage() {
     }
   }, [buildSearch]);
 
+  // On the first mount, restore the page the user was on before a browser
+  // refresh by fetching with the persisted cursor. On every subsequent change
+  // to the query (search/filters/sort/perPage) reset back to the first page.
+  const didInitFetch = useRef(false);
   useEffect(() => {
-    (async () => {
-      setCursorStack([]);
-      setCurrentCursor(null);
-      setCurrentPage(1);
-      await fetchCompanies(null);
-    })();
-  }, [fetchCompanies]);
+    if (!didInitFetch.current) {
+      didInitFetch.current = true;
+      fetchCompanies((persisted?.currentCursor as string | null) ?? null);
+      return;
+    }
+    setCursorStack([]);
+    setCurrentCursor(null);
+    setCurrentPage(1);
+    fetchCompanies(null);
+  }, [fetchCompanies, persisted]);
+
+  // Mirror the search state into sessionStorage so a browser refresh can land
+  // the user back on the same page with the same query.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
+        nameQ, sortBy, sortOrder, viewMode, perPage,
+        appliedFilters, currentPage, cursorStack, currentCursor,
+      }));
+    } catch {
+      // Ignore quota/serialization errors — persistence is best-effort.
+    }
+  }, [nameQ, sortBy, sortOrder, viewMode, perPage, appliedFilters, currentPage, cursorStack, currentCursor]);
 
   // Keep the active page's cursor in a ref so async callers (the drawer's
   // single-enrich, the batch-enrich WebSocket toast) can refetch whatever page
@@ -226,22 +254,27 @@ export default function SearchPage() {
           <button
             data-tooltip-id="export-tip"
             onClick={() => setShowExportModal(true)}
-            disabled={role === 'FREE'}
+            disabled={role === 'FREE' || selectedIds.size === 0}
             className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
-              role === 'FREE' && 'cursor-not-allowed opacity-50'
+              (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50'
             )}
           >
-            <Download className="h-4 w-4" /> Export
+            <Download className="h-4 w-4" /> Export{selectedIds.size > 0 && ` (${selectedIds.size})`}
           </button>
           <Tooltip
             id="export-tip"
             place="bottom"
-            content={role === 'FREE' ? 'Please upgrade to export companies' : 'Export search companies'}
+            content={role === 'FREE'
+              ? 'Please upgrade to export companies'
+              : selectedIds.size === 0
+                ? 'Select companies to export'
+                : 'Export selected companies'}
             className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
           />
 
           <button
             type="button"
+            data-tooltip-id="enrich-tip"
             onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refreshSearch)}
             disabled={selectedIds.size <= 1 || isEnriching}
             className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
@@ -252,6 +285,14 @@ export default function SearchPage() {
               ? <><Loader2 className="h-4 w-4 animate-spin" />Enriching...</>
               : <><Zap className="h-4 w-4" />Batch Enrich{selectedIds.size > 1 && ` (${selectedIds.size})`}</>}
           </button>
+          <Tooltip
+            id="enrich-tip"
+            place="bottom"
+            content={selectedIds.size <= 1
+              ? 'Select at least 2 companies for batch enrichment'
+              : 'Enrich selected companies'}
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+          />
 
         </div>
 
@@ -337,7 +378,10 @@ export default function SearchPage() {
           setShowExportModal={setShowExportModal}
           exportFormat={exportFormat}
           setExportFormat={setExportFormat}
-          handleExport={() => exportData(exportPayload, exportFormat, () => setShowExportModal(false))}
+          handleExport={() => exportData(Array.from(selectedIds), exportFormat, () => {
+            setShowExportModal(false);
+            setSelectedIds(new Set());
+          })}
           isExporting={isExporting}
         />
       )}

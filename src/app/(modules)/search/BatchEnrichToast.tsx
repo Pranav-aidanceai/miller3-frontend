@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle2, Loader2, XCircle, X } from 'lucide-react';
+import { store } from '@/store/store';
+import { updateEnrichmentCredits } from '@/store/slices/authSlice';
 
 type Phase = 'connecting' | 'running' | 'completed' | 'failed';
 
@@ -11,8 +13,6 @@ interface BatchEnrichToastProps {
     toastId: string | number;
     wsUrl: string;
     total: number;
-    /** Fired once when the batch reaches a successful terminal state, so the
-     *  caller can refresh the search list to reflect new enrichment statuses. */
     onComplete?: () => void;
 }
 
@@ -42,8 +42,7 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | unde
 }
 
 export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, onComplete }: BatchEnrichToastProps) {
-    // Held in a ref so the WebSocket effect doesn't re-run (and reconnect) when
-    // the parent passes a new callback identity on re-render.
+
     const onCompleteRef = useRef(onComplete);
     useEffect(() => { onCompleteRef.current = onComplete; });
 
@@ -55,10 +54,6 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
     const [summary, setSummary] = useState({ succeeded: 0, failed: 0, duplicate: 0 });
 
     useEffect(() => {
-        // All connection state is local to this effect run so React StrictMode's
-        // dev double-mount (which tears down the first socket) can't leak into the
-        // real one. `cancelled` = this run is being cleaned up; `settled` = batch
-        // reached a terminal state on this connection.
         let cancelled = false;
         let settled = false;
         let processedCount = 0;
@@ -109,7 +104,6 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
         };
 
         const handle = (frame: unknown) => {
-            if (settled) return;
             if (frame == null || typeof frame !== 'object') return;
             let msg = frame as Record<string, unknown>;
             // Unwrap common envelopes: { data: {...} } / { payload: {...} }.
@@ -118,10 +112,19 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
                 if (inner && typeof inner === 'object') msg = { ...msg, ...(inner as Record<string, unknown>) };
             }
 
+            // The server sends a `type: "credits"` frame (usually first) carrying
+            // the user's remaining enrichment credits — push it into the store.
+            if ((pickString(msg, ['type']) ?? '').toLowerCase() === 'credits') {
+                const remaining = pickNumber(msg, ['remaining', 'credits_left', 'remaining_credits']);
+                if (remaining != null) store.dispatch(updateEnrichmentCredits(remaining));
+                return;
+            }
+
+            if (settled) return;
+
             const statusWord = (pickString(msg, ['status', 'state', 'event', 'type', 'phase']) ?? '').toLowerCase();
             const isRecordEvent = 'company_id' in msg || 'companyId' in msg;
 
-            // Track per-record completions when the frame is about a single company.
             if (isRecordEvent && (statusWord === '' || SUCCESS_WORDS.includes(statusWord) || FAILURE_WORDS.includes(statusWord))) {
                 processedCount += 1;
             }
@@ -129,7 +132,6 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
             const explicitTotal = pickNumber(msg, ['total', 'total_records', 'totalRecords', 'count']);
             if (explicitTotal != null && explicitTotal > 0) totalCount = explicitTotal;
 
-            // Outcome counts are cumulative running totals; keep the highest seen.
             const succeeded = pickNumber(msg, ['succeeded', 'success_count', 'completed_count']) ?? 0;
             const failed = pickNumber(msg, ['failed', 'failed_count', 'error_count']) ?? 0;
             const duplicate = pickNumber(msg, ['duplicate', 'duplicates', 'duplicate_count', 'skipped']) ?? 0;
@@ -187,8 +189,6 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
 
         return () => {
             cancelled = true;
-            // Closing a still-CONNECTING socket logs "closed before the connection
-            // is established"; wait for it to open, then close cleanly.
             if (ws.readyState === WebSocket.CONNECTING) {
                 ws.onopen = () => ws.close();
             } else {

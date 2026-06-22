@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { getTemplateAction, submitQueryAction } from './aisearch-services';
 import { isCreditError, showCreditLimitToast } from '../search/apiError';
+import { getCompanyAction } from '../search/searchServices';
 import { isSessionExpiring } from '@/lib/session';
 import { useFormik } from 'formik';
 import { CompanyDrawer } from '../search/CompanyDrawer';
@@ -23,7 +24,7 @@ import ExportModal from '../search/ExportModal';
 import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
 import { useBatchEnrich } from '../search/useBatchEnrich';
-import { Company } from '@/types/search';
+import { Company, CompanyData } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 import { useSearchParams } from 'next/navigation';
@@ -54,8 +55,7 @@ type AIResult = {
   enrichment_status?: 'unenriched' | 'enriched' | 'pending';
 };
 
-// The AI endpoint returns a slimmer row than the standard search; normalise it
-// to a `Company` so the shared table/card components render it identically.
+
 const toCompany = (r: AIResult): Company => {
   const emp =
     r.employee_size === null || r.employee_size === undefined || r.employee_size === ''
@@ -81,6 +81,20 @@ const toCompany = (r: AIResult): Company => {
   };
 };
 
+// Merge freshly-fetched company data into an AI result row. Used after an
+// enrich so the row reflects its new status/contacts without re-running the AI
+// query (which would cost an AI search credit for no new rows).
+const mergeEnriched = (r: AIResult, c: CompanyData): AIResult => ({
+  ...r,
+  enrichment_status: c.enrichment_status,
+  phone: c.phone,
+  email: c.email,
+  website: c.website,
+  employee_size: c.employee_size,
+  annual_revenue: c.annual_revenue,
+  year_founded: c.year_founded,
+});
+
 type ChatEntry = {
   id: string;
   query: string;
@@ -95,7 +109,6 @@ type ChatEntry = {
 export default function AISearchPage() {
   const dispatch = useDispatch();
   const role = useSelector((state: RootState) => state.auth.role);
-  const exportCreditsLeft = useSelector((state: RootState) => state.auth.credits_left.export);
   const searchParams = useSearchParams();
   const q = searchParams.get('q');
 
@@ -106,7 +119,6 @@ export default function AISearchPage() {
   const [expandedSql, setExpandedSql] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<AIResult[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [lastQuery, setLastQuery] = useState('');
 
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -114,13 +126,9 @@ export default function AISearchPage() {
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
-  const [rowLimit, setRowLimit] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
 
   const { isEnriching, enrich } = useBatchEnrich();
-
-  // AI search results are capped at 200 rows by the backend.
-  const MAX_AI_EXPORT_ROWS = 200;
 
   const hasSearched = chat.length > 0;
   const companies = useMemo(() => results.map(toCompany), [results]);
@@ -189,7 +197,6 @@ export default function AISearchPage() {
       const query = rawQuery.trim();
       if (!query) return;
       const silent = opts?.silent ?? false;
-      setLastQuery(query);
 
       let entryId: string | null = null;
       if (!silent) {
@@ -226,7 +233,6 @@ export default function AISearchPage() {
       setResults(rows);
       setStatusMessage(message);
       setSelectedIds(new Set());
-      setRowLimit(Math.min(rows.length || 1, MAX_AI_EXPORT_ROWS));
       if (entryId) {
         setChat(prev =>
           prev.map(c =>
@@ -250,18 +256,48 @@ export default function AISearchPage() {
     },
   });
 
-  // Re-run the last query (e.g. after a batch enrich) without adding a chat turn.
-  const refreshResults = useCallback(() => {
-    if (lastQuery) runQuery(lastQuery, { silent: true });
-  }, [lastQuery, runQuery]);
+  // After a single enrich from the drawer, patch just that row in place using
+  // the company the drawer already fetched. Re-running the AI query here would
+  // burn an AI search credit for no new results, so we deliberately avoid it.
+  const patchEnrichedCompany = useCallback((updated?: CompanyData) => {
+    if (!updated) return;
+    setResults(prev =>
+      prev.map(r =>
+        String(r.id) === String(updated.id) || String(r.id) === String(updated.company_id)
+          ? mergeEnriched(r, updated)
+          : r,
+      ),
+    );
+  }, []);
+
+  // After a batch enrich, re-fetch only the affected companies via the cheap
+  // per-company endpoint and patch them in place — again without re-running the
+  // AI query (which would cost a credit and return the same rows).
+  const refreshEnrichedCompanies = useCallback(async (ids: string[]) => {
+    const fetched = await Promise.all(
+      ids.map(async id => {
+        const res = await getCompanyAction(id);
+        return res.error ? null : (res.data as CompanyData);
+      }),
+    );
+    const byId = new Map<string, CompanyData>();
+    for (const c of fetched) {
+      if (!c) continue;
+      byId.set(String(c.id), c);
+      byId.set(String(c.company_id), c);
+    }
+    if (byId.size === 0) return;
+    setResults(prev =>
+      prev.map(r => {
+        const c = byId.get(String(r.id));
+        return c ? mergeEnriched(r, c) : r;
+      }),
+    );
+  }, []);
 
   const handleExport = async () => {
-    if (rowLimit < 1) {
-      toast.error('Enter a row count of at least 1.');
-      return;
-    }
-    if (role !== 'ADMIN' && rowLimit > exportCreditsLeft) {
-      toast.error(`You only have ${exportCreditsLeft} export credits left.`);
+    if (selectedIds.size === 0) {
+      toast.error('Select at least one company to export');
       return;
     }
 
@@ -269,7 +305,7 @@ export default function AISearchPage() {
     try {
       const response = await axios.post(
         '/api/ai-export',
-        { format: exportFormat, row_limit: rowLimit },
+        { company_ids: Array.from(selectedIds), format: exportFormat },
         { responseType: 'blob' },
       );
       const now = new Date();
@@ -292,6 +328,7 @@ export default function AISearchPage() {
       dispatch(updateExportCredits(remaining));
       toast.success(`Downloaded ${filename}`);
       setShowExportModal(false);
+      setSelectedIds(new Set());
     } catch (err) {
       let detail = 'Export failed. Please try again.';
       if (axios.isAxiosError(err) && err.response?.data) {
@@ -575,7 +612,11 @@ export default function AISearchPage() {
 
             <button
               type="button"
-              onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refreshResults)}
+              data-tooltip-id="ai-enrich-tip"
+              onClick={() => {
+                const ids = Array.from(selectedIds);
+                enrich(selectedIds, () => setSelectedIds(new Set()), () => refreshEnrichedCompanies(ids));
+              }}
               disabled={selectedIds.size <= 1 || isEnriching}
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -591,22 +632,34 @@ export default function AISearchPage() {
                 </>
               )}
             </button>
+            <Tooltip
+              id="ai-enrich-tip"
+              place="bottom"
+              content={selectedIds.size <= 1
+                ? 'Select at least 2 companies for batch enrichment'
+                : 'Enrich selected companies'}
+              className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+            />
 
             <button
               data-tooltip-id="ai-export-tip"
               onClick={() => setShowExportModal(true)}
-              disabled={role === 'FREE' || results.length === 0}
+              disabled={role === 'FREE' || selectedIds.size === 0}
               className={cn(
                 'flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer',
-                (role === 'FREE' || results.length === 0) && 'cursor-not-allowed opacity-50',
+                (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50',
               )}
             >
-              <Download className="h-4 w-4" /> Export
+              <Download className="h-4 w-4" /> Export{selectedIds.size > 0 && ` (${selectedIds.size})`}
             </button>
             <Tooltip
               id="ai-export-tip"
               place="bottom"
-              content={role === 'FREE' ? 'Please upgrade to export search results' : 'Export your last query'}
+              content={role === 'FREE'
+                ? 'Please upgrade to export search results'
+                : selectedIds.size === 0
+                  ? 'Select companies to export'
+                  : 'Export selected companies'}
               className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
             />
           </div>
@@ -650,7 +703,7 @@ export default function AISearchPage() {
         <CompanyDrawer
           id={selectedCompany.id}
           onClose={() => setSelectedCompany(null)}
-          onEnriched={refreshResults}
+          onEnriched={patchEnrichedCompany}
         />
       )}
 
@@ -662,9 +715,6 @@ export default function AISearchPage() {
           setExportFormat={setExportFormat}
           handleExport={handleExport}
           isExporting={isExporting}
-          rowLimit={rowLimit}
-          setRowLimit={setRowLimit}
-          maxRows={role === 'ADMIN' ? undefined : exportCreditsLeft}
         />
       )}
     </div>

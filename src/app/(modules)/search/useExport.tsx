@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { ExportPayload } from '@/types/search';
 import { updateExportCredits } from '@/store/slices/authSlice';
 import { parseApiError, isCreditError, showCreditLimitToast } from './apiError';
 import { isSessionExpiring } from '@/lib/session';
@@ -12,18 +11,18 @@ export function useExport() {
     const [isExporting, setIsExporting] = useState(false);
 
     const exportData = async (
-        exportPayload: ExportPayload | null,
+        companyIds: string[],
         exportFormat: 'csv' | 'json',
         onSuccess?: () => void,
     ) => {
-        if (!exportPayload) {
-            toast.error('No data to export');
+        if (companyIds.length === 0) {
+            toast.error('Select at least one company to export');
             return;
         }
 
         setIsExporting(true);
         try {
-            const payload = { ...exportPayload, format: exportFormat };
+            const payload = { company_ids: companyIds, format: exportFormat };
             const response = await axios.post('/api/export', payload, {
                 responseType: 'blob',
             });

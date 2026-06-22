@@ -108,7 +108,7 @@ function Field({
     );
 }
 
-export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose: () => void; onEnriched?: () => void }) {
+export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose: () => void; onEnriched?: (enriched?: CompanyData) => void }) {
 
     const dispatch = useDispatch();
     const [tab, setTab] = useState<'overview' | 'similar' | 'location' | 'activity'>('overview');
@@ -121,17 +121,20 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
     const [similarLoading, setSimilarLoading] = useState(false);
     const similarFetchedFor = useRef<string | null>(null);
 
-    const fetchCompany = async (id: string) => {
+    const fetchCompany = async (id: string): Promise<CompanyData | undefined> => {
         setLoading(true);
         setError(null);
         const response = await getCompanyAction(id);
+        let result: CompanyData | undefined;
         if (response.error) {
             const errBody = response.error as ApiErrorResponse;
             setError(errBody.detail);
         } else {
+            result = response.data;
             setCompanyData(response.data);
         }
         setLoading(false);
+        return result;
     };
 
     useEffect(() => {
@@ -235,10 +238,12 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
         } else if (data?.status === "SUCCESS") {
             setEnriching(false);
             dispatch(updateEnrichmentCredits(data.headers));
-            fetchCompany(id);
+            const updated = await fetchCompany(id);
             // Refresh the underlying search list so the row reflects the new
-            // enrichment status without the user having to reload.
-            onEnriched?.();
+            // enrichment status without the user having to reload. The freshly
+            // fetched company is passed up so callers can patch their row in
+            // place rather than re-running an expensive query.
+            onEnriched?.(updated);
             toast.success('Company enriched successfully');
         }
     };
