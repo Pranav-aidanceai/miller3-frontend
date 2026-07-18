@@ -361,11 +361,24 @@ export default function AISearchPage() {
     formikRef.current = formik;
   });
 
+  // Auto-run a replayed query, but only once per distinct `q`. Without this
+  // guard React's dev-mode double-invoke of effects fires the search twice,
+  // burning two AI search credits for one replay.
+  const submittedQueryRef = useRef<string | null>(null);
   useEffect(() => {
-    if (q) {
-      formikRef.current.setValues({ query: q });
-      formikRef.current.handleSubmit();
-    }
+    if (!q || submittedQueryRef.current === q) return;
+    submittedQueryRef.current = q;
+    formikRef.current.setValues({ query: q });
+    formikRef.current.handleSubmit();
+
+    // Drop `q` now that it has been consumed, so a refresh doesn't re-run the
+    // search (and spend another credit). history.replaceState keeps this out of
+    // Next's router, which would otherwise remount the page. Any other params
+    // are preserved.
+    const params = new URLSearchParams(window.location.search);
+    params.delete('q');
+    const rest = params.toString();
+    window.history.replaceState(null, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
   }, [q]);
 
   const allSelected = companies.length > 0 && companies.every(c => selectedIds.has(c.id));

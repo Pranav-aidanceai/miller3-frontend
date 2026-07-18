@@ -117,6 +117,11 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
     const [error, setError] = useState<string | null>(null);
     const [enriching, setEnriching] = useState<boolean>(false);
 
+    // Fields the current user's role can't see. Every Field below must receive
+    // this — omitting it silently renders the real value instead of a mask.
+    const notAccessible = companyData?.not_accessible;
+    const isLocked = (key: string) => notAccessible?.includes(key) ?? false;
+
     const [similar, setSimilar] = useState<CompanyData[]>([]);
     const [similarLoading, setSimilarLoading] = useState(false);
     const similarFetchedFor = useRef<string | null>(null);
@@ -258,13 +263,15 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                             <h2 className="text-xl font-bold">{companyData?.company_name}</h2>
                             <p className="text-sm text-muted-foreground">{companyData?.city}, {companyData?.state}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
-                                {companyData?.naics_code &&
+                                {/* These summary pills bypass Field, so they need
+                                    their own lock check or they leak the value. */}
+                                {companyData?.naics_code && !isLocked('naics_code') &&
                                     <span className="rounded-pill bg-muted px-2 py-0.5 text-xs font-mono">{companyData?.naics_code}</span>
                                 }
-                                {companyData?.employee_size &&
+                                {companyData?.employee_size && !isLocked('employee_size') &&
                                     <span className="rounded-pill bg-muted px-2 py-0.5 text-xs">{`${companyData?.employee_size} employees`}</span>
                                 }
-                                {companyData?.year_founded && (
+                                {companyData?.year_founded && !isLocked('year_founded') && (
                                     <span className="rounded-pill bg-muted px-2 py-0.5 text-xs">{companyData?.year_founded}</span>
                                 )}
                             </div>
@@ -333,33 +340,33 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Firmographics</h3>
-                                <Field label="Legal Name" fieldKey="company_name" value={companyData?.company_name} />
-                                <Field label="NAICS" fieldKey="naics_code" value={companyData?.naics_code ?? 'NA'} mono />
-                                <Field label="SIC" fieldKey="sic_code" value={companyData?.sic_code ?? 'NA'} mono />
-                                <Field label="Employees" fieldKey="employee_size" value={companyData?.employee_size ?? 'NA'} />
+                                <Field notAccessible={notAccessible} label="Legal Name" fieldKey="company_name" value={companyData?.company_name} />
+                                <Field notAccessible={notAccessible} label="NAICS" fieldKey="naics_code" value={companyData?.naics_code ?? 'NA'} mono />
+                                <Field notAccessible={notAccessible} label="SIC" fieldKey="sic_code" value={companyData?.sic_code ?? 'NA'} mono />
+                                <Field notAccessible={notAccessible} label="Employees" fieldKey="employee_size" value={companyData?.employee_size ?? 'NA'} />
                                 <Field
-                                    notAccessible={companyData?.not_accessible}
+                                    notAccessible={notAccessible}
                                     label="Revenue"
                                     fieldKey="annual_revenue"
                                     value={companyData?.annual_revenue
                                         ? `$${companyData.annual_revenue.toLocaleString()}`
                                         : 'NA'}
                                 />
-                                <Field label="Founded" fieldKey="year_founded" value={companyData?.year_founded} />
-                                <Field label="Ownership" fieldKey="ownership_type" value={companyData?.ownership_type || 'Not specified'} />
+                                <Field notAccessible={notAccessible} label="Founded" fieldKey="year_founded" value={companyData?.year_founded} />
+                                <Field notAccessible={notAccessible} label="Ownership" fieldKey="ownership_type" value={companyData?.ownership_type || 'Not specified'} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Contact</h3>
-                                <Field label="Phone" fieldKey="phone" value={companyData?.phone} />
-                                <Field label="Email" fieldKey="email" value={companyData?.email} />
-                                <Field label="Website" fieldKey="website" value={companyData?.website} link />
+                                <Field notAccessible={notAccessible} label="Phone" fieldKey="phone" value={companyData?.phone} />
+                                <Field notAccessible={notAccessible} label="Email" fieldKey="email" value={companyData?.email} />
+                                <Field notAccessible={notAccessible} label="Website" fieldKey="website" value={companyData?.website} link />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Location</h3>
-                                <Field label="City" fieldKey="city" value={companyData?.city} />
-                                <Field label="State" fieldKey="state" value={companyData?.state} />
-                                <Field label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
-                                <Field label="County" fieldKey="county" value={companyData?.county} />
+                                <Field notAccessible={notAccessible} label="City" fieldKey="city" value={companyData?.city} />
+                                <Field notAccessible={notAccessible} label="State" fieldKey="state" value={companyData?.state} />
+                                <Field notAccessible={notAccessible} label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
+                                <Field notAccessible={notAccessible} label="County" fieldKey="county" value={companyData?.county} />
                             </div>
                         </div>
                     )}
@@ -385,7 +392,7 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                                 </div>
                             )}
                             <p className="text-sm">{companyData?.city}, {companyData?.state} {companyData?.zip_code}</p>
-                            <p className="text-sm text-muted-foreground">{companyData?.county}</p>
+                            {!isLocked('county') && <p className="text-sm text-muted-foreground">{companyData?.county}</p>}
                             <button
                                 onClick={() => {
                                     navigator.clipboard.writeText(`${companyData?.city}, ${companyData?.state} ${companyData?.zip_code}`);

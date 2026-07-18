@@ -15,12 +15,14 @@ import 'react-tooltip/dist/react-tooltip.css';
 import ExportModal from './ExportModal';
 import { RootState } from '@/store/store';
 import { useSelector } from 'react-redux';
+import { useSearchParams } from 'next/navigation';
 import CompanyTable from './CompanyTable';
 import CompanyCards from './CompanyCards';
 import SearchPagination from './SearchPagination';
 import SortPopover from './SortPopover';
 import { useExport } from './useExport';
 import { useBatchEnrich } from './useBatchEnrich';
+import { emptyFilters, filtersFromQuery } from './replayParams';
 
 // Persist enough of the search state to restore the exact page the user was on
 // across a browser refresh. The cursor is only valid for a specific query, so
@@ -39,26 +41,26 @@ function loadSearchState(): Record<string, unknown> | null {
 
 export default function SearchPage() {
 
-  const initialFilters = {
-    stateFilter: [] as string[],
-    cityFilter: '',
-    countyFilter: '',
-    naicsFilter: '',
-    sicFilter: '',
-    minYear: '',
-    maxYear: '',
-    minEmp: '',
-    maxEmp: '',
-    minRev: '',
-    maxRev: '',
-    demoFilter: [] as string[],
-    hasPhone: false,
-    hasEmail: false,
-    hasWebsite: false
-  };
+  const initialFilters = emptyFilters;
 
   const role = useSelector((state: RootState) => state.auth.role);
-  const [persisted] = useState(loadSearchState);
+  // Filters handed over from a Query History replay. Read via useSearchParams
+  // rather than window.location, which still holds the previous URL during a
+  // client-side navigation. Captured once so later edits to the filters aren't
+  // overwritten by the params still sitting in the URL.
+  const searchParams = useSearchParams();
+  const [replayFilters] = useState(() => filtersFromQuery(searchParams.toString()));
+  // Replay params outlive the navigation that set them, so arriving with them
+  // is ambiguous: it's either a fresh replay, or a refresh of one already open.
+  // The persisted cursor is only valid in the latter case — when the persisted
+  // filters still match the URL. On a fresh replay it belongs to the previous
+  // query, so drop it and start from the first page.
+  const [persisted] = useState(() => {
+    const saved = loadSearchState();
+    if (!replayFilters) return saved;
+    const sameQuery = JSON.stringify(saved?.appliedFilters) === JSON.stringify(replayFilters);
+    return sameQuery ? saved : null;
+  });
   const [nameQ, setNameQ] = useState((persisted?.nameQ as string) ?? '');
   const [sortBy, setSortBy] = useState((persisted?.sortBy as string) ?? '');
   const [sortOrder, setSortOrder] = useState((persisted?.sortOrder as string) ?? '');
@@ -70,7 +72,9 @@ export default function SearchPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [notAccessibleFields, setNotAccessibleFields] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState((persisted?.currentPage as number) ?? 1);
-  const [appliedFilters, setAppliedFilters] = useState((persisted?.appliedFilters as typeof initialFilters) ?? initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState(
+    replayFilters ?? (persisted?.appliedFilters as typeof initialFilters) ?? initialFilters
+  );
   const [hasNextPage, setHasNextPage] = useState<string | null>(null);
   const [cursorStack, setCursorStack] = useState<string[]>((persisted?.cursorStack as string[]) ?? []);
   const [currentCursor, setCurrentCursor] = useState<string | null>((persisted?.currentCursor as string | null) ?? null);
@@ -153,6 +157,28 @@ export default function SearchPage() {
     fetchCompanies(null);
   }, [fetchCompanies, persisted]);
 
+  // Selections are ids from the previous result set. Once the filters or the
+  // name search change, those companies may no longer be listed, so an export
+  // or batch enrich would silently act on rows the user can no longer see —
+  // and the count next to the button would contradict what's on screen. Sort
+  // and per-page changes keep the same set, so selections survive those.
+  const didInitSelection = useRef(false);
+  useEffect(() => {
+    if (!didInitSelection.current) {
+      didInitSelection.current = true;
+      return;
+    }
+    setSelectedIds(new Set());
+  }, [appliedFilters, searchQuery]);
+
+  // Replay params stay in the URL so a refresh (or a shared link) reapplies the
+  // same filters. Clearing the filters is what drops them — see clearFilters.
+  // history.replaceState keeps this out of Next's router, which would otherwise
+  // remount the page and re-run the search.
+  const clearFilters = useCallback(() => {
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+
   // Mirror the search state into sessionStorage so a browser refresh can land
   // the user back on the same page with the same query.
   useEffect(() => {
@@ -219,6 +245,7 @@ export default function SearchPage() {
         setFilters={setAppliedFilters}
         setPage={() => { }}
         initialFilters={initialFilters}
+        onClear={clearFilters}
       />
 
       <div className="flex-1 overflow-auto p-4 md:py-6 px-1" style={{ height: 'calc(100vh - 3.5rem)' }}>
@@ -357,17 +384,16 @@ export default function SearchPage() {
           />
         )}
 
-        {totalPages > 1 && (
-          <SearchPagination
-            perPage={perPage}
-            setPerPage={setPerPage}
-            currentPage={currentPage}
-            hasNextPage={hasNextPage}
-            isLoading={isLoading}
-            onPrev={handlePrev}
-            onNext={handleNext}
-          />
-        )}
+        <SearchPagination
+          perPage={perPage}
+          setPerPage={setPerPage}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          hasNextPage={hasNextPage}
+          isLoading={isLoading}
+          onPrev={handlePrev}
+          onNext={handleNext}
+        />
       </div>
 
       {selectedCompany && <CompanyDrawer id={selectedCompany.id} onClose={() => setSelectedCompany(null)} onEnriched={refreshSearch} />}

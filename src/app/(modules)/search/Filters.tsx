@@ -30,9 +30,11 @@ interface FiltersProps {
     setFilters: (f: typeof initialFilters) => void;
     setPage: (p: number) => void;
     initialFilters: typeof initialFilters;
+    /** Notifies the page that the user cleared every filter. */
+    onClear?: () => void;
 }
 
-const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps) => {
+const Filters = ({ setPage, filters, setFilters, initialFilters, onClear }: FiltersProps) => {
 
     const [draftFilters, setDraftFilters] = useState(filters);
     const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify(filters);
@@ -52,6 +54,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters }: FiltersProps)
         setDraftFilters(initialFilters);
         setFilters(initialFilters);
         setPage(1);
+        onClear?.();
     };
 
     return (
