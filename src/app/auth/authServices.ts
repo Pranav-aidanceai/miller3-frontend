@@ -20,13 +20,13 @@ export async function loginAction(email: string, password: string) {
         cookieStore.set('access_token', access_token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             path: '/',
         })
         cookieStore.set('refresh_token', refresh_token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             path: '/',
             maxAge: 7 * 24 * 60 * 60 // 7 days
         })
@@ -56,7 +56,7 @@ export async function refreshTokenAction() {
         cookieStore.set('access_token', access_token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             path: '/',
         })
 
