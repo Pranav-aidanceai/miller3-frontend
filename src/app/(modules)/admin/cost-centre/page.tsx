@@ -14,17 +14,18 @@ interface CostResponse {
         serper_total_cost: number;
     } | null;
     openai: {
+        total_requests: number;
         input_tokens: number;
         output_tokens: number;
         total_tokens: number;
-        input_cost: number;
-        output_cost: number;
-        total_cost: number;
+        estimated_cost: number;
+        period_days: number;
     } | null;
     enrichment: {
         count: number;
     } | null;
     grand_total_spend: number;
+    latency_ms?: number;
 }
 
 const usd = (n: number) => `$${n?.toFixed(4)}`;
@@ -176,11 +177,15 @@ export default function AdminCostsPage() {
                                         <Cpu className="h-4 w-4 text-violet-500" />
                                     </div>
                                 </div>
-                                <p className="mt-3 text-3xl font-bold text-violet-500">{usd(data.openai.total_cost)}</p>
-                                <p className="mt-1 text-xs text-muted-foreground">{data.openai.total_tokens.toLocaleString()} tokens</p>
+                                <p className="mt-3 text-3xl font-bold text-violet-500">{usd(data.openai.estimated_cost)}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    estimated over {data.openai.period_days} day{data.openai.period_days === 1 ? '' : 's'}
+                                </p>
                                 <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-                                    <div className="flex justify-between"><span>Input ({data.openai.input_tokens.toLocaleString()})</span><span className="font-mono">{usd(data.openai.input_cost)}</span></div>
-                                    <div className="flex justify-between"><span>Output ({data.openai.output_tokens.toLocaleString()})</span><span className="font-mono">{usd(data.openai.output_cost)}</span></div>
+                                    <div className="flex justify-between"><span>Input tokens</span><span className="font-mono">{data.openai.input_tokens.toLocaleString()}</span></div>
+                                    <div className="flex justify-between"><span>Output tokens</span><span className="font-mono">{data.openai.output_tokens.toLocaleString()}</span></div>
+                                    <div className="flex justify-between"><span>Total tokens</span><span className="font-mono">{data.openai.total_tokens.toLocaleString()}</span></div>
+                                    <div className="flex justify-between"><span>Requests</span><span className="font-mono">{data.openai.total_requests.toLocaleString()}</span></div>
                                 </div>
                             </div>
                         )}

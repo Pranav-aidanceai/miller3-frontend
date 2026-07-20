@@ -9,13 +9,12 @@ import { logout, toggleSidebar } from '@/store/slices/authSlice';
 import { adminNav, mainNav, roleBadgeColor } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import axios from 'axios';
 
 export function AppSidebar() {
 
     const dispatch = useAppDispatch();
-    const router = useRouter();
     const pathName = usePathname();
     const user = useAppSelector(state => state.auth.user)
     const role = useAppSelector(state => state.auth.role)
@@ -59,7 +58,7 @@ export function AppSidebar() {
         try {
             await axios.post('/api/auth/logout');
             dispatch(logout());
-            router.push('/');
+            window.location.replace('/');
         } catch (error) {
             const message = axios.isAxiosError(error)
                 ? error.response?.data?.errors?.[0]?.message

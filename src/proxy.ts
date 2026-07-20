@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 const WHITE_LISTED_ROUTES = [
   "/",
   "/auth/register",
-  "/forgot-password",
-  "/reset-password",
+  "/auth/forgot-password",
+  "/auth/reset-password",
 ];
 
-const PROTECTED_ROUTES = ["/search"];
+const PROTECTED_ROUTES = ["/search", "/admin", "/ai-search", "/query-history"];
 
 const isWhiteListed = (pathname: string) =>
   WHITE_LISTED_ROUTES.some((route) =>

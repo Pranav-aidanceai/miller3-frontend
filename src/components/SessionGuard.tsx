@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { useRouter } from 'next/navigation';
 import { ShieldAlert } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
@@ -12,19 +11,14 @@ const LOGOUT_DELAY_SECONDS = Number(process.env.NEXT_PUBLIC_LOGOUT_DELAY_SECONDS
 
 export function SessionGuard() {
     const dispatch = useAppDispatch();
-    const router = useRouter();
-    // `isAuthenticated` is not persisted by redux-persist, so it's false after a
-    // page refresh even for logged-in users. Key off the persisted `user` instead
-    // so the guard still recognizes an active session post-refresh.
     const user = useAppSelector((s) => s.auth.user);
     const [expired, setExpired] = useState(false);
     const loggedInRef = useRef(!!user);
+    
     useEffect(() => {
         loggedInRef.current = !!user;
     }, [user]);
 
-    // Let any code path (axios interceptor below, or the fetch-based export /
-    // batch-enrichment hooks) open the modal via triggerSessionExpired().
     useEffect(() => {
         setSessionExpiryHandler(() => setExpired(true));
         return () => setSessionExpiryHandler(null);
@@ -55,13 +49,18 @@ export function SessionGuard() {
             try { await axios.post('/api/delete-cookie'); } catch { /* ignore */ }
             try { localStorage.clear(); } catch { /* ignore */ }
             dispatch(logout());
-            router.replace('/');
             resetSessionExpiring();
-            setExpired(false);
+            // Hard navigation rather than router.replace. '/' is a static route,
+            // so a soft nav can be served from the App Router's client cache and
+            // never reaches the proxy; it also leaves the current document (and
+            // all its state) alive. A full load re-requests '/' with the freshly
+            // cleared cookies, so the proxy sees a logged-out user and serves the
+            // login page instead of bouncing back to /search.
+            window.location.replace('/');
         }, LOGOUT_DELAY_SECONDS * 1000);
 
         return () => clearTimeout(timer);
-    }, [expired, dispatch, router]);
+    }, [expired, dispatch]);
 
     if (!expired) return null;
 

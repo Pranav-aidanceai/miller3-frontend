@@ -5,6 +5,7 @@ interface SearchPaginationProps {
     perPage: number;
     setPerPage: (value: number) => void;
     currentPage: number;
+    totalPages: number;
     hasNextPage: string | null;
     isLoading: boolean;
     onPrev: () => void;
@@ -15,6 +16,7 @@ export default function SearchPagination({
     perPage,
     setPerPage,
     currentPage,
+    totalPages,
     hasNextPage,
     isLoading,
     onPrev,
@@ -38,7 +40,9 @@ export default function SearchPagination({
                 <span className="text-xs text-muted-foreground">per page</span>
             </div>
 
-            <div className="flex items-center gap-1">
+            {/* The per-page selector above stays visible even for a single page
+                of results — only the page navigation is conditional. */}
+            {totalPages > 1 && <div className="flex items-center gap-1">
                 <button
                     disabled={currentPage === 1 || isLoading}
                     onClick={onPrev}
@@ -78,7 +82,7 @@ export default function SearchPagination({
                 >
                     Next
                 </button>
-            </div>
+            </div>}
         </div>
     );
 }

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getErrorMessage } from '@/lib/apiError';
+import { useAppSelector } from '@/store/hooks';
 
 interface RoleDefaults {
     searches: number;
@@ -116,6 +117,8 @@ interface UserDetailModalProps {
 }
 
 export default function UserDetailModal({ userId, status, onClose, onUpdated }: UserDetailModalProps) {
+    const currentUserId = useAppSelector(state => state.auth.user?.id);
+
     const [user, setUser] = useState<GetUserResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -257,7 +260,11 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
     };
 
     const effectiveStatus = user?.status ?? status;
-    const availableActions = (effectiveStatus ? STATUS_ACTIONS[effectiveStatus] ?? [] : []).map(k => ACTIONS[k]);
+    // Admins can't deactivate their own account.
+    const isSelf = !!currentUserId && currentUserId === userId;
+    const availableActions = (effectiveStatus ? STATUS_ACTIONS[effectiveStatus] ?? [] : [])
+        .filter(k => !(isSelf && k === 'deactivate'))
+        .map(k => ACTIONS[k]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

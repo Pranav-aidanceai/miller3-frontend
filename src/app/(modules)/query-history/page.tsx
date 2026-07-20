@@ -8,10 +8,12 @@ import { getErrorMessage } from "@/lib/apiError";
 import { cn } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
+import { StructuredFilters, structuredFiltersToQuery } from "../search/replayParams";
 
 interface QueryHistoryItem {
   query_type: 'ai' | 'structured';
   raw_input: string | null;
+  filters_applied: StructuredFilters | null;
   result_count: number;
   created_at: string;
   user_email: string | null;
@@ -28,6 +30,20 @@ export default function QueryHistoryPage() {
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(0);
+
+  const replay = (q: QueryHistoryItem) => {
+    if (q.query_type === 'structured') {
+      const query = structuredFiltersToQuery(q.filters_applied ?? {});
+      router.push(query ? `/search?${query}` : '/search');
+      return;
+    }
+    router.push(`/ai-search?q=${encodeURIComponent(q.raw_input!)}`);
+  };
+
+  const canReplay = (q: QueryHistoryItem) =>
+    q.query_type === 'structured'
+      ? !!structuredFiltersToQuery(q.filters_applied ?? {})
+      : !!q.raw_input;
 
   useEffect(() => {
     let active = true;
@@ -102,7 +118,11 @@ export default function QueryHistoryPage() {
                 className="rounded-lg border border-border bg-card p-4 flex items-start justify-between gap-4"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm truncate">{q.raw_input ?? 'Structured search'}</p>
+                  {/* Structured queries are long pipe-joined filter strings, so
+                      wrap onto as many lines as needed. break-words catches the
+                      individual tokens (e.g. employee_size_range(min=1,max=5))
+                      that are themselves wider than the card. */}
+                  <p className="font-medium text-sm wrap-break-word">{q.raw_input ?? 'Structured search'}</p>
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       {q.query_type === 'ai' ? 'AI' : 'Structured'}
@@ -114,17 +134,15 @@ export default function QueryHistoryPage() {
                       const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).replace(':', ' ');
                       return `${date}, ${time}`;
                     })()}</span>
-                    {q.user_email && <span className="text-primary">{q.user_email}</span>}
+                    {q.user_email && <span className="text-primary wrap-break-word">{q.user_email}</span>}
                   </div>
                 </div>
-                {q.raw_input && (
+                {canReplay(q) && (
                   <button
                     type="button"
                     data-tour="query-replay-button"
                     className="shrink-0 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent transition-colors cursor-pointer"
-                    onClick={() => {
-                      router.push(`/ai-search?q=${encodeURIComponent(q.raw_input!)}`);
-                    }}
+                    onClick={() => replay(q)}
                   >
                     Replay
                   </button>
