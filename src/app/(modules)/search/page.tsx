@@ -24,9 +24,7 @@ import { useExport } from './useExport';
 import { useBatchEnrich } from './useBatchEnrich';
 import { emptyFilters, filtersFromQuery } from './replayParams';
 
-// Persist enough of the search state to restore the exact page the user was on
-// across a browser refresh. The cursor is only valid for a specific query, so
-// the filters/sort/search that produced it are persisted alongside it.
+
 const SEARCH_STATE_KEY = 'miller3:search-state';
 
 function loadSearchState(): Record<string, unknown> | null {
