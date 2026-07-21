@@ -7,10 +7,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const nextConfig: NextConfig = {
   distDir: 'build',
-  output: 'standalone',
-  env: {
-    API_BASE_URL: process.env.API_BASE_URL,
-  },
+  output: 'standalone'
 };
 
 export default withBundleAnalyzer(nextConfig);
