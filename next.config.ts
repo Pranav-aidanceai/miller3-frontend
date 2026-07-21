@@ -6,7 +6,9 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-  
+  // Traces only the modules actually imported into `.next/standalone`,
+  // keeping the deployed hybrid app under Azure SWA's 250 MB limit.
+  output: "standalone",
 };
 
 export default withBundleAnalyzer(nextConfig);
