@@ -87,6 +87,7 @@ export default function LoginForm() {
       setShowTouModal(false);
       router.push('/search');
     } catch (error) {
+      console.error('Error accepting Terms of Use:', error);
       setError('Failed to accept the Terms of Use. Please try again.');
     }
   }

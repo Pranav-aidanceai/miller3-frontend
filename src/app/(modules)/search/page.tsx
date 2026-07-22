@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Search, X, Grid3X3, List, Loader2, Download, Zap, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -42,17 +42,8 @@ export default function SearchPage() {
   const initialFilters = emptyFilters;
 
   const role = useSelector((state: RootState) => state.auth.role);
-  // Filters handed over from a Query History replay. Read via useSearchParams
-  // rather than window.location, which still holds the previous URL during a
-  // client-side navigation. Captured once so later edits to the filters aren't
-  // overwritten by the params still sitting in the URL.
   const searchParams = useSearchParams();
   const [replayFilters] = useState(() => filtersFromQuery(searchParams.toString()));
-  // Replay params outlive the navigation that set them, so arriving with them
-  // is ambiguous: it's either a fresh replay, or a refresh of one already open.
-  // The persisted cursor is only valid in the latter case — when the persisted
-  // filters still match the URL. On a fresh replay it belongs to the previous
-  // query, so drop it and start from the first page.
   const [persisted] = useState(() => {
     const saved = loadSearchState();
     if (!replayFilters) return saved;
@@ -195,9 +186,23 @@ export default function SearchPage() {
   // the user is currently viewing — not the page they were on when they started.
   const currentCursorRef = useRef(currentCursor);
   useEffect(() => { currentCursorRef.current = currentCursor; }, [currentCursor]);
+
+  // An in-place refresh (single/batch enrich) briefly flips isLoading, which
+  // swaps the list for a shorter loading state and collapses the scroll
+  // container — the browser then clamps scrollTop to 0. Capture the position
+  // before the refetch and restore it once the fresh results have rendered.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const restoreScrollRef = useRef<number | null>(null);
   const refreshSearch = useCallback(() => {
+    restoreScrollRef.current = scrollRef.current?.scrollTop ?? null;
     fetchCompanies(currentCursorRef.current);
   }, [fetchCompanies]);
+
+  useLayoutEffect(() => {
+    if (isLoading || restoreScrollRef.current === null) return;
+    if (scrollRef.current) scrollRef.current.scrollTop = restoreScrollRef.current;
+    restoreScrollRef.current = null;
+  }, [isLoading, companies]);
 
   const allSelected = companies.length > 0 && companies.every(c => selectedIds.has(c.id));
 
@@ -246,7 +251,7 @@ export default function SearchPage() {
         onClear={clearFilters}
       />
 
-      <div className="flex-1 overflow-auto p-4 md:py-6 px-1" style={{ height: 'calc(100vh - 3.5rem)' }}>
+      <div ref={scrollRef} className="flex-1 overflow-auto p-4 md:py-6 px-1" style={{ height: 'calc(100vh - 3.5rem)' }}>
 
         {/* Top bar */}
         <div className="flex flex-wrap items-center gap-3 mb-4">

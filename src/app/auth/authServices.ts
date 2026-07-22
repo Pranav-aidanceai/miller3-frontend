@@ -33,7 +33,6 @@ export async function loginAction(email: string, password: string) {
 
         return { data: { role, user_details, role_details, credits_left }, error: null }
     } catch (error) {
-        console.error('Login error:', error);
         if (axios.isAxiosError(error)) {
             return {
                 data: null,

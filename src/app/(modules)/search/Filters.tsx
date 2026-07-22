@@ -90,8 +90,8 @@ const Filters = ({ setPage, filters, setFilters, initialFilters, onClear }: Filt
                 {/* Industry */}
                 <div data-tour="industry-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Industry</p>
-                    <FilterInput label="NAICS Code" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="e.g. 541" mono />
-                    <FilterInput label="SIC Code" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="e.g. 541" mono />
+                    <FilterInput label="NAICS Code" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="e.g. 561622" mono />
+                    <FilterInput label="SIC Code" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="e.g. 769962" mono />
                     <div className="grid grid-cols-2 gap-2 mt-2">
                         <FilterInput label="Min Year Founded" value={draftFilters.minYear} onChange={(v) => setDraftFilters({ ...draftFilters, minYear: v })} placeholder="1900" />
                         <FilterInput label="Max Year Founded" value={draftFilters.maxYear} onChange={(v) => setDraftFilters({ ...draftFilters, maxYear: v })} placeholder="2023" />
