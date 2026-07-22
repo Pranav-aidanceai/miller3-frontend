@@ -2,9 +2,13 @@
   "name": "miller3-frontend",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "local-build": "next build",
+    "build": "next build && cp -r build/static build/standalone/build/ && cp -r public build/standalone/",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

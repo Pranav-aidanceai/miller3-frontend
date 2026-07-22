@@ -46,16 +46,10 @@ export function SessionGuard() {
         if (!expired) return;
 
         const timer = setTimeout(async () => {
-            try { await axios.post('/api/delete-cookie'); } catch { /* ignore */ }
-            try { localStorage.clear(); } catch { /* ignore */ }
+            try { await axios.post('/api/delete-cookie'); } catch {}
+            try { localStorage.clear(); } catch {}
             dispatch(logout());
             resetSessionExpiring();
-            // Hard navigation rather than router.replace. '/' is a static route,
-            // so a soft nav can be served from the App Router's client cache and
-            // never reaches the proxy; it also leaves the current document (and
-            // all its state) alive. A full load re-requests '/' with the freshly
-            // cleared cookies, so the proxy sees a logged-out user and serves the
-            // login page instead of bouncing back to /search.
             window.location.replace('/');
         }, LOGOUT_DELAY_SECONDS * 1000);
 

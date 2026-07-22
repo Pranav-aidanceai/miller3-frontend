@@ -5,18 +5,14 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-
-  // Global rules (all files)
   {
     rules: {
       "react/react-in-jsx-scope": "off",
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", ignoreRestSiblings: true }],
       "@typescript-eslint/no-explicit-any": "warn",
-      "no-console": ["warn"],
+      "no-console": ["warn", { allow: ["error", "warn"] }],
     },
   },
-
-  // Allow console.error / console.warn in server/API files only
   {
     files: [
       "src/app/api/**/*.ts",

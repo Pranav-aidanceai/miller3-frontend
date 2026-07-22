@@ -65,7 +65,7 @@ export interface Company {
   state: string;
   naics_code: string | null;
   sic_code: string | null;
-  employee_size: number | null;
+  employee_size: string | null;
   annual_revenue: number | null;
   year_founded: number | null;
   enrichment_status: 'unenriched' | 'enriched' | 'pending';

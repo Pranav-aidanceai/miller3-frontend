@@ -49,7 +49,7 @@ type AIResult = {
   phone: string | null;
   email: string | null;
   website: string | null;
-  employee_size: string | number | null;
+  employee_size: string | null;
   annual_revenue?: number | null;
   year_founded?: number | null;
   enrichment_status?: 'unenriched' | 'enriched' | 'pending';
@@ -57,10 +57,7 @@ type AIResult = {
 
 
 const toCompany = (r: AIResult): Company => {
-  const emp =
-    r.employee_size === null || r.employee_size === undefined || r.employee_size === ''
-      ? null
-      : Number(r.employee_size);
+
   return {
     id: String(r.id),
     company_name: r.company_name,
@@ -68,7 +65,7 @@ const toCompany = (r: AIResult): Company => {
     state: r.state ?? '',
     naics_code: r.naics_code,
     sic_code: r.sic_code ?? null,
-    employee_size: emp != null && !Number.isNaN(emp) ? emp : null,
+    employee_size: r.employee_size,
     annual_revenue: r.annual_revenue ?? null,
     year_founded: r.year_founded ?? null,
     enrichment_status: r.enrichment_status ?? 'unenriched',
@@ -81,9 +78,6 @@ const toCompany = (r: AIResult): Company => {
   };
 };
 
-// Merge freshly-fetched company data into an AI result row. Used after an
-// enrich so the row reflects its new status/contacts without re-running the AI
-// query (which would cost an AI search credit for no new rows).
 const mergeEnriched = (r: AIResult, c: CompanyData): AIResult => ({
   ...r,
   enrichment_status: c.enrichment_status,
