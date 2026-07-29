@@ -58,6 +58,19 @@ export interface ExportPayload {
   enrichment_status: string | null;
 }
 
+/**
+ * Response of the NAICS/SIC autocomplete filters. `results` is a
+ * `{ code: title }` dict rather than a list, and paging is cursor based.
+ */
+export interface CodeFilterResponse {
+  field: string;
+  query: string;
+  results: Record<string, string>;
+  next_cursor: string | null;
+  prev_cursor: string | null;
+  latency_ms: number;
+}
+
 export interface Company {
   id: string;
   company_name: string;

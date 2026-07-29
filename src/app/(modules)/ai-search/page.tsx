@@ -16,14 +16,13 @@ import {
 import { cn } from '@/lib/utils';
 import { getTemplateAction, submitQueryAction } from './aisearch-services';
 import { isCreditError, showCreditLimitToast } from '../search/apiError';
-import { getCompanyAction } from '../search/searchServices';
 import { isSessionExpiring } from '@/lib/session';
 import { useFormik } from 'formik';
 import { CompanyDrawer } from '../search/CompanyDrawer';
 import ExportModal from '../search/ExportModal';
 import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
-import { useBatchEnrich } from '../search/useBatchEnrich';
+import { useBatchEnrich, type EnrichRecordUpdate } from '../search/useBatchEnrich';
 import { Company, CompanyData } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
@@ -53,6 +52,11 @@ type AIResult = {
   annual_revenue?: number | null;
   year_founded?: number | null;
   enrichment_status?: 'unenriched' | 'enriched' | 'pending';
+  // Set by batch enrichment, which reports what it found per company without
+  // sending the values back. Absent on rows straight from the AI search.
+  has_email?: boolean | null;
+  has_phone?: boolean | null;
+  has_website?: boolean | null;
 };
 
 
@@ -72,9 +76,9 @@ const toCompany = (r: AIResult): Company => {
     phone: r.phone,
     email: r.email,
     website: r.website,
-    has_mobile_number: !!r.phone,
-    has_email: !!r.email,
-    has_website: !!r.website,
+    has_mobile_number: r.has_phone ?? !!r.phone,
+    has_email: r.has_email ?? !!r.email,
+    has_website: r.has_website ?? !!r.website,
   };
 };
 
@@ -87,6 +91,10 @@ const mergeEnriched = (r: AIResult, c: CompanyData): AIResult => ({
   employee_size: c.employee_size,
   annual_revenue: c.annual_revenue,
   year_founded: c.year_founded,
+  // The detail fetch is authoritative — let the values drive the flags again.
+  has_email: !!c.email,
+  has_phone: !!c.phone,
+  has_website: !!c.website,
 });
 
 type ChatEntry = {
@@ -202,7 +210,7 @@ export default function AISearchPage() {
       }
 
       const { data, errors, headers } = await submitQueryAction(query);
-      dispatch(updateAiSearchCredits(headers));
+      if (headers !== null) dispatch(updateAiSearchCredits(headers));
       setThinking(false);
 
       if (errors) {
@@ -221,8 +229,7 @@ export default function AISearchPage() {
       }
 
       const rows: AIResult[] = data.results ?? [];
-      // A 200 can still be a non-answer (e.g. status "invalid_query") with an
-      // explanatory message and no rows — surface that message to the user.
+
       const message: string | null = rows.length === 0 ? data.message ?? null : null;
       setResults(rows);
       setStatusMessage(message);
@@ -250,9 +257,22 @@ export default function AISearchPage() {
     },
   });
 
-  // After a single enrich from the drawer, patch just that row in place using
-  // the company the drawer already fetched. Re-running the AI query here would
-  // burn an AI search credit for no new results, so we deliberately avoid it.
+  // Batch enrichment reports each company as it finishes. Only the availability
+  // flags come over the socket, so patch those and leave the values alone.
+  const applyEnrichUpdate = useCallback((update: EnrichRecordUpdate) => {
+    setResults(prev =>
+      prev.map(r =>
+        String(r.id) !== update.companyId ? r : {
+          ...r,
+          enrichment_status: update.succeeded ? 'enriched' : r.enrichment_status,
+          has_email: update.hasEmail ?? r.has_email,
+          has_phone: update.hasPhone ?? r.has_phone,
+          has_website: update.hasWebsite ?? r.has_website,
+        },
+      ),
+    );
+  }, []);
+
   const patchEnrichedCompany = useCallback((updated?: CompanyData) => {
     if (!updated) return;
     setResults(prev =>
@@ -264,30 +284,27 @@ export default function AISearchPage() {
     );
   }, []);
 
-  // After a batch enrich, re-fetch only the affected companies via the cheap
-  // per-company endpoint and patch them in place — again without re-running the
-  // AI query (which would cost a credit and return the same rows).
-  const refreshEnrichedCompanies = useCallback(async (ids: string[]) => {
-    const fetched = await Promise.all(
-      ids.map(async id => {
-        const res = await getCompanyAction(id);
-        return res.error ? null : (res.data as CompanyData);
-      }),
-    );
-    const byId = new Map<string, CompanyData>();
-    for (const c of fetched) {
-      if (!c) continue;
-      byId.set(String(c.id), c);
-      byId.set(String(c.company_id), c);
-    }
-    if (byId.size === 0) return;
-    setResults(prev =>
-      prev.map(r => {
-        const c = byId.get(String(r.id));
-        return c ? mergeEnriched(r, c) : r;
-      }),
-    );
-  }, []);
+  // const refreshEnrichedCompanies = useCallback(async (ids: string[]) => {
+  //   const fetched = await Promise.all(
+  //     ids.map(async id => {
+  //       const res = await getCompanyAction(id);
+  //       return res.error ? null : (res.data as CompanyData);
+  //     }),
+  //   );
+  //   const byId = new Map<string, CompanyData>();
+  //   for (const c of fetched) {
+  //     if (!c) continue;
+  //     byId.set(String(c.id), c);
+  //     byId.set(String(c.company_id), c);
+  //   }
+  //   if (byId.size === 0) return;
+  //   setResults(prev =>
+  //     prev.map(r => {
+  //       const c = byId.get(String(r.id));
+  //       return c ? mergeEnriched(r, c) : r;
+  //     }),
+  //   );
+  // }, []);
 
   const handleExport = async () => {
     if (selectedIds.size === 0) {
@@ -327,7 +344,6 @@ export default function AISearchPage() {
       let detail = 'Export failed. Please try again.';
       if (axios.isAxiosError(err) && err.response?.data) {
         try {
-          // Error responses arrive as a Blob because responseType is 'blob'.
           const text =
             err.response.data instanceof Blob
               ? await err.response.data.text()
@@ -349,26 +365,17 @@ export default function AISearchPage() {
     }
   };
 
-  // Keep the latest formik instance in a ref so the `q` effect depends only on `q`.
   const formikRef = useRef(formik);
   useEffect(() => {
     formikRef.current = formik;
   });
 
-  // Auto-run a replayed query, but only once per distinct `q`. Without this
-  // guard React's dev-mode double-invoke of effects fires the search twice,
-  // burning two AI search credits for one replay.
   const submittedQueryRef = useRef<string | null>(null);
   useEffect(() => {
     if (!q || submittedQueryRef.current === q) return;
     submittedQueryRef.current = q;
     formikRef.current.setValues({ query: q });
     formikRef.current.handleSubmit();
-
-    // Drop `q` now that it has been consumed, so a refresh doesn't re-run the
-    // search (and spend another credit). history.replaceState keeps this out of
-    // Next's router, which would otherwise remount the page. Any other params
-    // are preserved.
     const params = new URLSearchParams(window.location.search);
     params.delete('q');
     const rest = params.toString();
@@ -620,10 +627,7 @@ export default function AISearchPage() {
             <button
               type="button"
               data-tooltip-id="ai-enrich-tip"
-              onClick={() => {
-                const ids = Array.from(selectedIds);
-                enrich(selectedIds, () => setSelectedIds(new Set()), () => refreshEnrichedCompanies(ids));
-              }}
+              onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), undefined, applyEnrichUpdate)}
               disabled={selectedIds.size <= 1 || isEnriching}
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >

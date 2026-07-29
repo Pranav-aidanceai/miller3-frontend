@@ -1,9 +1,6 @@
-// Shared vocabulary for replaying a structured query from Query History into
-// the search page. Query History holds the backend's `filters_applied` shape;
-// the search page holds its own `SearchFilters` shape. The URL sits between
-// them, so both sides must agree on the param names defined here.
-
 export interface SearchFilters {
+    /** Free-text company-name search — applied together with the rest. */
+    searchText: string;
     stateFilter: string[];
     cityFilter: string;
     countyFilter: string;
@@ -22,6 +19,7 @@ export interface SearchFilters {
 }
 
 export const emptyFilters: SearchFilters = {
+    searchText: '',
     stateFilter: [],
     cityFilter: '',
     countyFilter: '',
@@ -110,6 +108,7 @@ export function filtersFromQuery(search: string): SearchFilters | null {
     const digits = (key: string) => (params.get(key) ?? '').replace(/[^0-9]/g, '');
 
     const filters: SearchFilters = {
+        searchText: params.get('q') ?? '',
         stateFilter: params.getAll('state'),
         cityFilter: params.get('city') ?? '',
         countyFilter: params.get('county') ?? '',

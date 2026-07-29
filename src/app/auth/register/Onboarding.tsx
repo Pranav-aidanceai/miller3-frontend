@@ -24,7 +24,7 @@ export default function OnboardingPage({ onTierSelect, selectedTier, onSubmit, s
                     <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                         <Sparkles className="h-8 w-8 text-primary" />
                     </div>
-                    <h1 className="text-3xl font-bold">Welcome to <span className="text-gradient">Miller3</span></h1>
+                    <h1 className="text-3xl font-bold">Welcome to <span className="text-gradient">Vendor Lens</span></h1>
                     <p className="mt-3 text-muted-foreground">Let&apos;s find your first vendor in under 60 seconds.</p>
                     <button onClick={() => setStep(1)} className="mt-8 inline-flex items-center gap-2 rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer">
                         Get Started <ArrowRight className="h-4 w-4" />

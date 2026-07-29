@@ -1,4 +1,4 @@
-import { CompanySearchPayload } from "@/types/search";
+import { CodeFilterResponse, CompanySearchPayload } from "@/types/search";
 import axios from "axios";
 
 export async function searchAction(payload: CompanySearchPayload) {
@@ -23,6 +23,26 @@ export async function getCompanyAction(id: string) {
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
             return { data: null, error: error.response?.data ?? { detail: 'Fetch company failed' } };
+        }
+        return { data: null, error: { detail: 'Something went wrong' } };
+    }
+}
+
+export async function getCodeFilterAction(
+    field: 'naics' | 'sic',
+    params: { q: string; cursor?: string | null; limit?: number }
+) {
+    try {
+        const response = await axios.get<CodeFilterResponse>(`/api/${field}-filter`, {
+            params: { q: params.q, cursor: params.cursor || undefined, limit: params.limit }
+        });
+        return { data: response.data, error: null }
+    } catch (error: unknown) {
+        if (axios.isAxiosError(error)) {
+            return {
+                data: null,
+                error: error.response?.data ?? { detail: `Fetch ${field.toUpperCase()} codes failed` }
+            };
         }
         return { data: null, error: { detail: 'Something went wrong' } };
     }

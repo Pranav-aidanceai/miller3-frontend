@@ -72,7 +72,7 @@ export const MaskedCell = ({
 };
 
 export const ContactIcons = ({ c, notAccessibleFields }: { c: Company; notAccessibleFields: string[] }) => {
-    const getState = (hasData: string | null, fieldKey: string): 'green' | 'yellow' | 'red' => {
+    const getState = (hasData: boolean, fieldKey: string): 'green' | 'yellow' | 'red' => {
         if (notAccessibleFields.includes(fieldKey)) return 'yellow';
         if (!hasData) return 'red';
         return 'green';
@@ -102,9 +102,11 @@ export const ContactIcons = ({ c, notAccessibleFields }: { c: Company; notAccess
         },
     };
 
-    const phoneState = getState(c.phone, 'phone');
-    const emailState = getState(c.email, 'email');
-    const websiteState = getState(c.website, 'website');
+    // The has_* flags let a row report availability without carrying the value —
+    // that's how batch enrichment lights a row up mid-run, before the refetch.
+    const phoneState = getState(!!c.phone || !!c.has_mobile_number, 'phone');
+    const emailState = getState(!!c.email || !!c.has_email, 'email');
+    const websiteState = getState(!!c.website || !!c.has_website, 'website');
 
     // Unique tooltip ids per row to avoid conflicts when multiple rows render
     const phoneTooltipId = `contact-phone-${c.id}`;

@@ -98,7 +98,7 @@ export default function LoginForm() {
         <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:px-20">
           <div className="mx-auto w-full max-w-md">
             <h1 className="text-3xl font-bold tracking-tight flex gap-2">
-              <span className="bg-clip-text text-transparent bg-linear-to-r from-primary to-indigo-500">Miller3</span>
+              <span className="bg-clip-text text-transparent bg-linear-to-r from-primary to-indigo-500">Vendor Lens</span>
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">Find any vendor. Enrich any record.</p>
 
@@ -169,8 +169,15 @@ export default function LoginForm() {
             backgroundSize: '32px 32px',
           }} />
           <div className="relative z-10 text-center">
-            <div className="text-6xl font-bold text-gradient">25M+</div>
+            <div className="text-6xl font-bold text-gradient">16M+</div>
             <p className="mt-2 text-lg text-muted-foreground">Companies in our database</p>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+              A nationwide vendor discovery platform featuring{' '}
+              <span className="font-semibold text-foreground">250K women-owned</span>,{' '}
+              <span className="font-semibold text-foreground">300K minority-owned</span> and{' '}
+              <span className="font-semibold text-foreground">100K veteran-owned</span> businesses
+              across every major industry.
+            </p>
             <div className="mt-8 flex gap-4 justify-center">
               {['NAICS Codes', 'Contact Info', 'Revenue Data', 'Demographics'].map(tag => (
                 <span key={tag} className="rounded-pill border border-border bg-card px-3 py-1 text-xs font-medium">{tag}</span>

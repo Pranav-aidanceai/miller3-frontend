@@ -116,12 +116,8 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [enriching, setEnriching] = useState<boolean>(false);
-
-    // Fields the current user's role can't see. Every Field below must receive
-    // this — omitting it silently renders the real value instead of a mask.
     const notAccessible = companyData?.not_accessible;
     const isLocked = (key: string) => notAccessible?.includes(key) ?? false;
-
     const [similar, setSimilar] = useState<CompanyData[]>([]);
     const [similarLoading, setSimilarLoading] = useState(false);
     const similarFetchedFor = useRef<string | null>(null);
@@ -159,9 +155,6 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
         return () => { active = false; };
     }, [id]);
 
-    // Lazily fetch the similar-companies list once the user opens the similar
-    // tab, keyed to the company currently shown so it refreshes when the user
-    // drills into a different company. (The location map fetches its own pins.)
     useEffect(() => {
         const cid = companyData?.company_id;
         if (!cid) return;
@@ -201,7 +194,7 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
             setEnriching(false);
             const firstError = errors[0];
             const errorCode = firstError?.error?.error_code;
-            const detail = firstError?.error?.detail || firstError?.message || 'Enrich failed';
+            const detail = firstError?.error?.errors?.[0]?.message || firstError?.error?.detail || firstError?.message || 'Enrich failed';
 
             if (errorCode === 'HTTP_402') {
                 toast.custom((toastId) => (

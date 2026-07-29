@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import axios from 'axios';
-import BatchEnrichToast from './BatchEnrichToast';
+import BatchEnrichToast, { type EnrichRecordUpdate } from './BatchEnrichToast';
 import { parseApiError, isCreditError, showCreditLimitToast } from './apiError';
 import { isSessionExpiring } from '@/lib/session';
+
+export type { EnrichRecordUpdate };
 
 interface BatchEnrichResult {
     batch_id: string;
@@ -20,6 +22,8 @@ export function useBatchEnrich() {
         selectedIds: Set<string>,
         onSuccess?: () => void,
         onComplete?: () => void,
+        /** Fires per company as its progress frame arrives, before onComplete. */
+        onRecord?: (update: EnrichRecordUpdate) => void,
     ) => {
         const records = Array.from(selectedIds).map(id => ({ company_id: id }));
 
@@ -38,8 +42,6 @@ export function useBatchEnrich() {
                 return;
             }
 
-            // Persistent, non-dismissable toast that owns the WebSocket and renders
-            // live progress until the batch completes or the connection drops.
             toast.custom(
                 (id) => (
                     <BatchEnrichToast
@@ -47,14 +49,13 @@ export function useBatchEnrich() {
                         wsUrl={data.ws_url}
                         total={data.total_records ?? records.length}
                         onComplete={onComplete}
+                        onRecord={onRecord}
                     />
                 ),
                 { duration: Infinity, dismissible: false },
             );
             onSuccess?.();
         } catch (error) {
-            // A 403 (account deactivated) is handled by the global deactivation
-            // modal via SessionGuard's interceptor — don't stack an error toast.
             if (isSessionExpiring()) return;
 
             const body = axios.isAxiosError(error) ? error.response?.data : null;

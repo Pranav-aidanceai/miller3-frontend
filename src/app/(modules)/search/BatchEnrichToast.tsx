@@ -9,11 +9,27 @@ import { updateEnrichmentCredits } from '@/store/slices/authSlice';
 
 type Phase = 'connecting' | 'running' | 'completed' | 'failed';
 
+/**
+ * A single company's result, emitted as soon as its frame arrives so the list
+ * behind the toast can flip that row while the rest of the batch is still
+ * running. `null` means the frame didn't carry the field — keep what you have.
+ */
+export interface EnrichRecordUpdate {
+    companyId: string;
+    /** Per-record status (`record_status`), falling back to the frame status. */
+    status: string | null;
+    succeeded: boolean;
+    hasEmail: boolean | null;
+    hasPhone: boolean | null;
+    hasWebsite: boolean | null;
+}
+
 interface BatchEnrichToastProps {
     toastId: string | number;
     wsUrl: string;
     total: number;
     onComplete?: () => void;
+    onRecord?: (update: EnrichRecordUpdate) => void;
 }
 
 /**
@@ -33,6 +49,19 @@ function pickNumber(obj: Record<string, unknown>, keys: string[]): number | unde
     return undefined;
 }
 
+function pickBoolean(obj: Record<string, unknown>, keys: string[]): boolean | undefined {
+    for (const k of keys) {
+        const v = obj[k];
+        if (typeof v === 'boolean') return v;
+        if (typeof v === 'string') {
+            const s = v.trim().toLowerCase();
+            if (s === 'true') return true;
+            if (s === 'false') return false;
+        }
+    }
+    return undefined;
+}
+
 function pickString(obj: Record<string, unknown>, keys: string[]): string | undefined {
     for (const k of keys) {
         const v = obj[k];
@@ -41,10 +70,11 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | unde
     return undefined;
 }
 
-export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, onComplete }: BatchEnrichToastProps) {
+export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, onComplete, onRecord }: BatchEnrichToastProps) {
 
     const onCompleteRef = useRef(onComplete);
-    useEffect(() => { onCompleteRef.current = onComplete; });
+    const onRecordRef = useRef(onRecord);
+    useEffect(() => { onCompleteRef.current = onComplete; onRecordRef.current = onRecord; });
 
     const [phase, setPhase] = useState<Phase>('connecting');
     const [total, setTotal] = useState(initialTotal);
@@ -66,7 +96,6 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
         try {
             ws = new WebSocket(wsUrl);
         } catch {
-            // Defer out of the effect body so we don't setState synchronously.
             queueMicrotask(() => {
                 if (cancelled) return;
                 setPhase('failed');
@@ -83,10 +112,7 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
             if (next === 'completed') {
                 setProcessed(totalCount);
                 setPercent(100);
-                // Refresh the search list so the newly enriched rows show their
-                // updated status.
                 onCompleteRef.current?.();
-                // Leave the success state visible briefly, then clear it.
                 window.setTimeout(() => toast.dismiss(toastId), 4000);
             }
         };
@@ -98,7 +124,6 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
             setTotal(totalCount > 0 ? totalCount : initialTotal);
             let pct = explicitPercent;
             if (pct == null) pct = (p / t) * 100;
-            // Some backends send 0-1 fractions instead of 0-100.
             if (pct > 0 && pct <= 1) pct = pct * 100;
             setPercent(Math.max(0, Math.min(100, Math.round(pct))));
         };
@@ -106,14 +131,10 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
         const handle = (frame: unknown) => {
             if (frame == null || typeof frame !== 'object') return;
             let msg = frame as Record<string, unknown>;
-            // Unwrap common envelopes: { data: {...} } / { payload: {...} }.
             for (const wrap of ['data', 'payload', 'message']) {
                 const inner = msg[wrap];
                 if (inner && typeof inner === 'object') msg = { ...msg, ...(inner as Record<string, unknown>) };
             }
-
-            // The server sends a `type: "credits"` frame (usually first) carrying
-            // the user's remaining enrichment credits — push it into the store.
             if ((pickString(msg, ['type']) ?? '').toLowerCase() === 'credits') {
                 const remaining = pickNumber(msg, ['remaining', 'credits_left', 'remaining_credits']);
                 if (remaining != null) store.dispatch(updateEnrichmentCredits(remaining));
@@ -127,6 +148,23 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
 
             if (isRecordEvent && (statusWord === '' || SUCCESS_WORDS.includes(statusWord) || FAILURE_WORDS.includes(statusWord))) {
                 processedCount += 1;
+            }
+
+            // Each progress frame carries the company it just finished, with
+            // flags for what was found. Hand it up so the row can be patched
+            // now rather than waiting for the batch to finish and refetch.
+            const companyId = pickString(msg, ['company_id', 'companyId']);
+            if (companyId) {
+                const recordStatus = pickString(msg, ['record_status', 'recordStatus']) ?? null;
+                const outcome = (recordStatus ?? statusWord).toLowerCase();
+                onRecordRef.current?.({
+                    companyId,
+                    status: recordStatus,
+                    succeeded: SUCCESS_WORDS.includes(outcome),
+                    hasEmail: pickBoolean(msg, ['has_email', 'hasEmail']) ?? null,
+                    hasPhone: pickBoolean(msg, ['has_phone', 'has_mobile_number', 'hasPhone', 'hasMobileNumber']) ?? null,
+                    hasWebsite: pickBoolean(msg, ['has_website', 'hasWebsite']) ?? null,
+                });
             }
 
             const explicitTotal = pickNumber(msg, ['total', 'total_records', 'totalRecords', 'count']);
@@ -149,7 +187,6 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
             applyProgress(explicitPercent);
             setPhase(prev => (prev === 'connecting' ? 'running' : prev));
 
-            // A non-record frame carrying a terminal word is the batch outcome.
             if (!isRecordEvent && statusWord) {
                 if (FAILURE_WORDS.includes(statusWord)) {
                     settle('failed', pickString(msg, ['detail', 'message', 'error', 'reason']) ?? 'Enrichment failed.');
@@ -160,8 +197,6 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
                     return;
                 }
             }
-
-            // Fallback: all records accounted for with no explicit terminal frame.
             if (totalCount > 0 && processedCount >= totalCount) {
                 settle('completed', null);
             }

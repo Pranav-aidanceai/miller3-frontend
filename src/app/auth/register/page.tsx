@@ -97,7 +97,7 @@ export default function RegisterPage() {
                 /> :
                 <div className="flex min-h-screen items-center justify-center p-6">
                     <div className="w-full max-w-md">
-                        <h1 className="text-2xl font-bold"><span className="text-gradient">Miller3</span></h1>
+                        <h1 className="text-2xl font-bold"><span className="text-gradient">Vendor Lens</span></h1>
                         <p className="mt-1 text-sm text-muted-foreground">Create your account</p>
                         <form onSubmit={() => setOnboarding(true)} className="mt-8 space-y-4">
                             <div>
