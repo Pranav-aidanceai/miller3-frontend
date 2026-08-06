@@ -54,7 +54,6 @@ function diffEnrichedFields(before: CompanyData | null, after: CompanyData | und
     });
 }
 
-/** "Phone" / "Phone and Email" / "Phone, Email and Website" */
 function formatFieldList(labels: string[]): string {
     if (labels.length === 1) return labels[0];
     return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
