@@ -22,6 +22,7 @@ import { CompanyDrawer } from '../search/CompanyDrawer';
 import ExportModal from '../search/ExportModal';
 import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
+import SearchPagination from '../search/SearchPagination';
 import { useBatchEnrich, type EnrichRecordUpdate } from '../search/useBatchEnrich';
 import { Company, CompanyData } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
@@ -122,6 +123,20 @@ export default function AISearchPage() {
   const [results, setResults] = useState<AIResult[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  // Paging state — mirrors the standard search page: the upstream hands back a
+  // cursor per page, so going back means replaying the cursor we came from.
+  const [perPage, setPerPage] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [currentCursor, setCurrentCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
+  // Set only while fetching another page, so the first search keeps its own
+  // "Analyzing your query..." state in the chat thread.
+  const [paging, setPaging] = useState(false);
+  const lastQueryRef = useRef<string | null>(null);
+
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -195,9 +210,11 @@ export default function AISearchPage() {
     });
 
   const runQuery = useCallback(
-    async (rawQuery: string, opts?: { silent?: boolean }) => {
+    async (rawQuery: string, opts?: { silent?: boolean; cursor?: string | null; limit?: number }) => {
       const query = rawQuery.trim();
       if (!query) return;
+      // A silent run is a page change on the query already in the thread — it
+      // swaps the rows without adding another conversation turn.
       const silent = opts?.silent ?? false;
 
       let entryId: string | null = null;
@@ -207,11 +224,27 @@ export default function AISearchPage() {
         setResults([]);
         setStatusMessage(null);
         setThinking(true);
+        lastQueryRef.current = query;
+        setCursorStack([]);
+        setCurrentCursor(null);
+        setCurrentPage(1);
+        setNextCursor(null);
+        setTotalPages(0);
+        setTotalResults(0);
+      } else {
+        setPaging(true);
       }
 
-      const { data, errors, headers } = await submitQueryAction(query);
+      const { data, errors, headers } = await submitQueryAction(query, {
+        cursor: opts?.cursor ?? null,
+        limit: opts?.limit ?? perPage,
+        // A silent run is exactly the paging/page-size case, so it doubles as
+        // the `operation` flag the upstream expects.
+        operation: silent,
+      });
       if (headers !== null) dispatch(updateAiSearchCredits(headers));
       setThinking(false);
+      setPaging(false);
 
       if (errors) {
         let detail = 'AI search failed';
@@ -224,28 +257,75 @@ export default function AISearchPage() {
           setChat(prev =>
             prev.map(c => (c.id === entryId ? { ...c, status: 'error', error: detail, errorCode: code } : c)),
           );
+        } else if (!isSessionExpiring()) {
+          toast.error(detail, {
+            duration: 5000,
+            className: '!bg-destructive !text-white !border-destructive',
+          });
         }
         return;
       }
 
       const rows: AIResult[] = data.results ?? [];
+      // The chat reports the size of the whole match, not the current page.
+      const total: number = data.total_companies ?? data.total ?? rows.length;
 
       const message: string | null = rows.length === 0 ? data.message ?? null : null;
       setResults(rows);
       setStatusMessage(message);
-      setSelectedIds(new Set());
+      // Selections survive paging so a user can gather rows across pages before
+      // exporting; only a brand new query clears them.
+      if (!silent) setSelectedIds(new Set());
+      setNextCursor(data.next_cursor ?? null);
+      setTotalPages(data.total_pages ?? 0);
+      setTotalResults(total);
       if (entryId) {
         setChat(prev =>
           prev.map(c =>
             c.id === entryId
-              ? { ...c, status: 'done', count: rows.length, sql: data.generated_sql, message }
+              ? { ...c, status: 'done', count: total, sql: data.generated_sql, message }
               : c,
           ),
         );
       }
     },
-    [dispatch],
+    [dispatch, perPage],
   );
+
+  // Changing the page size re-runs the current query from the first page.
+  const didInitPerPage = useRef(false);
+  useEffect(() => {
+    if (!didInitPerPage.current) {
+      didInitPerPage.current = true;
+      return;
+    }
+    const query = lastQueryRef.current;
+    if (!query) return;
+    setCursorStack([]);
+    setCurrentCursor(null);
+    setCurrentPage(1);
+    runQuery(query, { silent: true, cursor: null, limit: perPage });
+  }, [perPage, runQuery]);
+
+  const handleNext = () => {
+    const query = lastQueryRef.current;
+    if (!nextCursor || !query || paging || thinking) return;
+    setCursorStack(prev => [...prev, currentCursor ?? '']);
+    setCurrentCursor(nextCursor);
+    setCurrentPage(prev => prev + 1);
+    runQuery(query, { silent: true, cursor: nextCursor });
+  };
+
+  const handlePrev = () => {
+    const query = lastQueryRef.current;
+    if (cursorStack.length === 0 || !query || paging || thinking) return;
+    const stack = [...cursorStack];
+    const prevCursor = stack.pop() || null;
+    setCursorStack(stack);
+    setCurrentCursor(prevCursor);
+    setCurrentPage(prev => prev - 1);
+    runQuery(query, { silent: true, cursor: prevCursor });
+  };
 
   const formik = useFormik({
     initialValues: { query: '' },
@@ -284,27 +364,6 @@ export default function AISearchPage() {
     );
   }, []);
 
-  // const refreshEnrichedCompanies = useCallback(async (ids: string[]) => {
-  //   const fetched = await Promise.all(
-  //     ids.map(async id => {
-  //       const res = await getCompanyAction(id);
-  //       return res.error ? null : (res.data as CompanyData);
-  //     }),
-  //   );
-  //   const byId = new Map<string, CompanyData>();
-  //   for (const c of fetched) {
-  //     if (!c) continue;
-  //     byId.set(String(c.id), c);
-  //     byId.set(String(c.company_id), c);
-  //   }
-  //   if (byId.size === 0) return;
-  //   setResults(prev =>
-  //     prev.map(r => {
-  //       const c = byId.get(String(r.id));
-  //       return c ? mergeEnriched(r, c) : r;
-  //     }),
-  //   );
-  // }, []);
 
   const handleExport = async () => {
     if (selectedIds.size === 0) {
@@ -518,7 +577,7 @@ export default function AISearchPage() {
                         </p>
                       ) : (
                         <p>
-                          Found <span className="font-semibold">{entry.count}</span>{' '}
+                          Found <span className="font-semibold">{entry.count?.toLocaleString()}</span>{' '}
                           {entry.count === 1 ? 'company' : 'companies'}.
                         </p>
                       )}
@@ -574,9 +633,9 @@ export default function AISearchPage() {
         {/* Toolbar */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <p className="text-sm text-muted-foreground">
-            {thinking && results.length === 0
+            {(thinking || paging) && results.length === 0
               ? 'Searching…'
-              : `${results.length} result${results.length === 1 ? '' : 's'}`}
+              : `Showing ${results.length} of ${totalResults.toLocaleString()} ${totalResults === 1 ? 'company' : 'companies'}`}
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -678,34 +737,49 @@ export default function AISearchPage() {
 
         {/* Results */}
         <div className="min-h-0 flex-1 overflow-auto p-4">
-          {results.length === 0 && !thinking ? (
+          {results.length === 0 && !thinking && !paging ? (
             <div className="flex h-full items-center justify-center text-center text-muted-foreground">
               <div className="max-w-md">
                 <p className="text-lg font-medium">No results found</p>
                 <p className="mt-1 text-sm">{statusMessage || 'Try rephrasing your query.'}</p>
               </div>
             </div>
-          ) : viewMode === 'table' ? (
-            <CompanyTable
-              companies={companies}
-              isLoading={thinking && results.length === 0}
-              perPage={companies.length || 10}
-              selectedIds={selectedIds}
-              allSelected={allSelected}
-              notAccessibleFields={[]}
-              onToggleSelect={toggleSelect}
-              onToggleSelectAll={toggleSelectAll}
-              onRowClick={setSelectedCompany}
-            />
           ) : (
-            <CompanyCards
-              companies={companies}
-              isLoading={thinking && results.length === 0}
-              selectedIds={selectedIds}
-              notAccessibleFields={[]}
-              onToggleSelect={toggleSelect}
-              onCardClick={setSelectedCompany}
-            />
+            <>
+              {viewMode === 'table' ? (
+                <CompanyTable
+                  companies={companies}
+                  isLoading={thinking || paging}
+                  perPage={perPage}
+                  selectedIds={selectedIds}
+                  allSelected={allSelected}
+                  notAccessibleFields={[]}
+                  onToggleSelect={toggleSelect}
+                  onToggleSelectAll={toggleSelectAll}
+                  onRowClick={setSelectedCompany}
+                />
+              ) : (
+                <CompanyCards
+                  companies={companies}
+                  isLoading={thinking || paging}
+                  selectedIds={selectedIds}
+                  notAccessibleFields={[]}
+                  onToggleSelect={toggleSelect}
+                  onCardClick={setSelectedCompany}
+                />
+              )}
+
+              <SearchPagination
+                perPage={perPage}
+                setPerPage={setPerPage}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                hasNextPage={nextCursor}
+                isLoading={thinking || paging}
+                onPrev={handlePrev}
+                onNext={handleNext}
+              />
+            </>
           )}
         </div>
       </div>

@@ -185,6 +185,31 @@
       transform: translateX(100%);
     }
   }
+
+  /* Marks a value that the enrichment just filled in. Deliberately wordless:
+     the value pulses a few times to catch the eye, then settles into a quiet
+     tint that persists for as long as the drawer stays open. */
+  .enriched-value {
+    border-radius: var(--radius-sm);
+    padding: 0.125rem 0.375rem;
+    background: color-mix(in oklab, var(--success) 12%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--success) 28%, transparent);
+    animation: enriched-glow 1.8s ease-in-out 3;
+  }
+
+  @keyframes enriched-glow {
+
+    0%,
+    100% {
+      box-shadow: 0 0 0 1px color-mix(in oklab, var(--success) 28%, transparent);
+    }
+
+    50% {
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--success) 55%, transparent),
+        0 0 12px 1px color-mix(in oklab, var(--success) 40%, transparent);
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -15,8 +15,16 @@ function creditsHeader(headers: unknown): Record<string, string> {
 
 export async function POST(request: Request) {
     try {
-        const { query } = await request.json();
-        const response = await AXIOS.post('/api/v1/search/ai', { query });
+        const { query, cursor, limit, operation } = await request.json();
+        // Only forward the paging keys when they carry a value so a plain
+        // first-page query keeps the upstream defaults. `operation` always goes
+        // through — false is a meaningful value there (a new query).
+        const response = await AXIOS.post('/api/v1/search/ai', {
+            query,
+            operation: operation === true,
+            ...(cursor ? { cursor } : {}),
+            ...(limit ? { limit } : {}),
+        });
 
         return NextResponse.json(response.data, {
             status: response.status || 200,

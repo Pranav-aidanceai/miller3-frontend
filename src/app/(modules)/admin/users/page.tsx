@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
-import { ListFilter, ChevronDown, Check, Search, RefreshCw } from 'lucide-react';
+import { ListFilter, Check, Search, RefreshCw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useDebounce } from '@/hooks/useDebounce';
 import { getErrorMessage } from '@/lib/apiError';
@@ -31,6 +31,8 @@ interface UsersResponse {
     page: number;
 }
 
+const LIMIT = 25;
+
 const ROLES = ['free', 'standard', 'premium', 'admin'] as const;
 type Role = typeof ROLES[number];
 
@@ -43,8 +45,6 @@ const STATUS_LABELS: Record<string, string> = {
     pending: 'Pending Approval',
     rejected: 'Rejected',
 };
-
-const PRESET_LIMITS = [20, 50, 100] as const;
 
 const roleBadge: Record<string, string> = {
     admin: 'bg-destructive/10 text-destructive',
@@ -64,7 +64,6 @@ export default function AdminUsersPage() {
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(20);
     const [roleFilter, setRoleFilter] = useState<Role | null>(null);
     const [statusFilter, setStatusFilter] = useState<Status | null>(null);
     const [search, setSearch] = useState('');
@@ -72,20 +71,17 @@ export default function AdminUsersPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-
     const [rolePopoverOpen, setRolePopoverOpen] = useState(false);
     const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
-    const [limitPopoverOpen, setLimitPopoverOpen] = useState(false);
-    const [customMode, setCustomMode] = useState(false);
-    const [customLimit, setCustomLimit] = useState('');
 
-    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
     const fetchUsers = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const params: Record<string, string | number> = { page, limit };
+            const params: Record<string, string | number> = { page, LIMIT };
             if (roleFilter) params.role = roleFilter;
             if (statusFilter) params.status = statusFilter;
             if (debouncedSearch) params.username = debouncedSearch;
@@ -98,13 +94,13 @@ export default function AdminUsersPage() {
         } finally {
             setLoading(false);
         }
-    }, [page, limit, roleFilter, statusFilter, debouncedSearch]);
+    }, [page, roleFilter, statusFilter, debouncedSearch]);
 
     useEffect(() => {
         let active = true;
         (async () => {
             try {
-                const params: Record<string, string | number> = { page, limit };
+                const params: Record<string, string | number> = { page, LIMIT };
                 if (roleFilter) params.role = roleFilter;
                 if (statusFilter) params.status = statusFilter;
                 if (debouncedSearch) params.username = debouncedSearch;
@@ -121,10 +117,8 @@ export default function AdminUsersPage() {
             }
         })();
         return () => { active = false; };
-    }, [page, limit, roleFilter, statusFilter, debouncedSearch]);
+    }, [page, roleFilter, statusFilter, debouncedSearch]);
 
-    // Reset to the first page whenever a new search term is applied. Adjusting
-    // state during render (instead of in an effect) avoids a cascading re-render.
     const [prevSearch, setPrevSearch] = useState(debouncedSearch);
     if (debouncedSearch !== prevSearch) {
         setPrevSearch(debouncedSearch);
@@ -141,20 +135,6 @@ export default function AdminUsersPage() {
         setPage(1);
         setStatusFilter(prev => (prev === status ? null : status));
         setStatusPopoverOpen(false);
-    };
-
-    const applyLimit = (value: number) => {
-        setLimit(value);
-        setPage(1);
-        setCustomMode(false);
-        setCustomLimit('');
-        setLimitPopoverOpen(false);
-    };
-
-    const applyCustomLimit = () => {
-        const value = parseInt(customLimit, 10);
-        if (!value || value < 1) return;
-        applyLimit(value);
     };
 
     return (
@@ -333,63 +313,7 @@ export default function AdminUsersPage() {
             {!error && (
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                        {/* Row limit */}
-                        <Popover
-                            open={limitPopoverOpen}
-                            onOpenChange={(open) => {
-                                setLimitPopoverOpen(open);
-                                if (!open) { setCustomMode(false); setCustomLimit(''); }
-                            }}
-                        >
-                            <PopoverTrigger asChild>
-                                <button className="flex items-center gap-1.5 h-9 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent cursor-pointer">
-                                    {limit}
-                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-40 p-1" align="start">
-                                {PRESET_LIMITS.map(value => (
-                                    <button
-                                        key={value}
-                                        onClick={() => applyLimit(value)}
-                                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                                    >
-                                        {value}
-                                        {limit === value && !customMode && <Check className="h-4 w-4 text-primary" />}
-                                    </button>
-                                ))}
-                                {customMode ? (
-                                    <div className="mt-1 border-t border-border p-1.5">
-                                        <input
-                                            autoFocus
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={customLimit}
-                                            onChange={e => setCustomLimit(e.target.value.replace(/[^0-9]/g, ''))}
-                                            onKeyDown={e => { if (e.key === 'Enter') applyCustomLimit(); }}
-                                            placeholder="Enter number"
-                                            className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-1 focus:ring-ring"
-                                        />
-                                        <button
-                                            onClick={applyCustomLimit}
-                                            disabled={!customLimit}
-                                            className="mt-1.5 w-full rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                                        >
-                                            Apply
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button
-                                        onClick={() => setCustomMode(true)}
-                                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
-                                    >
-                                        Custom
-                                        {!PRESET_LIMITS.includes(limit as typeof PRESET_LIMITS[number]) && <Check className="h-4 w-4 text-primary" />}
-                                    </button>
-                                )}
-                            </PopoverContent>
-                        </Popover>
-                        <span className="text-xs text-muted-foreground">per page · {total.toLocaleString()} users</span>
+                        <span className="text-xs text-muted-foreground">{total.toLocaleString()} users</span>
                     </div>
 
                     <div className="flex items-center gap-1">

@@ -122,4 +122,7 @@ export interface CompanyData {
   updated_at: string;
   execution_time_ms: number;
   not_accessible: string[];
+  msa: string | null;
+  address: string | null;
+  certification_status: string | null;
 }

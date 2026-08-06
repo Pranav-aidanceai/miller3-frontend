@@ -28,9 +28,22 @@ function parseCreditsRemaining(headers: unknown): number | null {
     return Number.isFinite(remaining) ? remaining : null;
 }
 
-export async function submitQueryAction(query: string) {
+// `cursor`/`limit` page through an existing result set — the upstream returns
+// the same cursor envelope as the standard search, so paging just re-issues the
+// query with the cursor handed back by the previous page. `operation` tells the
+// upstream which of the two it is: false for a brand new query, true when the
+// same query is being re-run for a page change or a new page size.
+export async function submitQueryAction(
+    query: string,
+    opts?: { cursor?: string | null; limit?: number; operation?: boolean }
+) {
     try {
-        const response = await axios.post(`/api/search/ai`, { query });
+        const response = await axios.post(`/api/search/ai`, {
+            query,
+            cursor: opts?.cursor ?? null,
+            limit: opts?.limit ?? null,
+            operation: opts?.operation ?? false,
+        });
         return {
             data: response.data,
             error: null,
