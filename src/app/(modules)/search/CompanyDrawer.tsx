@@ -38,22 +38,12 @@ const LocationMap = dynamic(() => import('./LocationMap'), {
     ),
 });
 
-
-/**
- * The only fields an enrichment can fill in. Drives both the post-enrich diff
- * and the wording of the success toast.
- */
 const ENRICHABLE_FIELDS: { key: keyof CompanyData; label: string }[] = [
     { key: 'phone', label: 'Phone' },
     { key: 'email', label: 'Email' },
     { key: 'website', label: 'Website' },
 ];
 
-/**
- * Fields the enrichment actually delivered — ones that now hold a value and
- * differ from what was on screen beforehand. Fields the API returned empty are
- * skipped, so nothing gets highlighted for data we did not gain.
- */
 function diffEnrichedFields(before: CompanyData | null, after: CompanyData | undefined) {
     if (!after) return [];
     return ENRICHABLE_FIELDS.filter(({ key }) => {
