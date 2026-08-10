@@ -81,7 +81,7 @@ export default function SearchPage() {
   const buildSearch = useCallback((cursorValue: string | null): CompanySearchPayload => {
     const {
       searchText, stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
-      minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
+      msaFilter, certificationFilter, minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
       demoFilter, hasEmail, hasPhone, hasWebsite
     } = appliedFilters;
 
@@ -92,6 +92,8 @@ export default function SearchPage() {
       county: countyFilter || null,
       naics_code: naicsFilter || null,
       sic_code: sicFilter || null,
+      msa: msaFilter || null,
+      certification_status: certificationFilter || null,
       employee_size_min: minEmp ? parseInt(minEmp) : null,
       employee_size_max: maxEmp ? parseInt(maxEmp) : null,
       annual_revenue_min: minRev ? Number(minRev) : null,

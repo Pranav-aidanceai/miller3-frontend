@@ -6,6 +6,8 @@ export interface SearchFilters {
     countyFilter: string;
     naicsFilter: string;
     sicFilter: string;
+    msaFilter: string;
+    certificationFilter: string;
     minYear: string;
     maxYear: string;
     minEmp: string;
@@ -25,6 +27,8 @@ export const emptyFilters: SearchFilters = {
     countyFilter: '',
     naicsFilter: '',
     sicFilter: '',
+    msaFilter: '',
+    certificationFilter: '',
     minYear: '',
     maxYear: '',
     minEmp: '',
@@ -49,6 +53,8 @@ export interface StructuredFilters {
     county?: string[] | null;
     naics_code?: string[] | null;
     sic_code?: string[] | null;
+    msa?: string[] | null;
+    certification_status?: string[] | null;
     has_email?: boolean | null;
     has_website?: boolean | null;
     has_mobile_number?: boolean | null;
@@ -80,6 +86,8 @@ export function structuredFiltersToQuery(filters: StructuredFilters): string {
     if (filters.county?.[0]) params.set('county', filters.county[0]);
     if (filters.naics_code?.[0]) params.set('naics', filters.naics_code[0]);
     if (filters.sic_code?.[0]) params.set('sic', filters.sic_code[0]);
+    if (filters.msa?.[0]) params.set('msa', filters.msa[0]);
+    if (filters.certification_status?.[0]) params.set('certification', filters.certification_status[0]);
 
     if (filters.year_founded?.min != null) params.set('min_year', String(filters.year_founded.min));
     if (filters.year_founded?.max != null) params.set('max_year', String(filters.year_founded.max));
@@ -114,6 +122,8 @@ export function filtersFromQuery(search: string): SearchFilters | null {
         countyFilter: params.get('county') ?? '',
         naicsFilter: params.get('naics') ?? '',
         sicFilter: params.get('sic') ?? '',
+        msaFilter: params.get('msa') ?? '',
+        certificationFilter: params.get('certification') ?? '',
         minYear: digits('min_year'),
         maxYear: digits('max_year'),
         minEmp: digits('min_emp'),

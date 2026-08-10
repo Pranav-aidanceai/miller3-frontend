@@ -2,7 +2,7 @@
 
 import { statesList } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { CodeAutocomplete } from './CodeAutocomplete';
+import { FilterAutocomplete } from './FilterAutocomplete';
 import { FilterInput, Toggle } from './helper';
 import { SearchFilters } from './replayParams';
 
@@ -73,12 +73,13 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
                             ))}
                         </div>
                     </div>
+                    <FilterAutocomplete label="Metropolitan Statistical Area (MSA)" field="msa" value={draftFilters.msaFilter} onChange={(v) => setDraftFilters({ ...draftFilters, msaFilter: v })} placeholder="e.g. Austin, TX" />
                 </div>
                 {/* Industry */}
                 <div data-tour="industry-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Industry</p>
-                    <CodeAutocomplete label="NAICS Code" field="naics" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="Code or industry" />
-                    <CodeAutocomplete label="SIC Code" field="sic" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="Code or industry" />
+                    <FilterAutocomplete label="NAICS Code" field="naics" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="Code or industry" />
+                    <FilterAutocomplete label="SIC Code" field="sic" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="Code or industry" />
                     <div className="grid grid-cols-2 gap-2 mt-2">
                         <FilterInput label="Min Year Founded" value={draftFilters.minYear} onChange={(v) => setDraftFilters({ ...draftFilters, minYear: v })} placeholder="1900" />
                         <FilterInput label="Max Year Founded" value={draftFilters.maxYear} onChange={(v) => setDraftFilters({ ...draftFilters, maxYear: v })} placeholder="2023" />
@@ -107,6 +108,7 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
                             {d}
                         </label>
                     ))}
+                    <FilterAutocomplete label="Certification" field="certification" value={draftFilters.certificationFilter} onChange={(v) => setDraftFilters({ ...draftFilters, certificationFilter: v })} placeholder="e.g. SBE, MBE, HUBZone" />
                 </div>
                 {/* Data Quality */}
                 <div data-tour="data-quality-filter">

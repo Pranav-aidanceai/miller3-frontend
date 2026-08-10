@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { X, Copy, AlertCircle, Info, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCodeFilterAction, getCompanyAction, getSimilarCompanyAction, singleEnrichAction } from './searchServices';
+import { filterTitleOf, getCompanyAction, getFilterOptionsAction, getSimilarCompanyAction, singleEnrichAction } from './searchServices';
 import { isSessionExpiring } from '@/lib/session';
 import { CompanyData } from '@/types/search';
 import SimilarPage from './Similar';
@@ -234,8 +234,8 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
         if (!naicsCode || isLocked('naics_code')) return;
         let active = true;
         (async () => {
-            const response = await getCodeFilterAction('naics', { q: naicsCode, limit: 1 });
-            if (active) setNaicsInfo({ code: naicsCode, label: response.data?.results?.[naicsCode] ?? null });
+            const response = await getFilterOptionsAction('naics', { q: naicsCode, limit: 1 });
+            if (active) setNaicsInfo({ code: naicsCode, label: filterTitleOf(response.data?.results, naicsCode) });
         })();
         return () => { active = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -245,8 +245,8 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
         if (!sicCode || isLocked('sic_code')) return;
         let active = true;
         (async () => {
-            const response = await getCodeFilterAction('sic', { q: sicCode, limit: 1 });
-            if (active) setSicInfo({ code: sicCode, label: response.data?.results?.[sicCode] ?? null });
+            const response = await getFilterOptionsAction('sic', { q: sicCode, limit: 1 });
+            if (active) setSicInfo({ code: sicCode, label: filterTitleOf(response.data?.results, sicCode) });
         })();
         return () => { active = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps

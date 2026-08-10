@@ -1,4 +1,4 @@
-import { CodeFilterResponse, CompanySearchPayload } from "@/types/search";
+import { CodeFilterResponse, CompanySearchPayload, FilterField } from "@/types/search";
 import axios from "axios";
 
 export async function searchAction(payload: CompanySearchPayload) {
@@ -28,8 +28,8 @@ export async function getCompanyAction(id: string) {
     }
 }
 
-export async function getCodeFilterAction(
-    field: 'naics' | 'sic',
+export async function getFilterOptionsAction(
+    field: FilterField,
     params: { q: string; cursor?: string | null; limit?: number }
 ) {
     try {
@@ -41,11 +41,34 @@ export async function getCodeFilterAction(
         if (axios.isAxiosError(error)) {
             return {
                 data: null,
-                error: error.response?.data ?? { detail: `Fetch ${field.toUpperCase()} codes failed` }
+                error: error.response?.data ?? { detail: `Fetch ${field} options failed` }
             };
         }
         return { data: null, error: { detail: 'Something went wrong' } };
     }
+}
+
+export interface FilterOption {
+    /** The value sent to the search API. */
+    code: string;
+    /** Human-readable expansion. Empty for fields whose value is already prose. */
+    title: string;
+}
+
+/**
+ * Flatten a filter response's `results`. The dict shape is `{ code: title }`;
+ * the list shape has no separate code, so each value stands in for itself.
+ */
+export function filterResultsToOptions(results: CodeFilterResponse['results']): FilterOption[] {
+    return Array.isArray(results)
+        ? results.map(value => ({ code: value, title: '' }))
+        : Object.entries(results).map(([code, title]) => ({ code, title }));
+}
+
+/** Look up a single value's label, tolerating the list-shaped `results`. */
+export function filterTitleOf(results: CodeFilterResponse['results'] | undefined, code: string): string | null {
+    if (!results || Array.isArray(results)) return null;
+    return results[code] ?? null;
 }
 
 export async function getSimilarCompanyAction(payload: { company_id: string, limit: number, cursor: string | null }) {

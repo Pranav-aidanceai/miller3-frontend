@@ -4,36 +4,43 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { getCodeFilterAction } from './searchServices';
+import { FilterField } from '@/types/search';
+import { filterResultsToOptions, getFilterOptionsAction, type FilterOption } from './searchServices';
 
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 500;
 const LOAD_MORE_THRESHOLD = 48;
 
-interface CodeOption {
-    code: string;
-    title: string;
-}
+/** What the "nothing matched" line calls this field's rows. */
+const FIELD_NOUNS: Record<FilterField, string> = {
+    naics: 'NAICS codes',
+    sic: 'SIC codes',
+    msa: 'metro areas',
+    certification: 'certifications',
+};
 
-interface CodeAutocompleteProps {
+/** NAICS/SIC values are numeric codes; MSA/certification values are words. */
+const MONO_FIELDS: FilterField[] = ['naics', 'sic'];
+
+interface FilterAutocompleteProps {
     label: string;
-    field: 'naics' | 'sic';
+    field: FilterField;
     value: string;
     onChange: (code: string) => void;
     placeholder: string;
 }
 
-export const CodeAutocomplete = ({ label, field, value, onChange, placeholder }: CodeAutocompleteProps) => {
+export const FilterAutocomplete = ({ label, field, value, onChange, placeholder }: FilterAutocompleteProps) => {
     const [query, setQuery] = useState('');
     const [dismissed, setDismissed] = useState(false);
-    const [options, setOptions] = useState<CodeOption[]>([]);
+    const [options, setOptions] = useState<FilterOption[]>([]);
     const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [activeIndex, setActiveIndex] = useState(-1);
     const [activeQuery, setActiveQuery] = useState('');
-    const [picked, setPicked] = useState<CodeOption | null>(null);
+    const [picked, setPicked] = useState<FilterOption | null>(null);
     const listboxId = useId();
     const inputRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -42,6 +49,7 @@ export const CodeAutocomplete = ({ label, field, value, onChange, placeholder }:
     const requestIdRef = useRef(0);
 
     const isOpen = query.trim().length > 0 && !dismissed;
+    const isMono = MONO_FIELDS.includes(field);
     const selectedTitle = picked?.code === value ? picked.title : null;
 
     useEffect(() => () => {
@@ -56,18 +64,18 @@ export const CodeAutocomplete = ({ label, field, value, onChange, placeholder }:
 
     const runSearch = useCallback(async (q: string, cursor: string | null) => {
         const requestId = ++requestIdRef.current;
-        const { data, error: fetchError } = await getCodeFilterAction(field, { q, cursor, limit: PAGE_SIZE });
+        const { data, error: fetchError } = await getFilterOptionsAction(field, { q, cursor, limit: PAGE_SIZE });
         if (requestId !== requestIdRef.current) return;
 
         if (data) {
-            const page = Object.entries(data.results).map(([code, title]) => ({ code, title }));
+            const page = filterResultsToOptions(data.results);
             setOptions(prev => (cursor ? [...prev, ...page] : page));
             setNextCursor(data.next_cursor ?? null);
             setError(null);
         } else {
             if (!cursor) setOptions([]);
             setNextCursor(null);
-            setError((fetchError as { detail?: string } | null)?.detail ?? 'Failed to load codes');
+            setError((fetchError as { detail?: string } | null)?.detail ?? 'Failed to load options');
         }
         setIsLoading(false);
         setIsLoadingMore(false);
@@ -125,7 +133,7 @@ export const CodeAutocomplete = ({ label, field, value, onChange, placeholder }:
         runSearch(activeQuery, null);
     };
 
-    const select = (option: CodeOption) => {
+    const select = (option: FilterOption) => {
         setPicked(option);
         onChange(option.code);
         setQuery('');
@@ -176,13 +184,22 @@ export const CodeAutocomplete = ({ label, field, value, onChange, placeholder }:
                         className="mt-1 flex h-9 w-full items-center gap-1.5 rounded-md border border-input bg-background px-2 focus-within:ring-1 focus-within:ring-ring"
                     >
                         {value && (
-                            <span className="flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 py-0.5 pl-1.5 pr-1 font-mono text-xs text-primary">
-                                {value}
+                            // Values like a full MSA name outrun the sidebar, so the
+                            // chip is capped and truncated rather than left to push
+                            // the input out of the row.
+                            <span
+                                title={value}
+                                className={cn(
+                                    'flex min-w-0 max-w-[65%] items-center gap-1 rounded-md border border-primary/40 bg-primary/10 py-0.5 pl-1.5 pr-1 text-xs text-primary',
+                                    isMono && 'font-mono'
+                                )}
+                            >
+                                <span className="truncate">{value}</span>
                                 <button
                                     type="button"
                                     onClick={e => { e.stopPropagation(); clearSelection(); }}
                                     aria-label={`Remove ${value}`}
-                                    className="cursor-pointer text-primary/60 transition-colors hover:text-primary"
+                                    className="shrink-0 cursor-pointer text-primary/60 transition-colors hover:text-primary"
                                 >
                                     <X className="h-3 w-3" />
                                 </button>
@@ -198,9 +215,12 @@ export const CodeAutocomplete = ({ label, field, value, onChange, placeholder }:
                             aria-expanded={isOpen}
                             aria-controls={listboxId}
                             aria-autocomplete="list"
-                            aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${options[activeIndex]?.code}` : undefined}
+                            aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
                             aria-label={label}
-                            className="h-full min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:font-sans"
+                            className={cn(
+                                'h-full min-w-10 flex-1 bg-transparent text-sm outline-none placeholder:font-sans',
+                                isMono && 'font-mono'
+                            )}
                         />
                         {isLoading && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />}
                     </div>
@@ -229,7 +249,7 @@ export const CodeAutocomplete = ({ label, field, value, onChange, placeholder }:
                             </div>
                         ) : options.length === 0 ? (
                             <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                                No {field.toUpperCase()} codes match &ldquo;{activeQuery}&rdquo;
+                                No {FIELD_NOUNS[field]} match &ldquo;{activeQuery}&rdquo;
                             </p>
                         ) : (
                             <>
@@ -237,21 +257,31 @@ export const CodeAutocomplete = ({ label, field, value, onChange, placeholder }:
                                     {options.map((option, index) => (
                                         <button
                                             key={option.code}
-                                            id={`${listboxId}-${option.code}`}
+                                            id={`${listboxId}-${index}`}
                                             type="button"
                                             role="option"
                                             aria-selected={option.code === value}
                                             onClick={() => select(option)}
                                             onMouseEnter={() => setActiveIndex(index)}
                                             className={cn(
-                                                'flex w-full cursor-pointer items-baseline gap-2 rounded-md px-2 py-1.5 text-left',
+                                                'flex w-full cursor-pointer items-baseline gap-2 overflow-hidden rounded-md px-2 py-1.5 text-left',
                                                 index === activeIndex ? 'bg-accent' : 'hover:bg-accent/60'
                                             )}
                                         >
-                                            <span className={cn('shrink-0 font-mono text-xs', option.code === value ? 'text-primary' : 'text-foreground')}>
+                                            <span
+                                                title={option.code}
+                                                className={cn(
+                                                    'truncate text-xs',
+                                                    isMono && 'font-mono',
+                                                    // With a title alongside it the code keeps its width and the
+                                                    // title absorbs the overflow; alone it is the whole row.
+                                                    option.title ? 'max-w-[55%] shrink-0' : 'min-w-0 flex-1',
+                                                    option.code === value ? 'text-primary' : 'text-foreground'
+                                                )}
+                                            >
                                                 {option.code}
                                             </span>
-                                            <span className="truncate text-xs text-muted-foreground">{option.title}</span>
+                                            {option.title && <span className="truncate text-xs text-muted-foreground">{option.title}</span>}
                                         </button>
                                     ))}
                                 </div>
