@@ -16,14 +16,14 @@ import {
 import { cn } from '@/lib/utils';
 import { getTemplateAction, submitQueryAction } from './aisearch-services';
 import { isCreditError, showCreditLimitToast } from '../search/apiError';
-import { getCompanyAction } from '../search/searchServices';
 import { isSessionExpiring } from '@/lib/session';
 import { useFormik } from 'formik';
 import { CompanyDrawer } from '../search/CompanyDrawer';
 import ExportModal from '../search/ExportModal';
 import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
-import { useBatchEnrich } from '../search/useBatchEnrich';
+import SearchPagination from '../search/SearchPagination';
+import { useBatchEnrich, type EnrichRecordUpdate } from '../search/useBatchEnrich';
 import { Company, CompanyData } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
@@ -53,6 +53,11 @@ type AIResult = {
   annual_revenue?: number | null;
   year_founded?: number | null;
   enrichment_status?: 'unenriched' | 'enriched' | 'pending';
+  // Set by batch enrichment, which reports what it found per company without
+  // sending the values back. Absent on rows straight from the AI search.
+  has_email?: boolean | null;
+  has_phone?: boolean | null;
+  has_website?: boolean | null;
 };
 
 
@@ -72,9 +77,9 @@ const toCompany = (r: AIResult): Company => {
     phone: r.phone,
     email: r.email,
     website: r.website,
-    has_mobile_number: !!r.phone,
-    has_email: !!r.email,
-    has_website: !!r.website,
+    has_mobile_number: r.has_phone ?? !!r.phone,
+    has_email: r.has_email ?? !!r.email,
+    has_website: r.has_website ?? !!r.website,
   };
 };
 
@@ -87,6 +92,10 @@ const mergeEnriched = (r: AIResult, c: CompanyData): AIResult => ({
   employee_size: c.employee_size,
   annual_revenue: c.annual_revenue,
   year_founded: c.year_founded,
+  // The detail fetch is authoritative — let the values drive the flags again.
+  has_email: !!c.email,
+  has_phone: !!c.phone,
+  has_website: !!c.website,
 });
 
 type ChatEntry = {
@@ -113,6 +122,20 @@ export default function AISearchPage() {
   const [expandedSql, setExpandedSql] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<AIResult[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // Paging state — mirrors the standard search page: the upstream hands back a
+  // cursor per page, so going back means replaying the cursor we came from.
+  const [perPage, setPerPage] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalResults, setTotalResults] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [currentCursor, setCurrentCursor] = useState<string | null>(null);
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
+  // Set only while fetching another page, so the first search keeps its own
+  // "Analyzing your query..." state in the chat thread.
+  const [paging, setPaging] = useState(false);
+  const lastQueryRef = useRef<string | null>(null);
 
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -187,9 +210,11 @@ export default function AISearchPage() {
     });
 
   const runQuery = useCallback(
-    async (rawQuery: string, opts?: { silent?: boolean }) => {
+    async (rawQuery: string, opts?: { silent?: boolean; cursor?: string | null; limit?: number }) => {
       const query = rawQuery.trim();
       if (!query) return;
+      // A silent run is a page change on the query already in the thread — it
+      // swaps the rows without adding another conversation turn.
       const silent = opts?.silent ?? false;
 
       let entryId: string | null = null;
@@ -199,11 +224,27 @@ export default function AISearchPage() {
         setResults([]);
         setStatusMessage(null);
         setThinking(true);
+        lastQueryRef.current = query;
+        setCursorStack([]);
+        setCurrentCursor(null);
+        setCurrentPage(1);
+        setNextCursor(null);
+        setTotalPages(0);
+        setTotalResults(0);
+      } else {
+        setPaging(true);
       }
 
-      const { data, errors, headers } = await submitQueryAction(query);
-      dispatch(updateAiSearchCredits(headers));
+      const { data, errors, headers } = await submitQueryAction(query, {
+        cursor: opts?.cursor ?? null,
+        limit: opts?.limit ?? perPage,
+        // A silent run is exactly the paging/page-size case, so it doubles as
+        // the `operation` flag the upstream expects.
+        operation: silent,
+      });
+      if (headers !== null) dispatch(updateAiSearchCredits(headers));
       setThinking(false);
+      setPaging(false);
 
       if (errors) {
         let detail = 'AI search failed';
@@ -216,29 +257,75 @@ export default function AISearchPage() {
           setChat(prev =>
             prev.map(c => (c.id === entryId ? { ...c, status: 'error', error: detail, errorCode: code } : c)),
           );
+        } else if (!isSessionExpiring()) {
+          toast.error(detail, {
+            duration: 5000,
+            className: '!bg-destructive !text-white !border-destructive',
+          });
         }
         return;
       }
 
       const rows: AIResult[] = data.results ?? [];
-      // A 200 can still be a non-answer (e.g. status "invalid_query") with an
-      // explanatory message and no rows — surface that message to the user.
+      // The chat reports the size of the whole match, not the current page.
+      const total: number = data.total_companies ?? data.total ?? rows.length;
+
       const message: string | null = rows.length === 0 ? data.message ?? null : null;
       setResults(rows);
       setStatusMessage(message);
-      setSelectedIds(new Set());
+      // Selections survive paging so a user can gather rows across pages before
+      // exporting; only a brand new query clears them.
+      if (!silent) setSelectedIds(new Set());
+      setNextCursor(data.next_cursor ?? null);
+      setTotalPages(data.total_pages ?? 0);
+      setTotalResults(total);
       if (entryId) {
         setChat(prev =>
           prev.map(c =>
             c.id === entryId
-              ? { ...c, status: 'done', count: rows.length, sql: data.generated_sql, message }
+              ? { ...c, status: 'done', count: total, sql: data.generated_sql, message }
               : c,
           ),
         );
       }
     },
-    [dispatch],
+    [dispatch, perPage],
   );
+
+  // Changing the page size re-runs the current query from the first page.
+  const didInitPerPage = useRef(false);
+  useEffect(() => {
+    if (!didInitPerPage.current) {
+      didInitPerPage.current = true;
+      return;
+    }
+    const query = lastQueryRef.current;
+    if (!query) return;
+    setCursorStack([]);
+    setCurrentCursor(null);
+    setCurrentPage(1);
+    runQuery(query, { silent: true, cursor: null, limit: perPage });
+  }, [perPage, runQuery]);
+
+  const handleNext = () => {
+    const query = lastQueryRef.current;
+    if (!nextCursor || !query || paging || thinking) return;
+    setCursorStack(prev => [...prev, currentCursor ?? '']);
+    setCurrentCursor(nextCursor);
+    setCurrentPage(prev => prev + 1);
+    runQuery(query, { silent: true, cursor: nextCursor });
+  };
+
+  const handlePrev = () => {
+    const query = lastQueryRef.current;
+    if (cursorStack.length === 0 || !query || paging || thinking) return;
+    const stack = [...cursorStack];
+    const prevCursor = stack.pop() || null;
+    setCursorStack(stack);
+    setCurrentCursor(prevCursor);
+    setCurrentPage(prev => prev - 1);
+    runQuery(query, { silent: true, cursor: prevCursor });
+  };
 
   const formik = useFormik({
     initialValues: { query: '' },
@@ -250,9 +337,22 @@ export default function AISearchPage() {
     },
   });
 
-  // After a single enrich from the drawer, patch just that row in place using
-  // the company the drawer already fetched. Re-running the AI query here would
-  // burn an AI search credit for no new results, so we deliberately avoid it.
+  // Batch enrichment reports each company as it finishes. Only the availability
+  // flags come over the socket, so patch those and leave the values alone.
+  const applyEnrichUpdate = useCallback((update: EnrichRecordUpdate) => {
+    setResults(prev =>
+      prev.map(r =>
+        String(r.id) !== update.companyId ? r : {
+          ...r,
+          enrichment_status: update.succeeded ? 'enriched' : r.enrichment_status,
+          has_email: update.hasEmail ?? r.has_email,
+          has_phone: update.hasPhone ?? r.has_phone,
+          has_website: update.hasWebsite ?? r.has_website,
+        },
+      ),
+    );
+  }, []);
+
   const patchEnrichedCompany = useCallback((updated?: CompanyData) => {
     if (!updated) return;
     setResults(prev =>
@@ -264,30 +364,6 @@ export default function AISearchPage() {
     );
   }, []);
 
-  // After a batch enrich, re-fetch only the affected companies via the cheap
-  // per-company endpoint and patch them in place — again without re-running the
-  // AI query (which would cost a credit and return the same rows).
-  const refreshEnrichedCompanies = useCallback(async (ids: string[]) => {
-    const fetched = await Promise.all(
-      ids.map(async id => {
-        const res = await getCompanyAction(id);
-        return res.error ? null : (res.data as CompanyData);
-      }),
-    );
-    const byId = new Map<string, CompanyData>();
-    for (const c of fetched) {
-      if (!c) continue;
-      byId.set(String(c.id), c);
-      byId.set(String(c.company_id), c);
-    }
-    if (byId.size === 0) return;
-    setResults(prev =>
-      prev.map(r => {
-        const c = byId.get(String(r.id));
-        return c ? mergeEnriched(r, c) : r;
-      }),
-    );
-  }, []);
 
   const handleExport = async () => {
     if (selectedIds.size === 0) {
@@ -327,7 +403,6 @@ export default function AISearchPage() {
       let detail = 'Export failed. Please try again.';
       if (axios.isAxiosError(err) && err.response?.data) {
         try {
-          // Error responses arrive as a Blob because responseType is 'blob'.
           const text =
             err.response.data instanceof Blob
               ? await err.response.data.text()
@@ -349,26 +424,17 @@ export default function AISearchPage() {
     }
   };
 
-  // Keep the latest formik instance in a ref so the `q` effect depends only on `q`.
   const formikRef = useRef(formik);
   useEffect(() => {
     formikRef.current = formik;
   });
 
-  // Auto-run a replayed query, but only once per distinct `q`. Without this
-  // guard React's dev-mode double-invoke of effects fires the search twice,
-  // burning two AI search credits for one replay.
   const submittedQueryRef = useRef<string | null>(null);
   useEffect(() => {
     if (!q || submittedQueryRef.current === q) return;
     submittedQueryRef.current = q;
     formikRef.current.setValues({ query: q });
     formikRef.current.handleSubmit();
-
-    // Drop `q` now that it has been consumed, so a refresh doesn't re-run the
-    // search (and spend another credit). history.replaceState keeps this out of
-    // Next's router, which would otherwise remount the page. Any other params
-    // are preserved.
     const params = new URLSearchParams(window.location.search);
     params.delete('q');
     const rest = params.toString();
@@ -511,7 +577,7 @@ export default function AISearchPage() {
                         </p>
                       ) : (
                         <p>
-                          Found <span className="font-semibold">{entry.count}</span>{' '}
+                          Found <span className="font-semibold">{entry.count?.toLocaleString()}</span>{' '}
                           {entry.count === 1 ? 'company' : 'companies'}.
                         </p>
                       )}
@@ -567,9 +633,9 @@ export default function AISearchPage() {
         {/* Toolbar */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <p className="text-sm text-muted-foreground">
-            {thinking && results.length === 0
+            {(thinking || paging) && results.length === 0
               ? 'Searching…'
-              : `${results.length} result${results.length === 1 ? '' : 's'}`}
+              : `Showing ${results.length} of ${totalResults.toLocaleString()} ${totalResults === 1 ? 'company' : 'companies'}`}
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -620,10 +686,7 @@ export default function AISearchPage() {
             <button
               type="button"
               data-tooltip-id="ai-enrich-tip"
-              onClick={() => {
-                const ids = Array.from(selectedIds);
-                enrich(selectedIds, () => setSelectedIds(new Set()), () => refreshEnrichedCompanies(ids));
-              }}
+              onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), undefined, applyEnrichUpdate)}
               disabled={selectedIds.size <= 1 || isEnriching}
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -674,34 +737,49 @@ export default function AISearchPage() {
 
         {/* Results */}
         <div className="min-h-0 flex-1 overflow-auto p-4">
-          {results.length === 0 && !thinking ? (
+          {results.length === 0 && !thinking && !paging ? (
             <div className="flex h-full items-center justify-center text-center text-muted-foreground">
               <div className="max-w-md">
                 <p className="text-lg font-medium">No results found</p>
                 <p className="mt-1 text-sm">{statusMessage || 'Try rephrasing your query.'}</p>
               </div>
             </div>
-          ) : viewMode === 'table' ? (
-            <CompanyTable
-              companies={companies}
-              isLoading={thinking && results.length === 0}
-              perPage={companies.length || 10}
-              selectedIds={selectedIds}
-              allSelected={allSelected}
-              notAccessibleFields={[]}
-              onToggleSelect={toggleSelect}
-              onToggleSelectAll={toggleSelectAll}
-              onRowClick={setSelectedCompany}
-            />
           ) : (
-            <CompanyCards
-              companies={companies}
-              isLoading={thinking && results.length === 0}
-              selectedIds={selectedIds}
-              notAccessibleFields={[]}
-              onToggleSelect={toggleSelect}
-              onCardClick={setSelectedCompany}
-            />
+            <>
+              {viewMode === 'table' ? (
+                <CompanyTable
+                  companies={companies}
+                  isLoading={thinking || paging}
+                  perPage={perPage}
+                  selectedIds={selectedIds}
+                  allSelected={allSelected}
+                  notAccessibleFields={[]}
+                  onToggleSelect={toggleSelect}
+                  onToggleSelectAll={toggleSelectAll}
+                  onRowClick={setSelectedCompany}
+                />
+              ) : (
+                <CompanyCards
+                  companies={companies}
+                  isLoading={thinking || paging}
+                  selectedIds={selectedIds}
+                  notAccessibleFields={[]}
+                  onToggleSelect={toggleSelect}
+                  onCardClick={setSelectedCompany}
+                />
+              )}
+
+              <SearchPagination
+                perPage={perPage}
+                setPerPage={setPerPage}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                hasNextPage={nextCursor}
+                isLoading={thinking || paging}
+                onPrev={handlePrev}
+                onNext={handleNext}
+              />
+            </>
           )}
         </div>
       </div>

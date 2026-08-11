@@ -6,7 +6,6 @@ import { Search, X, Grid3X3, List, Loader2, Download, Zap, RefreshCw } from 'luc
 import { cn } from '@/lib/utils';
 import { CompanyDrawer } from './CompanyDrawer';
 import Filters from './Filters';
-import { useDebounce } from '@/hooks/useDebounce';
 import { searchAction } from './searchServices';
 import { isSessionExpiring } from '@/lib/session';
 import { Company, CompanySearchPayload } from '@/types/search';
@@ -21,8 +20,8 @@ import CompanyCards from './CompanyCards';
 import SearchPagination from './SearchPagination';
 import SortPopover from './SortPopover';
 import { useExport } from './useExport';
-import { useBatchEnrich } from './useBatchEnrich';
-import { emptyFilters, filtersFromQuery } from './replayParams';
+import { useBatchEnrich, type EnrichRecordUpdate } from './useBatchEnrich';
+import { emptyFilters, filtersFromQuery, type SearchFilters } from './replayParams';
 
 
 const SEARCH_STATE_KEY = 'miller3:search-state';
@@ -50,7 +49,6 @@ export default function SearchPage() {
     const sameQuery = JSON.stringify(saved?.appliedFilters) === JSON.stringify(replayFilters);
     return sameQuery ? saved : null;
   });
-  const [nameQ, setNameQ] = useState((persisted?.nameQ as string) ?? '');
   const [sortBy, setSortBy] = useState((persisted?.sortBy as string) ?? '');
   const [sortOrder, setSortOrder] = useState((persisted?.sortOrder as string) ?? '');
   const [viewMode, setViewMode] = useState<'table' | 'card'>((persisted?.viewMode as 'table' | 'card') ?? 'card');
@@ -61,9 +59,14 @@ export default function SearchPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [notAccessibleFields, setNotAccessibleFields] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState((persisted?.currentPage as number) ?? 1);
-  const [appliedFilters, setAppliedFilters] = useState(
-    replayFilters ?? (persisted?.appliedFilters as typeof initialFilters) ?? initialFilters
+  // Spread over the defaults so a session persisted by an older build — one
+  // without every filter key — still restores into a complete shape.
+  const [appliedFilters, setAppliedFilters] = useState<SearchFilters>(
+    replayFilters ?? { ...initialFilters, ...(persisted?.appliedFilters as SearchFilters | undefined) }
   );
+  // Pending edits from the sidebar and the company-name box. Nothing is
+  // fetched until Apply (or Enter in the search box) commits them.
+  const [draftFilters, setDraftFilters] = useState<SearchFilters>(appliedFilters);
   const [hasNextPage, setHasNextPage] = useState<string | null>(null);
   const [cursorStack, setCursorStack] = useState<string[]>((persisted?.cursorStack as string[]) ?? []);
   const [currentCursor, setCurrentCursor] = useState<string | null>((persisted?.currentCursor as string | null) ?? null);
@@ -71,25 +74,26 @@ export default function SearchPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
-  const searchQuery = useDebounce(nameQ, 500).toLowerCase();
 
   const { isExporting, exportData } = useExport();
   const { isEnriching, enrich } = useBatchEnrich();
 
   const buildSearch = useCallback((cursorValue: string | null): CompanySearchPayload => {
     const {
-      stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
-      minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
+      searchText, stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
+      msaFilter, certificationFilter, minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
       demoFilter, hasEmail, hasPhone, hasWebsite
     } = appliedFilters;
 
     const payload: CompanySearchPayload = {
-      search_text: searchQuery || null,
+      search_text: searchText.trim().toLowerCase() || null,
       state: stateFilter.length > 0 ? stateFilter : null,
       city: cityFilter || null,
       county: countyFilter || null,
       naics_code: naicsFilter || null,
       sic_code: sicFilter || null,
+      msa: msaFilter || null,
+      certification_status: certificationFilter || null,
       employee_size_min: minEmp ? parseInt(minEmp) : null,
       employee_size_max: maxEmp ? parseInt(maxEmp) : null,
       annual_revenue_min: minRev ? Number(minRev) : null,
@@ -111,7 +115,7 @@ export default function SearchPage() {
     };
 
     return payload;
-  }, [searchQuery, perPage, appliedFilters, sortBy, sortOrder]);
+  }, [perPage, appliedFilters, sortBy, sortOrder]);
 
   const fetchCompanies = useCallback(async (cursorValue: string | null = null) => {
     setIsLoading(true);
@@ -146,11 +150,6 @@ export default function SearchPage() {
     fetchCompanies(null);
   }, [fetchCompanies, persisted]);
 
-  // Selections are ids from the previous result set. Once the filters or the
-  // name search change, those companies may no longer be listed, so an export
-  // or batch enrich would silently act on rows the user can no longer see —
-  // and the count next to the button would contradict what's on screen. Sort
-  // and per-page changes keep the same set, so selections survive those.
   const didInitSelection = useRef(false);
   useEffect(() => {
     if (!didInitSelection.current) {
@@ -158,45 +157,44 @@ export default function SearchPage() {
       return;
     }
     setSelectedIds(new Set());
-  }, [appliedFilters, searchQuery]);
+  }, [appliedFilters]);
 
-  // Replay params stay in the URL so a refresh (or a shared link) reapplies the
-  // same filters. Clearing the filters is what drops them — see clearFilters.
-  // history.replaceState keeps this out of Next's router, which would otherwise
-  // remount the page and re-run the search.
   const clearFilters = useCallback(() => {
     window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
-  // Mirror the search state into sessionStorage so a browser refresh can land
-  // the user back on the same page with the same query.
   useEffect(() => {
     try {
       sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
-        nameQ, sortBy, sortOrder, viewMode, perPage,
+        sortBy, sortOrder, viewMode, perPage,
         appliedFilters, currentPage, cursorStack, currentCursor,
       }));
     } catch {
       // Ignore quota/serialization errors — persistence is best-effort.
     }
-  }, [nameQ, sortBy, sortOrder, viewMode, perPage, appliedFilters, currentPage, cursorStack, currentCursor]);
+  }, [sortBy, sortOrder, viewMode, perPage, appliedFilters, currentPage, cursorStack, currentCursor]);
 
-  // Keep the active page's cursor in a ref so async callers (the drawer's
-  // single-enrich, the batch-enrich WebSocket toast) can refetch whatever page
-  // the user is currently viewing — not the page they were on when they started.
   const currentCursorRef = useRef(currentCursor);
   useEffect(() => { currentCursorRef.current = currentCursor; }, [currentCursor]);
 
-  // An in-place refresh (single/batch enrich) briefly flips isLoading, which
-  // swaps the list for a shorter loading state and collapses the scroll
-  // container — the browser then clamps scrollTop to 0. Capture the position
-  // before the refetch and restore it once the fresh results have rendered.
   const scrollRef = useRef<HTMLDivElement>(null);
   const restoreScrollRef = useRef<number | null>(null);
   const refreshSearch = useCallback(() => {
     restoreScrollRef.current = scrollRef.current?.scrollTop ?? null;
     fetchCompanies(currentCursorRef.current);
   }, [fetchCompanies]);
+
+  const applyEnrichUpdate = useCallback((update: EnrichRecordUpdate) => {
+    setCompanies(prev => prev.map(c => (
+      c.id !== update.companyId ? c : {
+        ...c,
+        enrichment_status: update.succeeded ? 'enriched' : c.enrichment_status,
+        has_mobile_number: update.hasPhone ?? c.has_mobile_number,
+        has_email: update.hasEmail ?? c.has_email,
+        has_website: update.hasWebsite ?? c.has_website,
+      }
+    )));
+  }, []);
 
   useLayoutEffect(() => {
     if (isLoading || restoreScrollRef.current === null) return;
@@ -246,6 +244,8 @@ export default function SearchPage() {
       <Filters
         filters={appliedFilters}
         setFilters={setAppliedFilters}
+        draftFilters={draftFilters}
+        setDraftFilters={setDraftFilters}
         setPage={() => { }}
         initialFilters={initialFilters}
         onClear={clearFilters}
@@ -258,13 +258,15 @@ export default function SearchPage() {
           <div className="relative flex-1 min-w-50">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
-              value={nameQ}
-              onChange={e => setNameQ(e.target.value)}
+              value={draftFilters.searchText}
+              onChange={e => setDraftFilters({ ...draftFilters, searchText: e.target.value })}
+              // Enter is the same commit as the sidebar's Apply button.
+              onKeyDown={e => { if (e.key === 'Enter') setAppliedFilters(draftFilters); }}
               className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-sm outline-none focus:ring-2 focus:ring-ring"
               placeholder="Search company name..."
             />
-            {nameQ && (
-              <button onClick={() => setNameQ('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            {draftFilters.searchText && (
+              <button onClick={() => setDraftFilters({ ...draftFilters, searchText: '' })} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             )}
@@ -305,7 +307,7 @@ export default function SearchPage() {
           <button
             type="button"
             data-tooltip-id="enrich-tip"
-            onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refreshSearch)}
+            onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refreshSearch, applyEnrichUpdate)}
             disabled={selectedIds.size <= 1 || isEnriching}
             className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
               'disabled:cursor-not-allowed disabled:opacity-50'

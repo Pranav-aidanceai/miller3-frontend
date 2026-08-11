@@ -18,6 +18,8 @@ export interface CompanySearchPayload {
   has_email?: true | null;
   has_website?: true | null;
   sic_code: string | null;
+  msa: string | null;
+  certification_status: string | null;
   sort_by: string | null;
   sort_order: 'asc' | 'desc';
   limit: number;
@@ -50,12 +52,31 @@ export interface ExportPayload {
   has_email?: true | null;
   has_website?: true | null;
   sic_code: string | null;
+  msa: string | null;
+  certification_status: string | null;
   sort_by: string | null;
   sort_order: 'asc' | 'desc';
   year_founded_min: number | null;
   year_founded_max: number | null;
   ownership_type: string[] | null;
   enrichment_status: string | null;
+}
+
+/** The searchable dropdown filters backed by `/api/<field>-filter`. */
+export type FilterField = 'naics' | 'sic' | 'msa' | 'certification';
+
+/**
+ * Response of the autocomplete filters. Paging is cursor based. `results` is a
+ * `{ code: title }` dict for the coded fields (NAICS/SIC/certification) and a
+ * plain list of values for the ones with no separate code (MSA).
+ */
+export interface CodeFilterResponse {
+  field: string;
+  query: string;
+  results: Record<string, string> | string[];
+  next_cursor: string | null;
+  prev_cursor: string | null;
+  latency_ms: number;
 }
 
 export interface Company {
@@ -109,4 +130,7 @@ export interface CompanyData {
   updated_at: string;
   execution_time_ms: number;
   not_accessible: string[];
+  msa: string | null;
+  address: string | null;
+  certification_status: string | null;
 }

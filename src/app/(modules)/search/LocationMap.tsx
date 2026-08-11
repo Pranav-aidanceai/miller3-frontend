@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -39,7 +39,15 @@ const similarPin = makePin('#3b82f6', 30);
 
 function FrameView({ center, points }: { center: [number, number]; points: [number, number][] }) {
     const map = useMap();
+    // `center` and `points` are fresh arrays on every render, so frame once per
+    // distinct set of coordinates — otherwise any re-render of the drawer would
+    // snap the map back and throw away the zoom/pan the user just did.
+    const framedRef = useRef('');
     useEffect(() => {
+        const signature = `${center.join()}|${points.map(p => p.join()).join(';')}`;
+        if (framedRef.current === signature) return;
+        framedRef.current = signature;
+
         if (points.length === 0) {
             map.setView(center, 13);
             return;
@@ -96,7 +104,9 @@ export default function LocationMap({ companyId, lat, lng, companyName, address,
             <MapContainer
                 center={center}
                 zoom={13}
-                scrollWheelZoom={false}
+                // Wheel zooms toward the cursor; Leaflet swallows the event, so
+                // the drawer behind the map does not scroll at the same time.
+                scrollWheelZoom={true}
                 attributionControl={false}
                 style={{ height: '100%', width: '100%' }}
             >

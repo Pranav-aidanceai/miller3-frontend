@@ -23,7 +23,7 @@ export function WelcomeScreen({ onStartTour }: WelcomeScreenProps) {
 
                     {/* Welcome Text */}
                     <h1 className="text-4xl font-bold mb-4 animate-slide-up" style={{ animationDelay: '100ms' }}>
-                        Welcome to <span className="text-primary">Miller3</span>
+                        Welcome to <span className="text-primary">Vendor Lens</span>
                     </h1>
 
                     <p className="text-lg text-muted-foreground mb-8 animate-slide-up" style={{ animationDelay: '200ms' }}>

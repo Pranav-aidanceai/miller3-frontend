@@ -2,41 +2,28 @@
 
 import { statesList } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { FilterAutocomplete } from './FilterAutocomplete';
 import { FilterInput, Toggle } from './helper';
-
-const initialFilters = {
-    stateFilter: [] as string[],
-    cityFilter: '',
-    countyFilter: '',
-    naicsFilter: '',
-    sicFilter: '',
-    minYear: '',
-    maxYear: '',
-    minEmp: '',
-    maxEmp: '',
-    minRev: '',
-    maxRev: '',
-    demoFilter: [] as string[],
-    hasPhone: false,
-    hasEmail: false,
-    hasWebsite: false,
-};
-
-type Filters = typeof initialFilters;
+import { SearchFilters } from './replayParams';
 
 interface FiltersProps {
-    filters: typeof initialFilters;
-    setFilters: (f: typeof initialFilters) => void;
+    /** The filters the current results were fetched with. */
+    filters: SearchFilters;
+    setFilters: (f: SearchFilters) => void;
+    /**
+     * Edits waiting to be applied. Owned by the page because the company-name
+     * search lives in the top bar but applies through this sidebar's Apply.
+     */
+    draftFilters: SearchFilters;
+    setDraftFilters: (f: SearchFilters) => void;
     setPage: (p: number) => void;
-    initialFilters: typeof initialFilters;
+    initialFilters: SearchFilters;
     /** Notifies the page that the user cleared every filter. */
     onClear?: () => void;
 }
 
-const Filters = ({ setPage, filters, setFilters, initialFilters, onClear }: FiltersProps) => {
+const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, initialFilters, onClear }: FiltersProps) => {
 
-    const [draftFilters, setDraftFilters] = useState(filters);
     const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify(filters);
 
     const activeFilterCount = Object.values(filters).reduce((count, value) => {
@@ -86,12 +73,13 @@ const Filters = ({ setPage, filters, setFilters, initialFilters, onClear }: Filt
                             ))}
                         </div>
                     </div>
+                    <FilterAutocomplete label="Metropolitan Statistical Area (MSA)" field="msa" value={draftFilters.msaFilter} onChange={(v) => setDraftFilters({ ...draftFilters, msaFilter: v })} placeholder="e.g. Austin, TX" />
                 </div>
                 {/* Industry */}
                 <div data-tour="industry-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Industry</p>
-                    <FilterInput label="NAICS Code" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="e.g. 561622" mono />
-                    <FilterInput label="SIC Code" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="e.g. 769962" mono />
+                    <FilterAutocomplete label="NAICS Code" field="naics" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="Code or industry" />
+                    <FilterAutocomplete label="SIC Code" field="sic" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="Code or industry" />
                     <div className="grid grid-cols-2 gap-2 mt-2">
                         <FilterInput label="Min Year Founded" value={draftFilters.minYear} onChange={(v) => setDraftFilters({ ...draftFilters, minYear: v })} placeholder="1900" />
                         <FilterInput label="Max Year Founded" value={draftFilters.maxYear} onChange={(v) => setDraftFilters({ ...draftFilters, maxYear: v })} placeholder="2023" />
@@ -120,6 +108,7 @@ const Filters = ({ setPage, filters, setFilters, initialFilters, onClear }: Filt
                             {d}
                         </label>
                     ))}
+                    <FilterAutocomplete label="Certification" field="certification" value={draftFilters.certificationFilter} onChange={(v) => setDraftFilters({ ...draftFilters, certificationFilter: v })} placeholder="e.g. SBE, MBE, HUBZone" />
                 </div>
                 {/* Data Quality */}
                 <div data-tour="data-quality-filter">

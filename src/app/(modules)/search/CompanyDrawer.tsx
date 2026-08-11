@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { X, Copy, AlertCircle, Info, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getCompanyAction, getSimilarCompanyAction, singleEnrichAction } from './searchServices';
+import { filterTitleOf, getCompanyAction, getFilterOptionsAction, getSimilarCompanyAction, singleEnrichAction } from './searchServices';
 import { isSessionExpiring } from '@/lib/session';
 import { CompanyData } from '@/types/search';
 import SimilarPage from './Similar';
@@ -38,6 +38,26 @@ const LocationMap = dynamic(() => import('./LocationMap'), {
     ),
 });
 
+const ENRICHABLE_FIELDS: { key: keyof CompanyData; label: string }[] = [
+    { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'website', label: 'Website' },
+];
+
+function diffEnrichedFields(before: CompanyData | null, after: CompanyData | undefined) {
+    if (!after) return [];
+    return ENRICHABLE_FIELDS.filter(({ key }) => {
+        const next = after[key];
+        if (next === null || next === undefined || next === '') return false;
+        const previous = before?.[key];
+        return String(next) !== String(previous ?? '');
+    });
+}
+
+function formatFieldList(labels: string[]): string {
+    if (labels.length === 1) return labels[0];
+    return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
+}
 
 function Field({
     label,
@@ -46,6 +66,7 @@ function Field({
     fieldKey,
     notAccessible,
     link,
+    enrichedFields,
 }: {
     label: string;
     value: string | number | null | undefined;
@@ -53,8 +74,11 @@ function Field({
     fieldKey?: string;
     notAccessible?: string[];
     link?: boolean;
+    enrichedFields?: string[];
 }) {
     const isLocked = fieldKey !== undefined && notAccessible?.includes(fieldKey);
+    // A locked field only ever renders dots, so it is never worth glowing.
+    const enriched = !isLocked && fieldKey !== undefined && enrichedFields?.includes(fieldKey);
     const href = link && value ? (/^https?:\/\//i.test(String(value)) ? String(value) : `https://${value}`) : null;
 
     // Unique tooltip anchor id per field to avoid conflicts
@@ -62,7 +86,7 @@ function Field({
 
     return (
         <div className="flex justify-between py-2 border-b border-border">
-            <span className="text-sm text-muted-foreground">{label}</span>
+            <span className="text-sm text-muted-foreground shrink-0">{label}</span>
 
             {isLocked ? (
                 <span className="flex items-center gap-1.5">
@@ -95,12 +119,22 @@ function Field({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className={cn('text-sm font-medium text-right text-primary hover:underline break-all', mono && 'font-mono')}
+                    className={cn(
+                        'text-sm font-medium text-right text-primary hover:underline break-all',
+                        mono && 'font-mono',
+                        enriched && 'enriched-value'
+                    )}
                 >
                     {value}
                 </a>
             ) : (
-                <span className={cn('text-sm font-medium text-right', mono && 'font-mono')}>
+                <span
+                    className={cn(
+                        'text-sm font-medium text-right pl-4',
+                        mono && 'font-mono',
+                        enriched && 'enriched-value pl-1.5'
+                    )}
+                >
                     {value || 'NA'}
                 </span>
             )}
@@ -116,15 +150,30 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [enriching, setEnriching] = useState<boolean>(false);
-
-    // Fields the current user's role can't see. Every Field below must receive
-    // this — omitting it silently renders the real value instead of a mask.
     const notAccessible = companyData?.not_accessible;
     const isLocked = (key: string) => notAccessible?.includes(key) ?? false;
-
     const [similar, setSimilar] = useState<CompanyData[]>([]);
     const [similarLoading, setSimilarLoading] = useState(false);
     const similarFetchedFor = useRef<string | null>(null);
+    // Fields the latest enrichment filled in. Kept until the drawer closes (or a
+    // different company is loaded into it) so the user can see what was gained.
+    const [enrichedFields, setEnrichedFields] = useState<string[]>([]);
+    // Descriptions are keyed by the code they were fetched for, so a drawer swap never shows a stale label.
+    const [naicsInfo, setNaicsInfo] = useState<{ code: string; label: string | null } | null>(null);
+    const [sicInfo, setSicInfo] = useState<{ code: string; label: string | null } | null>(null);
+    const naicsCode = companyData?.naics_code;
+    const sicCode = companyData?.sic_code;
+    const naicsLabel = naicsInfo && naicsInfo.code === naicsCode ? naicsInfo.label : null;
+    const sicLabel = sicInfo && sicInfo.code === sicCode ? sicInfo.label : null;
+    const naicsLoading = !!naicsCode && !isLocked('naics_code') && naicsInfo?.code !== naicsCode;
+    const sicLoading = !!sicCode && !isLocked('sic_code') && sicInfo?.code !== sicCode;
+
+    // "531210 - Offices of Real Estate Agents and Brokers", or just the code until its description lands.
+    const codeValue = (code: string | null | undefined, label: string | null, isLoading: boolean) => {
+        if (!code) return 'NA';
+        if (isLoading) return 'Loading…';
+        return label ? `${code} - ${label}` : code;
+    };
 
     const fetchCompany = async (id: string): Promise<CompanyData | undefined> => {
         setLoading(true);
@@ -159,9 +208,6 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
         return () => { active = false; };
     }, [id]);
 
-    // Lazily fetch the similar-companies list once the user opens the similar
-    // tab, keyed to the company currently shown so it refreshes when the user
-    // drills into a different company. (The location map fetches its own pins.)
     useEffect(() => {
         const cid = companyData?.company_id;
         if (!cid) return;
@@ -183,14 +229,40 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
         return () => { active = false; };
     }, [tab, companyData?.company_id]);
 
+    // Resolve the NAICS/SIC codes to their human-readable descriptions.
+    useEffect(() => {
+        if (!naicsCode || isLocked('naics_code')) return;
+        let active = true;
+        (async () => {
+            const response = await getFilterOptionsAction('naics', { q: naicsCode, limit: 1 });
+            if (active) setNaicsInfo({ code: naicsCode, label: filterTitleOf(response.data?.results, naicsCode) });
+        })();
+        return () => { active = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [naicsCode, notAccessible]);
+
+    useEffect(() => {
+        if (!sicCode || isLocked('sic_code')) return;
+        let active = true;
+        (async () => {
+            const response = await getFilterOptionsAction('sic', { q: sicCode, limit: 1 });
+            if (active) setSicInfo({ code: sicCode, label: filterTitleOf(response.data?.results, sicCode) });
+        })();
+        return () => { active = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sicCode, notAccessible]);
+
     // Load a different company into the drawer (from a similar pin or list card).
     const loadCompany = (cid: string) => {
         setTab('overview');
+        setEnrichedFields([]);
         fetchCompany(cid);
     };
 
     const handleEnrich = async () => {
         setEnriching(true);
+        // Snapshot before the refetch overwrites it, so we can tell what is new.
+        const before = companyData;
         const payload = {
             company_id: id,
             company_name: companyData?.company_name || '',
@@ -201,7 +273,7 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
             setEnriching(false);
             const firstError = errors[0];
             const errorCode = firstError?.error?.error_code;
-            const detail = firstError?.error?.detail || firstError?.message || 'Enrich failed';
+            const detail = firstError?.error?.errors?.[0]?.message || firstError?.error?.detail || firstError?.message || 'Enrich failed';
 
             if (errorCode === 'HTTP_402') {
                 toast.custom((toastId) => (
@@ -244,12 +316,20 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
             setEnriching(false);
             dispatch(updateEnrichmentCredits(data.headers));
             const updated = await fetchCompany(id);
+            const gained = diffEnrichedFields(before, updated);
+            // Accumulate, so a second enrichment in the same session does not
+            // drop the highlight off what the first one brought in.
+            setEnrichedFields(prev => [...new Set([...prev, ...gained.map(f => f.key)])]);
             // Refresh the underlying search list so the row reflects the new
             // enrichment status without the user having to reload. The freshly
             // fetched company is passed up so callers can patch their row in
             // place rather than re-running an expensive query.
             onEnriched?.(updated);
-            toast.success('Company enriched successfully');
+            toast.success(
+                gained.length
+                    ? `Company enriched — updated ${formatFieldList(gained.map(f => f.label))}`
+                    : 'Company enriched — no new data found'
+            );
         }
     };
 
@@ -340,33 +420,51 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Firmographics</h3>
-                                <Field notAccessible={notAccessible} label="Legal Name" fieldKey="company_name" value={companyData?.company_name} />
-                                <Field notAccessible={notAccessible} label="NAICS" fieldKey="naics_code" value={companyData?.naics_code ?? 'NA'} mono />
-                                <Field notAccessible={notAccessible} label="SIC" fieldKey="sic_code" value={companyData?.sic_code ?? 'NA'} mono />
-                                <Field notAccessible={notAccessible} label="Employees" fieldKey="employee_size" value={companyData?.employee_size ?? 'NA'} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Legal Name" fieldKey="company_name" value={companyData?.company_name} />
                                 <Field
                                     notAccessible={notAccessible}
+                                    enrichedFields={enrichedFields}
+                                    label="NAICS"
+                                    fieldKey="naics_code"
+                                    value={codeValue(naicsCode, naicsLabel, naicsLoading)}
+                                    mono={!naicsLabel}
+                                />
+                                <Field
+                                    notAccessible={notAccessible}
+                                    enrichedFields={enrichedFields}
+                                    label="SIC"
+                                    fieldKey="sic_code"
+                                    value={codeValue(sicCode, sicLabel, sicLoading)}
+                                    mono={!sicLabel}
+                                />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Employees" fieldKey="employee_size" value={companyData?.employee_size ?? 'NA'} />
+                                <Field
+                                    notAccessible={notAccessible}
+                                    enrichedFields={enrichedFields}
                                     label="Revenue"
                                     fieldKey="annual_revenue"
                                     value={companyData?.annual_revenue
                                         ? `$${companyData.annual_revenue.toLocaleString()}`
                                         : 'NA'}
                                 />
-                                <Field notAccessible={notAccessible} label="Founded" fieldKey="year_founded" value={companyData?.year_founded} />
-                                <Field notAccessible={notAccessible} label="Ownership" fieldKey="ownership_type" value={companyData?.ownership_type || 'Not specified'} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Founded" fieldKey="year_founded" value={companyData?.year_founded} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Ownership" fieldKey="ownership_type" value={companyData?.ownership_type || 'Not specified'} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Certification" fieldKey="certification_status" value={companyData?.certification_status || 'NA'} />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Contact</h3>
-                                <Field notAccessible={notAccessible} label="Phone" fieldKey="phone" value={companyData?.phone} />
-                                <Field notAccessible={notAccessible} label="Email" fieldKey="email" value={companyData?.email} />
-                                <Field notAccessible={notAccessible} label="Website" fieldKey="website" value={companyData?.website} link />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Phone" fieldKey="phone" value={companyData?.phone} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Email" fieldKey="email" value={companyData?.email} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Website" fieldKey="website" value={companyData?.website} link />
                             </div>
                             <div>
                                 <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">Location</h3>
-                                <Field notAccessible={notAccessible} label="City" fieldKey="city" value={companyData?.city} />
-                                <Field notAccessible={notAccessible} label="State" fieldKey="state" value={companyData?.state} />
-                                <Field notAccessible={notAccessible} label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
-                                <Field notAccessible={notAccessible} label="County" fieldKey="county" value={companyData?.county} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Address" fieldKey="address" value={companyData?.address} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="City" fieldKey="city" value={companyData?.city} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="State" fieldKey="state" value={companyData?.state} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="Zipcode" fieldKey="zip_code" value={companyData?.zip_code} mono />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="County" fieldKey="county" value={companyData?.county} />
+                                <Field notAccessible={notAccessible} enrichedFields={enrichedFields} label="MSA" fieldKey="msa" value={companyData?.msa} />
                             </div>
                         </div>
                     )}

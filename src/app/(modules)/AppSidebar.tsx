@@ -84,7 +84,7 @@ export function AppSidebar() {
             <div className="flex h-14 items-center justify-between border-b border-border px-4">
                 {!sidebarCollapsed && (
                     <span className="text-lg font-bold tracking-tight">
-                        <span className="text-gradient">Miller3</span>
+                        <span className="text-gradient">Vendor Lens</span>
                     </span>
                 )}
                 <button

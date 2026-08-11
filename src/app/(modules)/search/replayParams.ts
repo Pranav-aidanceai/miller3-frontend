@@ -1,14 +1,13 @@
-// Shared vocabulary for replaying a structured query from Query History into
-// the search page. Query History holds the backend's `filters_applied` shape;
-// the search page holds its own `SearchFilters` shape. The URL sits between
-// them, so both sides must agree on the param names defined here.
-
 export interface SearchFilters {
+    /** Free-text company-name search — applied together with the rest. */
+    searchText: string;
     stateFilter: string[];
     cityFilter: string;
     countyFilter: string;
     naicsFilter: string;
     sicFilter: string;
+    msaFilter: string;
+    certificationFilter: string;
     minYear: string;
     maxYear: string;
     minEmp: string;
@@ -22,11 +21,14 @@ export interface SearchFilters {
 }
 
 export const emptyFilters: SearchFilters = {
+    searchText: '',
     stateFilter: [],
     cityFilter: '',
     countyFilter: '',
     naicsFilter: '',
     sicFilter: '',
+    msaFilter: '',
+    certificationFilter: '',
     minYear: '',
     maxYear: '',
     minEmp: '',
@@ -51,6 +53,8 @@ export interface StructuredFilters {
     county?: string[] | null;
     naics_code?: string[] | null;
     sic_code?: string[] | null;
+    msa?: string[] | null;
+    certification_status?: string[] | null;
     has_email?: boolean | null;
     has_website?: boolean | null;
     has_mobile_number?: boolean | null;
@@ -82,6 +86,8 @@ export function structuredFiltersToQuery(filters: StructuredFilters): string {
     if (filters.county?.[0]) params.set('county', filters.county[0]);
     if (filters.naics_code?.[0]) params.set('naics', filters.naics_code[0]);
     if (filters.sic_code?.[0]) params.set('sic', filters.sic_code[0]);
+    if (filters.msa?.[0]) params.set('msa', filters.msa[0]);
+    if (filters.certification_status?.[0]) params.set('certification', filters.certification_status[0]);
 
     if (filters.year_founded?.min != null) params.set('min_year', String(filters.year_founded.min));
     if (filters.year_founded?.max != null) params.set('max_year', String(filters.year_founded.max));
@@ -110,11 +116,14 @@ export function filtersFromQuery(search: string): SearchFilters | null {
     const digits = (key: string) => (params.get(key) ?? '').replace(/[^0-9]/g, '');
 
     const filters: SearchFilters = {
+        searchText: params.get('q') ?? '',
         stateFilter: params.getAll('state'),
         cityFilter: params.get('city') ?? '',
         countyFilter: params.get('county') ?? '',
         naicsFilter: params.get('naics') ?? '',
         sicFilter: params.get('sic') ?? '',
+        msaFilter: params.get('msa') ?? '',
+        certificationFilter: params.get('certification') ?? '',
         minYear: digits('min_year'),
         maxYear: digits('max_year'),
         minEmp: digits('min_emp'),
