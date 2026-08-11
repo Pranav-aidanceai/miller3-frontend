@@ -1,4 +1,4 @@
-import { CodeFilterResponse, CompanySearchPayload, FilterField } from "@/types/search";
+import { CodeFilterResponse, CompanyDescriptionResponse, CompanySearchPayload, FilterField } from "@/types/search";
 import axios from "axios";
 
 export async function searchAction(payload: CompanySearchPayload) {
@@ -85,6 +85,21 @@ export async function getSimilarCompanyAction(payload: { company_id: string, lim
             }
         }
         return { data: null, errors: [{ error: error, message: 'Something went wrong' }] }
+    }
+}
+
+export async function generateCompanyDescriptionAction(payload: { company_id: string; regenerate: boolean }) {
+    try {
+        const response = await axios.post<CompanyDescriptionResponse>(`/api/company-description`, payload);
+        return { data: response.data, error: null }
+    } catch (error: unknown) {
+        if (axios.isAxiosError(error)) {
+            return {
+                data: null,
+                error: error.response?.data ?? { detail: 'Description generation failed' }
+            };
+        }
+        return { data: null, error: { detail: 'Something went wrong' } };
     }
 }
 

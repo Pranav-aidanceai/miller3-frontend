@@ -98,6 +98,24 @@ export interface Company {
   has_website: boolean;
 }
 
+/** Response of `POST /api/company-description` — an AI-written company summary. */
+export interface CompanyDescriptionResponse {
+  company_id: string;
+  description: string;
+  status: string;
+  source: string | null;
+  model: string | null;
+  prompt_version: string | null;
+  generated_at: string | null;
+  cached: boolean;
+  credits_charged: number;
+  crawl_iterations: number;
+  pages_crawled: string[];
+  elapsed_ms: number;
+  /** AI caveat the API wants surfaced alongside the text. */
+  disclaimer: string | null;
+}
+
 export interface CompanyData {
   id: string;
   company_id: string;
@@ -133,4 +151,6 @@ export interface CompanyData {
   msa: string | null;
   address: string | null;
   certification_status: string | null;
+  company_description: string | null;
+  buckets: string[];
 }

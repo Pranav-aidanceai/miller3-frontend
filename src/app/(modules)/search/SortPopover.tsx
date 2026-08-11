@@ -4,14 +4,27 @@ import { ArrowUpDown, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+export interface SortOption {
+    value: string;
+    label: string;
+}
+
+/** What company search sorts by — other modules pass their own columns. */
+const defaultOptions: SortOption[] = [
+    { value: 'company_name', label: 'Name' },
+    { value: 'annual_revenue', label: 'Revenue' },
+    { value: 'employee_size', label: 'Employees' },
+];
+
 interface SortPopoverProps {
     sortBy: string;
     sortOrder: string;
     setSortBy: (value: string) => void;
     setSortOrder: (value: string) => void;
+    options?: SortOption[];
 }
 
-export default function SortPopover({ sortBy, sortOrder, setSortBy, setSortOrder }: SortPopoverProps) {
+export default function SortPopover({ sortBy, sortOrder, setSortBy, setSortOrder, options = defaultOptions }: SortPopoverProps) {
     const [sortOpen, setSortOpen] = useState(false);
     const [pendingSortBy, setPendingSortBy] = useState('');
     const [pendingSortOrder, setPendingSortOrder] = useState('');
@@ -46,9 +59,9 @@ export default function SortPopover({ sortBy, sortOrder, setSortBy, setSortOrder
                                 <SelectValue placeholder="Select column" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="company_name">Name</SelectItem>
-                                <SelectItem value="annual_revenue">Revenue</SelectItem>
-                                <SelectItem value="employee_size">Employees</SelectItem>
+                                {options.map(option => (
+                                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>

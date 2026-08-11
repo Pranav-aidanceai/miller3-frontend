@@ -22,6 +22,7 @@ import SortPopover from './SortPopover';
 import { useExport } from './useExport';
 import { useBatchEnrich, type EnrichRecordUpdate } from './useBatchEnrich';
 import { emptyFilters, filtersFromQuery, type SearchFilters } from './replayParams';
+import BucketPickerPopover from '../buckets/BucketPickerPopover';
 
 
 const SEARCH_STATE_KEY = 'miller3:search-state';
@@ -281,6 +282,16 @@ export default function SearchPage() {
             sortOrder={sortOrder}
             setSortBy={setSortBy}
             setSortOrder={setSortOrder}
+          />
+
+          <BucketPickerPopover companyIds={Array.from(selectedIds)} tooltipId="add-to-bucket-tip" />
+          <Tooltip
+            id="add-to-bucket-tip"
+            place="bottom"
+            content={selectedIds.size === 0
+              ? 'Select companies to add to a bucket'
+              : 'Add selected companies to a bucket'}
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
           />
 
           <button
