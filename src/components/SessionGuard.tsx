@@ -5,7 +5,7 @@ import axios from 'axios';
 import { ShieldAlert } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
-import { setSessionExpiryHandler, triggerSessionExpired, resetSessionExpiring } from '@/lib/session';
+import { setSessionExpiryHandler, triggerSessionExpired, resetSessionExpiring, clearSearchState } from '@/lib/session';
 
 const LOGOUT_DELAY_SECONDS = Number(process.env.NEXT_PUBLIC_LOGOUT_DELAY_SECONDS) || 5;
 
@@ -48,6 +48,7 @@ export function SessionGuard() {
         const timer = setTimeout(async () => {
             try { await axios.post('/api/delete-cookie'); } catch {}
             try { localStorage.clear(); } catch {}
+            clearSearchState();
             dispatch(logout());
             resetSessionExpiring();
             window.location.replace('/');

@@ -7,6 +7,7 @@ import { useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout, toggleSidebar } from '@/store/slices/authSlice';
 import { adminNav, mainNav, roleBadgeColor } from '@/lib/constants';
+import { clearSearchState } from '@/lib/session';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { usePathname } from 'next/navigation';
@@ -57,6 +58,7 @@ export function AppSidebar() {
         setIsLoggingOut(true);
         try {
             await axios.post('/api/auth/logout');
+            clearSearchState();
             dispatch(logout());
             window.location.replace('/');
         } catch (error) {
@@ -100,7 +102,11 @@ export function AppSidebar() {
                 {!sidebarCollapsed && (
                     <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Main</p>
                 )}
-                {mainNav.map(item => <NavItem key={item.to} {...item} />)}
+                {/* Admins raise no update requests of their own — they edit
+                    records directly and review everyone else's under Admin. */}
+                {mainNav
+                    .filter(item => !(isAdmin && item.to === '/my-requests'))
+                    .map(item => <NavItem key={item.to} {...item} />)}
 
                 {isAdmin && (
                     <>

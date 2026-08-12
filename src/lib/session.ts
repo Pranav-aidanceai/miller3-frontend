@@ -29,3 +29,17 @@ export function isSessionExpiring() {
 export function resetSessionExpiring() {
     sessionExpiring = false;
 }
+
+/** Where the search page parks its filters/results so a drawer round-trip survives. */
+export const SEARCH_STATE_KEY = 'miller3:search-state';
+
+/**
+ * Drop the cached search state. Called on every logout so the next account to
+ * sign in on this tab does not inherit the previous one's filters and results.
+ */
+export function clearSearchState() {
+    if (typeof window === 'undefined') return;
+    try {
+        sessionStorage.removeItem(SEARCH_STATE_KEY);
+    } catch { /* storage unavailable — nothing cached to clear */ }
+}

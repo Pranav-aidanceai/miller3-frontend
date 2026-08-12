@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { CompanyDrawer } from './CompanyDrawer';
 import Filters from './Filters';
 import { searchAction } from './searchServices';
-import { isSessionExpiring } from '@/lib/session';
+import { isSessionExpiring, SEARCH_STATE_KEY } from '@/lib/session';
 import { Company, CompanySearchPayload } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
@@ -24,8 +24,6 @@ import { useBatchEnrich, type EnrichRecordUpdate } from './useBatchEnrich';
 import { emptyFilters, filtersFromQuery, type SearchFilters } from './replayParams';
 import BucketPickerPopover from '../buckets/BucketPickerPopover';
 
-
-const SEARCH_STATE_KEY = 'miller3:search-state';
 
 function loadSearchState(): Record<string, unknown> | null {
   if (typeof window === 'undefined') return null;

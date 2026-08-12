@@ -101,8 +101,10 @@ function RequestCard({ request, onReview }: { request: AdminCompanyUpdateRequest
                                         <p className="wrap-break-word text-sm font-medium">
                                             {formatCompanyFieldValue(key, value)}
                                         </p>
-                                        {/* Set when the reviewer applied something other than what was proposed. */}
-                                        {decision?.value != null && (
+                                        {/* Set when the reviewer applied something other than what
+                                            was proposed. Nothing is applied on a rejection, so the
+                                            value is only meaningful alongside an approval. */}
+                                        {approved === true && decision?.value != null && (
                                             <p className="wrap-break-word text-xs text-success">
                                                 Applied as {formatCompanyFieldValue(key, decision.value)}
                                             </p>
