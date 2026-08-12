@@ -50,6 +50,13 @@ export default function FilterPopover({ filters, values, onApply }: FilterPopove
 
   const activeCount = filters.filter((f) => (values[f.key] ?? f.default) !== f.default).length;
 
+  // Applying is only meaningful when the draft says something the applied
+  // values don't — including moving a filter back to its default.
+  const canApply = filters.some((f) => (draft[f.key] ?? f.default) !== (values[f.key] ?? f.default));
+  // Nothing to clear when neither the draft nor what's applied holds a filter.
+  const draftIsDefault = filters.every((f) => (draft[f.key] ?? f.default) === f.default);
+  const canClear = activeCount > 0 || !draftIsDefault;
+
   const apply = () => {
     onApply(draft);
     setOpen(false);
@@ -118,14 +125,16 @@ export default function FilterPopover({ filters, values, onApply }: FilterPopove
           <button
             type="button"
             onClick={clear}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            disabled={!canClear}
+            className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted-foreground"
           >
             Clear filters
           </button>
           <button
             type="button"
             onClick={apply}
-            className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90 transition-opacity cursor-pointer"
+            disabled={!canApply}
+            className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90 transition-opacity cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           >
             Apply
           </button>

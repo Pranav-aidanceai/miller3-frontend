@@ -51,7 +51,6 @@ export default function AnalyticsTable<T>({
   paginated = false,
 }: AnalyticsTableProps<T>) {
   const [data, setData] = useState<TableData<T> | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
@@ -73,6 +72,15 @@ export default function AnalyticsTable<T>({
 
   const paramsKey = JSON.stringify(requestParams);
 
+  // Loading is derived rather than stored: anything the effect has not yet
+  // fetched reads as loading. Flipping a flag in the handlers instead would
+  // strand the spinner whenever a filter change resolves to the same request
+  // (e.g. clearing filters that were never applied), because the effect is
+  // keyed on the request and so never re-runs to turn it back off.
+  const fetchKey = `${endpoint}|${paramsKey}|${reloadKey}`;
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const loading = loadedKey !== fetchKey;
+
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -85,7 +93,7 @@ export default function AnalyticsTable<T>({
         if (ignore) return;
         setError(getErrorMessage(err, 'Failed to load data'));
       } finally {
-        if (!ignore) setLoading(false);
+        if (!ignore) setLoadedKey(fetchKey);
       }
     })();
     return () => {
@@ -94,21 +102,14 @@ export default function AnalyticsTable<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, paramsKey, reloadKey]);
 
-  const refresh = () => {
-    setLoading(true);
-    setReloadKey((k) => k + 1);
-  };
+  const refresh = () => setReloadKey((k) => k + 1);
 
   const applyFilters = (next: Record<string, string>) => {
-    setLoading(true);
     setPage(1);
     setFilterValues(next);
   };
 
-  const goToPage = (next: number) => {
-    setLoading(true);
-    setPage(next);
-  };
+  const goToPage = (next: number) => setPage(next);
 
   const currentPage = data?.page ?? page;
   const totalPages = data?.totalPages ?? 1;

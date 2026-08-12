@@ -116,6 +116,120 @@ export interface CompanyDescriptionResponse {
   disclaimer: string | null;
 }
 
+/**
+ * Columns a user may propose changes to. The keys mirror the admin edit body;
+ * anything outside the caller's role tier is rejected by the API with a 403.
+ */
+export interface CompanyUpdateChanges {
+  company_name?: string;
+  city?: string;
+  county?: string;
+  state?: string;
+  zip_code?: string;
+  naics_code?: string;
+  sic_code?: string;
+  employee_size?: string;
+  annual_revenue?: number;
+  year_founded?: number;
+  minority_owned?: boolean;
+  women_owned?: boolean;
+  veteran_owned?: boolean;
+  latitude?: number;
+  longitude?: number;
+}
+
+/** Body of `POST /api/company-update` — queues an edit for admin review. */
+export interface CompanyUpdatePayload {
+  company_id: string;
+  changes: CompanyUpdateChanges;
+  reason?: string;
+}
+
+/**
+ * Body of `PUT /api/admin/company` — an admin editing a record directly, with
+ * the columns flat alongside the id rather than nested under `changes`.
+ */
+export type AdminCompanyEditPayload = { company_id: string } & CompanyUpdateChanges;
+
+export interface CompanyUpdateResponse {
+  request_id: string;
+}
+
+export type CompanyUpdateStatus = 'pending' | 'approved' | 'rejected' | 'partially_approved';
+
+export type CompanyFieldAction = 'approve' | 'reject';
+
+/** An admin's verdict on a single proposed field. */
+export interface CompanyFieldDecision {
+  action: CompanyFieldAction;
+  /** Set when the admin approved a value other than the one proposed. */
+  value: string | number | boolean | null;
+  reason: string | null;
+}
+
+/** A row of `GET /api/company-update` — one edit the user proposed. */
+export interface CompanyUpdateRequest {
+  request_id: string;
+  company_id: string;
+  company_name: string;
+  status: CompanyUpdateStatus;
+  submitted_changes: Record<string, unknown>;
+  reason: string | null;
+  /** The reviewer's overall note. Null until an admin has acted on the request. */
+  review_reason: string | null;
+  field_decisions: Record<string, CompanyFieldDecision> | null;
+  reviewed_at: string | null;
+  created_at: string;
+  latency_ms: number | null;
+}
+
+export interface CompanyUpdateRequestsResponse {
+  requests: CompanyUpdateRequest[];
+  total: number;
+  page: number;
+  limit: number;
+  latency_ms: number;
+}
+
+/**
+ * A row of `GET /api/admin/company-request`. The admin view names the proposed
+ * columns `requested_changes` and carries who raised them.
+ */
+export interface AdminCompanyUpdateRequest {
+  request_id: string;
+  company_id: string;
+  company_name: string;
+  requested_by: string;
+  requested_by_email: string | null;
+  requested_changes: Record<string, unknown>;
+  reason: string | null;
+  status: CompanyUpdateStatus;
+  field_decisions: Record<string, CompanyFieldDecision> | null;
+  created_at: string;
+}
+
+export interface AdminCompanyUpdateRequestsResponse {
+  requests: AdminCompanyUpdateRequest[];
+  total: number;
+  page: number;
+  limit: number;
+  latency_ms: number;
+}
+
+/** A verdict as the review endpoint accepts it — no `value`, unlike the response. */
+export interface CompanyFieldReviewDecision {
+  action: CompanyFieldAction;
+  reason?: string | null;
+}
+
+/** Body of `POST /api/admin/company-request` — an admin's ruling on one request. */
+export interface CompanyUpdateReviewPayload {
+  request_id: string;
+  field_decisions: Record<string, CompanyFieldReviewDecision>;
+  /** The reviewer's overall note, surfaced to the requester. */
+  reason?: string;
+}
+
 export interface CompanyData {
   id: string;
   company_id: string;

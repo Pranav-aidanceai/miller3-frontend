@@ -2,7 +2,7 @@ import {
   Crown, Gift, User, Search, LayoutDashboard,
   Users, DollarSign, Database,
   Sparkles, History,
-  Eye, Folder
+  Eye, Folder, ClipboardList, ClipboardCheck, Building2
 } from "lucide-react";
 
 export const tiers = [
@@ -16,6 +16,7 @@ export const mainNav = [
   { to: '/ai-search', icon: Sparkles, label: 'AI Search' },
   { to: '/buckets', icon: Folder, label: 'My Buckets' },
   { to: '/query-history', icon: History, label: 'Query History' },
+  { to: '/my-requests', icon: ClipboardList, label: 'My Requests' },
 ];
 
 export const adminNav = [
@@ -24,7 +25,9 @@ export const adminNav = [
   // { to: '/admin/errors', icon: AlertTriangle, label: 'Errors' },
   { to: '/admin/cost-centre', icon: DollarSign, label: 'Cost Center' },
   { to: '/admin/data-health', icon: Database, label: 'Data Health' },
-  { to: '/admin/search-oversight', icon: Eye, label: 'Search Oversight' }
+  { to: '/admin/search-oversight', icon: Eye, label: 'Search Oversight' },
+  { to: '/admin/company-requests', icon: ClipboardCheck, label: 'Company Requests' },
+  { to: '/admin/add-company', icon: Building2, label: 'Add Company' }
 ];
 
 export const roleBadgeColor: Record<string, string> = {

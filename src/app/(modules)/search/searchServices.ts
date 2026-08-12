@@ -1,4 +1,4 @@
-import { CodeFilterResponse, CompanyDescriptionResponse, CompanySearchPayload, FilterField } from "@/types/search";
+import { AdminCompanyEditPayload, CodeFilterResponse, CompanyDescriptionResponse, CompanySearchPayload, CompanyUpdatePayload, CompanyUpdateResponse, FilterField } from "@/types/search";
 import axios from "axios";
 
 export async function searchAction(payload: CompanySearchPayload) {
@@ -97,6 +97,38 @@ export async function generateCompanyDescriptionAction(payload: { company_id: st
             return {
                 data: null,
                 error: error.response?.data ?? { detail: 'Description generation failed' }
+            };
+        }
+        return { data: null, error: { detail: 'Something went wrong' } };
+    }
+}
+
+/** Propose an edit to a company record. The change is queued for admin review. */
+export async function requestCompanyUpdateAction(payload: CompanyUpdatePayload) {
+    try {
+        const response = await axios.post<CompanyUpdateResponse>(`/api/company-update`, payload);
+        return { data: response.data, error: null }
+    } catch (error: unknown) {
+        if (axios.isAxiosError(error)) {
+            return {
+                data: null,
+                error: error.response?.data ?? { detail: 'Company update request failed' }
+            };
+        }
+        return { data: null, error: { detail: 'Something went wrong' } };
+    }
+}
+
+/** Admin-only direct edit — applied to the company immediately, no review step. */
+export async function updateCompanyRecordAction(payload: AdminCompanyEditPayload) {
+    try {
+        const response = await axios.put(`/api/admin/company`, payload);
+        return { data: response.data ?? {}, error: null }
+    } catch (error: unknown) {
+        if (axios.isAxiosError(error)) {
+            return {
+                data: null,
+                error: error.response?.data ?? { detail: 'Company update failed' }
             };
         }
         return { data: null, error: { detail: 'Something went wrong' } };

@@ -202,7 +202,6 @@ export default function AnalyticsChart({
   select,
 }: AnalyticsChartProps) {
   const [options, setOptions] = useState<ChartOptions | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Per-chart filter state, seeded from each filter's default.
@@ -224,6 +223,15 @@ export default function AnalyticsChart({
   const paramsKey = JSON.stringify(requestParams);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Loading is derived rather than stored: anything the effect has not yet
+  // fetched reads as loading. Flipping a flag in the handlers instead would
+  // strand the overlay whenever a filter change resolves to the same request
+  // (e.g. clearing filters that were never applied), because the effect is
+  // keyed on the request and so never re-runs to turn it back off.
+  const fetchKey = `${endpoint}|${paramsKey}|${reloadKey}`;
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const loading = loadedKey !== fetchKey;
+
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -237,7 +245,7 @@ export default function AnalyticsChart({
         if (ignore) return;
         setError(getErrorMessage(err, 'Failed to load chart'));
       } finally {
-        if (!ignore) setLoading(false);
+        if (!ignore) setLoadedKey(fetchKey);
       }
     })();
     return () => {
@@ -246,17 +254,9 @@ export default function AnalyticsChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, paramsKey, reloadKey]);
 
-  // Loading is flipped on in the event handlers (not the effect) so the
-  // overlay shows immediately on refresh / filter changes.
-  const refresh = () => {
-    setLoading(true);
-    setReloadKey((k) => k + 1);
-  };
+  const refresh = () => setReloadKey((k) => k + 1);
 
-  const applyFilters = (next: Record<string, string>) => {
-    setLoading(true);
-    setFilterValues(next);
-  };
+  const applyFilters = (next: Record<string, string>) => setFilterValues(next);
 
   return (
     <div

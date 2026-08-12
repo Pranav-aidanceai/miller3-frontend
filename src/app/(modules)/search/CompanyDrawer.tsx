@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
-import { X, Copy, AlertCircle, Info, Zap, Folder, Sparkles, RefreshCw } from 'lucide-react';
+import { X, Copy, AlertCircle, Info, Zap, Folder, Sparkles, RefreshCw, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { filterTitleOf, generateCompanyDescriptionAction, getCompanyAction, getFilterOptionsAction, getSimilarCompanyAction, singleEnrichAction } from './searchServices';
 import { isSessionExpiring } from '@/lib/session';
@@ -15,6 +15,7 @@ import 'react-tooltip/dist/react-tooltip.css';
 import { useDispatch } from 'react-redux';
 import { updateEnrichmentCredits } from '@/store/slices/authSlice';
 import BucketPickerPopover from '../buckets/BucketPickerPopover';
+import EditCompanyModal from './EditCompanyModal';
 
 const ENRICHMENT_STALE_DAYS = 90;
 
@@ -246,6 +247,7 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
     const [error, setError] = useState<string | null>(null);
     const [enriching, setEnriching] = useState<boolean>(false);
     const [generatingDescription, setGeneratingDescription] = useState<boolean>(false);
+    const [editing, setEditing] = useState<boolean>(false);
     // Only the generation response carries the AI caveat, so it is kept beside
     // the description rather than on the company record.
     const [descriptionDisclaimer, setDescriptionDisclaimer] = useState<string | null>(null);
@@ -467,8 +469,19 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
             <div className="relative w-full max-w-2xl h-[90vh] max-h-[90vh] bg-card border border-border rounded-lg shadow-xl overflow-auto animate-in fade-in zoom-in-95 duration-200">
                 <div className="sticky top-0 z-10 bg-card border-b border-border p-6">
                     <div className="flex items-start justify-between">
-                        <div>
-                            <h2 className="text-xl font-bold">{companyData?.company_name}</h2>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <h2 className="min-w-0 text-xl font-bold">{companyData?.company_name}</h2>
+                                {companyData && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditing(true)}
+                                        className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors cursor-pointer hover:bg-accent hover:text-foreground"
+                                    >
+                                        <Pencil className="h-3 w-3" /> Edit details
+                                    </button>
+                                )}
+                            </div>
                             <p className="text-sm text-muted-foreground">{companyData?.city}, {companyData?.state}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {/* These summary pills bypass Field, so they need
@@ -670,6 +683,14 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                     )}
                 </div>
             </div>
+
+            {editing && companyData && (
+                <EditCompanyModal
+                    company={companyData}
+                    onClose={() => setEditing(false)}
+                    onSaved={() => fetchCompany(currentId)}
+                />
+            )}
         </div>
     );
 }
