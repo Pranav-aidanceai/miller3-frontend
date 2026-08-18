@@ -3,14 +3,15 @@ import AXIOS from '@/lib/axios';
 import { NextResponse } from 'next/server';
 
 // The upstream reports remaining credits on failures too (a rejected query can
-// still have consumed one), so forward the header from both branches.
+// still have consumed one), so forward the header from both branches. Credits
+// are unified now — read the canonical header, falling back to the deprecated
+// per-operation one in case an older upstream build is still in front of us.
 function creditsHeader(headers: unknown): Record<string, string> {
-    const remaining = (headers as Record<string, string> | undefined)?.[
-        'x-ai-search-credits-remaining'
-    ];
+    const h = headers as Record<string, string> | undefined;
+    const remaining = h?.['x-credits-remaining'] ?? h?.['x-ai-search-credits-remaining'];
     return remaining == null || remaining === ''
         ? {}
-        : { 'x-ai-search-credits-remaining': String(remaining) };
+        : { 'x-credits-remaining': String(remaining) };
 }
 
 export async function POST(request: Request) {

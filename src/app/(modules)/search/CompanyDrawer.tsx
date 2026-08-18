@@ -13,7 +13,7 @@ import { ApiErrorResponse } from '@/types/common';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 import { useDispatch } from 'react-redux';
-import { updateEnrichmentCredits } from '@/store/slices/authSlice';
+import { updateCreditsRemaining } from '@/store/slices/authSlice';
 import BucketPickerPopover from '../buckets/BucketPickerPopover';
 import EditCompanyModal from './EditCompanyModal';
 
@@ -419,13 +419,13 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                         <div className="flex items-start gap-3 pr-5">
                             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
                             <p className="text-sm font-medium leading-snug">
-                                You&apos;ve reached your monthly enrichment credit limit. Contact your admin to request more credits.
+                                You&apos;ve reached your monthly credit limit. Contact your admin to request more credits.
                             </p>
                         </div>
                         <button
                             type="button"
                             onClick={() => {
-                                window.location.href = 'mailto:admin@miller3.com?subject=Request for more enrichment credits';
+                                window.location.href = 'mailto:admin@miller3.com?subject=Request for more credits';
                             }}
                             className="w-fit rounded-md bg-black/30 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-black/40"
                         >
@@ -444,7 +444,8 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
             }
         } else if (data?.status === "SUCCESS") {
             setEnriching(false);
-            dispatch(updateEnrichmentCredits(data.headers));
+            const remaining = parseInt(data.headers ?? '', 10);
+            if (!Number.isNaN(remaining)) dispatch(updateCreditsRemaining(remaining));
             const updated = await fetchCompany(id);
             const gained = diffEnrichedFields(before, updated);
             // Accumulate, so a second enrichment in the same session does not

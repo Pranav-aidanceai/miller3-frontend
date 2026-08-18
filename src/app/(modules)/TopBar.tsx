@@ -3,34 +3,30 @@ import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { useAppSelector } from '@/store/hooks';
 
-function CreditBar({ label, remaining, total }: { label: string; remaining: number; total: number }) {
-    const [labelWidth, setLabelWidth] = useState(0);
-    const labelRef = useRef<HTMLDivElement>(null);
+// Single unified balance shared by AI search, enrichment and export.
+// `limit < 0` means unlimited (admin) — shown as a green infinity symbol
+// instead of a percentage bar.
+function CreditBar({ remaining, limit }: { remaining: number; limit: number }) {
+    const unlimited = limit < 0;
+    const pct = !unlimited && limit > 0 ? Math.min((remaining / limit) * 100, 100) : 0;
 
-    const pct = total > 0 ? Math.min((remaining / total) * 100, 100) : 0;
-    const barColor = pct > 60 ? 'bg-green-500' : pct > 30 ? 'bg-yellow-400' : 'bg-red-500';
-    const textColor = pct > 60 ? 'text-green-500' : pct > 30 ? 'text-yellow-400' : 'text-red-500';
-    const borderColor = pct > 60 ? 'border-green-500/30' : pct > 30 ? 'border-yellow-400/30' : 'border-red-500/30';
-
-    useEffect(() => {
-        if (labelRef.current) {
-            setLabelWidth(labelRef.current.offsetWidth);
-        }
-    }, [label]);
+    const barColor = unlimited ? 'bg-green-500' : pct > 60 ? 'bg-green-500' : pct > 30 ? 'bg-yellow-400' : 'bg-red-500';
+    const textColor = unlimited ? 'text-green-500' : pct > 60 ? 'text-green-500' : pct > 30 ? 'text-yellow-400' : 'text-red-500';
+    const borderColor = unlimited ? 'border-green-500/30' : pct > 60 ? 'border-green-500/30' : pct > 30 ? 'border-yellow-400/30' : 'border-red-500/30';
 
     return (
         <div className={`rounded-md border ${borderColor} bg-background px-3 py-1.5 text-xs group relative cursor-default select-none flex items-center gap-3`}>
             <div className="flex flex-col gap-1">
-                <div ref={labelRef} className="text-muted-foreground font-medium">{label}</div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden" style={{ width: `${labelWidth}px` }}>
+                <div className="text-muted-foreground font-medium">Credits</div>
+                <div className="h-1.5 w-24 rounded-full bg-muted overflow-hidden">
                     <div
                         className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                        style={{ width: `${pct}%` }}
+                        style={{ width: unlimited ? '100%' : `${pct}%` }}
                     />
                 </div>
             </div>
             <div className={`text-sm font-semibold tabular-nums ${textColor}`}>
-                {remaining}
+                {unlimited ? '∞' : remaining}
             </div>
         </div>
     );
@@ -41,7 +37,6 @@ export function TopBar() {
     const { theme, setTheme } = useTheme();
     const initialized = useRef(false);
     const credits_left = useAppSelector(state => state.auth.credits_left);
-    const roleDetails = useAppSelector(state => state.auth.roleDetails);
 
     useEffect(() => {
         if (initialized.current) return;
@@ -70,19 +65,8 @@ export function TopBar() {
             <div className="flex items-center gap-2">
                 <div data-tour="credits" className="flex items-center gap-2">
                     <CreditBar
-                        label="AI Search credits"
-                        remaining={credits_left?.ai_search ?? 0}
-                        total={roleDetails?.ai_search_credits_monthly ?? 50}
-                    />
-                    <CreditBar
-                        label="Enrichment credits"
-                        remaining={credits_left?.enrichment ?? 0}
-                        total={roleDetails?.enrichment_credits_monthly ?? 100}
-                    />
-                    <CreditBar
-                        label="Export credits"
-                        remaining={credits_left?.export ?? 0}
-                        total={roleDetails?.export_credits_monthly ?? 3000}
+                        remaining={credits_left?.total ?? 0}
+                        limit={credits_left?.limit ?? 0}
                     />
                 </div>
 

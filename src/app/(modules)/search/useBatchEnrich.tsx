@@ -64,7 +64,7 @@ export function useBatchEnrich() {
             if (isCreditError(code)) {
                 showCreditLimitToast({
                     detail,
-                    fallbackMessage: "You've reached your monthly enrichment credit limit. Contact your admin to request more credits.",
+                    fallbackMessage: "You've reached your monthly credit limit. Contact your admin to request more credits.",
                     mailtoSubject: 'Request for more enrichment credits',
                 });
                 return;

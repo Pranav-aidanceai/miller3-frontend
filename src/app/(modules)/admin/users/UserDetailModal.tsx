@@ -10,24 +10,26 @@ import { getErrorMessage } from '@/lib/apiError';
 import { useAppSelector } from '@/store/hooks';
 
 interface RoleDefaults {
-    searches: number;
-    exports: number;
+    // Unified monthly credit allowance for this role. `searches` / `exports` /
+    // `enrichments` are deprecated aliases the backend still sends — same number.
+    credits: number;
     export_rows: number;
-    enrichments: number;
+    export_rows_per_credit: number;
 }
 
 interface CustomQuotas {
     enabled: boolean;
-    search_quota_monthly: number | null;
-    export_quota_monthly: number | null;
+    unified_quota_monthly: number | null;
+    export_rows_per_credit: number | null;
     export_row_cap: number | null;
-    enrichment_quota_monthly: number | null;
 }
 
-interface CreditLeft {
-    ai_search: number,
-    enrichment: number,
-    export: number
+// The single unified balance shared by AI search, enrichment and export.
+// `limit` is -1 for admins (unlimited).
+interface CreditsLeft {
+    total: number;
+    used: number;
+    limit: number;
 }
 
 interface GetUserResponse {
@@ -40,7 +42,7 @@ interface GetUserResponse {
     role_defaults: RoleDefaults;
     custom_quotas: CustomQuotas;
     override_reason: string | null;
-    credits_left: CreditLeft
+    credits_left: CreditsLeft
 }
 
 const ROLES = ['free', 'standard', 'premium', 'admin'] as const;
@@ -54,16 +56,9 @@ const roleBadge: Record<string, string> = {
     free: 'bg-muted text-muted-foreground',
 };
 
-const CREDIT_LABELS: Record<keyof CreditLeft, string> = {
-    ai_search: 'AI Search',
-    enrichment: 'Enrichment',
-    export: 'Export',
-};
-
 const QUOTA_FIELDS: { key: keyof CustomQuotas; label: string }[] = [
-    { key: 'search_quota_monthly', label: 'Search quota (monthly)' },
-    { key: 'export_quota_monthly', label: 'Export quota (monthly)' },
-    { key: 'enrichment_quota_monthly', label: 'Enrichment quota (monthly)' },
+    { key: 'unified_quota_monthly', label: 'Credit quota (monthly)' },
+    { key: 'export_rows_per_credit', label: 'Export rows per credit' },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
@@ -130,9 +125,8 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
     const [savingQuotas, setSavingQuotas] = useState(false);
     const [reasonError, setReasonError] = useState(false);
     const [overrideValues, setOverrideValues] = useState<Record<string, string>>({
-        search_quota_monthly: '',
-        export_quota_monthly: '',
-        enrichment_quota_monthly: '',
+        unified_quota_monthly: '',
+        export_rows_per_credit: '',
         reason: '',
     });
 
@@ -151,9 +145,8 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
             setRole(data.role);
             setOverrideEnabled(data.custom_quotas.enabled);
             setOverrideValues({
-                search_quota_monthly: data.custom_quotas.search_quota_monthly?.toString() ?? '',
-                export_quota_monthly: data.custom_quotas.export_quota_monthly?.toString() ?? '',
-                enrichment_quota_monthly: data.custom_quotas.enrichment_quota_monthly?.toString() ?? '',
+                unified_quota_monthly: data.custom_quotas.unified_quota_monthly?.toString() ?? '',
+                export_rows_per_credit: data.custom_quotas.export_rows_per_credit?.toString() ?? '',
                 reason: data.override_reason ?? '',
             });
         } catch (err: unknown) {
@@ -174,9 +167,8 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
                 setRole(data.role);
                 setOverrideEnabled(data.custom_quotas.enabled);
                 setOverrideValues({
-                    search_quota_monthly: data.custom_quotas.search_quota_monthly?.toString() ?? '',
-                    export_quota_monthly: data.custom_quotas.export_quota_monthly?.toString() ?? '',
-                    enrichment_quota_monthly: data.custom_quotas.enrichment_quota_monthly?.toString() ?? '',
+                    unified_quota_monthly: data.custom_quotas.unified_quota_monthly?.toString() ?? '',
+                    export_rows_per_credit: data.custom_quotas.export_rows_per_credit?.toString() ?? '',
                     reason: data.override_reason ?? '',
                 });
             } catch (err: unknown) {
@@ -217,9 +209,8 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
             await axios.patch('/api/admin/update-credits', {
                 user_id: user.id,
                 enabled: overrideEnabled,
-                search_quota_monthly: overrideValues.search_quota_monthly ? Number(overrideValues.search_quota_monthly) : null,
-                export_quota_monthly: overrideValues.export_quota_monthly ? Number(overrideValues.export_quota_monthly) : null,
-                enrichment_quota_monthly: overrideValues.enrichment_quota_monthly ? Number(overrideValues.enrichment_quota_monthly) : null,
+                unified_quota_monthly: overrideValues.unified_quota_monthly ? Number(overrideValues.unified_quota_monthly) : null,
+                export_rows_per_credit: overrideValues.export_rows_per_credit ? Number(overrideValues.export_rows_per_credit) : null,
                 override_reason: overrideValues.reason.trim() || null,
             });
             toast.success(`Quotas updated for ${user.name}`);
@@ -426,20 +417,39 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
                                 </div>
                             </section>
 
-                            {/* Credits left */}
+                            {/* Credits left — single unified balance shared by AI
+                                search, enrichment and export. */}
                             <section>
                                 <h3 className="mb-2 text-sm font-semibold text-muted-foreground uppercase">Credits Left</h3>
-                                <div className="grid grid-cols-3 gap-2 text-sm">
-                                    {(Object.keys(CREDIT_LABELS) as (keyof CreditLeft)[]).map(k => {
-                                        const value = user.credits_left?.[k];
-                                        return (
-                                            <div key={k} className="rounded-lg border border-border bg-muted/30 px-3 py-2">
-                                                <p className="text-xs text-muted-foreground">{CREDIT_LABELS[k]}</p>
-                                                <p className="font-medium font-mono">{value == null ? '—' : value >= 999999 ? '∞' : value}</p>
+                                {(() => {
+                                    const cl = user.credits_left;
+                                    const unlimited = (cl?.limit ?? 0) < 0;
+                                    const remaining = cl?.total ?? null;
+                                    const limit = cl?.limit ?? null;
+                                    const pct = !unlimited && limit && limit > 0 && remaining != null
+                                        ? Math.min((remaining / limit) * 100, 100)
+                                        : 0;
+                                    const barColor = unlimited ? 'bg-green-500' : pct > 60 ? 'bg-green-500' : pct > 30 ? 'bg-yellow-400' : 'bg-red-500';
+                                    const textColor = unlimited ? 'text-green-500' : pct > 60 ? 'text-green-500' : pct > 30 ? 'text-yellow-400' : 'text-red-500';
+                                    return (
+                                        <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                                            <div className="flex-1">
+                                                <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                                                    <div
+                                                        className={cn('h-full rounded-full transition-all duration-500', barColor)}
+                                                        style={{ width: unlimited ? '100%' : `${pct}%` }}
+                                                    />
+                                                </div>
+                                                {!unlimited && limit != null && (
+                                                    <p className="mt-1 text-xs text-muted-foreground">{cl?.used ?? 0} used of {limit}</p>
+                                                )}
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                            <p className={cn('text-lg font-semibold font-mono', textColor)}>
+                                                {remaining == null ? '—' : unlimited ? '∞' : remaining}
+                                            </p>
+                                        </div>
+                                    );
+                                })()}
                             </section>
 
                             {/* Custom quotas */}

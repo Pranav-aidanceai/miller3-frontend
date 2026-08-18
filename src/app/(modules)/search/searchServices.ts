@@ -142,7 +142,7 @@ export async function singleEnrichAction(payload: { company_id?: string, company
             data: {
                 status: 'SUCCESS',
                 data: response.data,
-                headers: response.headers["x-enrichment-credits-remaining"]
+                headers: response.headers["x-credits-remaining"]
             },
             error: null
         }

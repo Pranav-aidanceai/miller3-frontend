@@ -10,8 +10,8 @@ export async function POST(request: Request) {
         return NextResponse.json(response.data, {
             status: response.status || 200,
             headers: {
-                'x-enrichment-credits-remaining': String(
-                    response.headers['x-enrichment-credits-remaining'] ?? ''
+                'x-credits-remaining': String(
+                    response.headers['x-credits-remaining'] ?? response.headers['x-enrichment-credits-remaining'] ?? ''
                 ),
             },
         });

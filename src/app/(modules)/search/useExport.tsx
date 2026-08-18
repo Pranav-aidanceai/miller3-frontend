@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { updateExportCredits } from '@/store/slices/authSlice';
+import { updateCreditsRemaining } from '@/store/slices/authSlice';
 import { parseApiError, isCreditError, showCreditLimitToast } from './apiError';
 import { isSessionExpiring } from '@/lib/session';
 
@@ -47,8 +47,8 @@ export function useExport() {
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
-            const remaining = parseInt(response.headers['x-export-credits-remaining'] ?? '0');
-            dispatch(updateExportCredits(remaining));
+            const remaining = parseInt(response.headers['x-credits-remaining'] ?? '0');
+            dispatch(updateCreditsRemaining(remaining));
             toast.success(`Downloaded ${filename}`);
             onSuccess?.();
         } catch (error) {
@@ -72,7 +72,7 @@ export function useExport() {
             if (isCreditError(code)) {
                 showCreditLimitToast({
                     detail,
-                    fallbackMessage: "You've reached your monthly export credit limit. Contact your admin to request more credits.",
+                    fallbackMessage: "You've reached your monthly credit limit. Contact your admin to request more credits.",
                     mailtoSubject: 'Request for more export credits',
                 });
                 return;

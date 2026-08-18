@@ -7,10 +7,9 @@ export async function PATCH(request: Request) {
         const data = await request.json();
         const payload = {
             enabled: data.enabled,
-            search_quota_monthly: data.search_quota_monthly,
-            export_quota_monthly: data.export_quota_monthly,
+            unified_quota_monthly: data.unified_quota_monthly,
+            export_rows_per_credit: data.export_rows_per_credit,
             export_row_cap: data.export_row_cap,
-            enrichment_quota_monthly: data.enrichment_quota_monthly,
             override_reason: data.override_reason
         }
         const response = await AXIOS.patch(`/api/v1/admin/users/${data?.user_id}/quotas`, payload);

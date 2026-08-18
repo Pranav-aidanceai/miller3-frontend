@@ -30,7 +30,7 @@ import 'react-tooltip/dist/react-tooltip.css';
 import { useSearchParams } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
-import { updateAiSearchCredits, updateExportCredits } from '@/store/slices/authSlice';
+import { updateCreditsRemaining } from '@/store/slices/authSlice';
 
 type Template = {
   id: number;
@@ -191,8 +191,8 @@ export default function AISearchPage() {
         if (isCreditError(code)) {
           showCreditLimitToast({
             detail: message,
-            fallbackMessage: "You've reached your monthly AI search credit limit. Contact your admin to request more credits.",
-            mailtoSubject: 'Request for more AI search credits',
+            fallbackMessage: "You've reached your monthly credit limit. Contact your admin to request more credits.",
+            mailtoSubject: 'Request for more credits',
           });
         } else {
           toast.error(message, {
@@ -252,7 +252,7 @@ export default function AISearchPage() {
         // the `operation` flag the upstream expects.
         operation: silent,
       });
-      if (headers !== null) dispatch(updateAiSearchCredits(headers));
+      if (headers !== null) dispatch(updateCreditsRemaining(headers));
       setThinking(false);
       setPaging(false);
 
@@ -404,8 +404,8 @@ export default function AISearchPage() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      const remaining = parseInt(response.headers['x-export-credits-remaining'] ?? '0');
-      dispatch(updateExportCredits(remaining));
+      const remaining = parseInt(response.headers['x-credits-remaining'] ?? '0');
+      dispatch(updateCreditsRemaining(remaining));
       toast.success(`Downloaded ${filename}`);
       setShowExportModal(false);
       setSelectedIds(new Set());

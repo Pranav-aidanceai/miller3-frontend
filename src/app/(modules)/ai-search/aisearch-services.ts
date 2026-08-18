@@ -18,11 +18,12 @@ function parseAiError(body: unknown, fallback: string): { detail: string; code: 
 }
 
 // Returns null when the response carried no credit count, so callers can tell
-// "no update" apart from "zero credits left".
+// "no update" apart from "zero credits left". Credits are a unified balance
+// now, reported on the canonical header (with the deprecated per-operation
+// header as a fallback).
 function parseCreditsRemaining(headers: unknown): number | null {
-    const raw = (headers as Record<string, string> | undefined)?.[
-        'x-ai-search-credits-remaining'
-    ];
+    const h = headers as Record<string, string> | undefined;
+    const raw = h?.['x-credits-remaining'] ?? h?.['x-ai-search-credits-remaining'];
     if (raw == null || raw === '') return null;
     const remaining = Number(raw);
     return Number.isFinite(remaining) ? remaining : null;

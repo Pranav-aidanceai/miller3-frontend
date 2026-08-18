@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle2, Loader2, XCircle, X } from 'lucide-react';
 import { store } from '@/store/store';
-import { updateEnrichmentCredits } from '@/store/slices/authSlice';
+import { updateCreditsRemaining } from '@/store/slices/authSlice';
 
 type Phase = 'connecting' | 'running' | 'completed' | 'failed';
 
@@ -137,7 +137,7 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
             }
             if ((pickString(msg, ['type']) ?? '').toLowerCase() === 'credits') {
                 const remaining = pickNumber(msg, ['remaining', 'credits_left', 'remaining_credits']);
-                if (remaining != null) store.dispatch(updateEnrichmentCredits(remaining));
+                if (remaining != null) store.dispatch(updateCreditsRemaining(remaining));
                 return;
             }
 
