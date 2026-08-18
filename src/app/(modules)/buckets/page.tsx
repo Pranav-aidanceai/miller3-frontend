@@ -41,6 +41,10 @@ interface BucketCompany {
     state?: string | null;
     county: string | null;
     zip_code: string | null;
+    address?: string | null;
+    msa?: string | null;
+    ownership_type?: string | null;
+    certification_status?: string | null;
     naics_code: string | null;
     sic_code: string | null;
     employee_size: string | null;
@@ -62,6 +66,11 @@ const toCompany = (r: BucketCompany): Company => ({
     company_name: r.company_name,
     city: r.city ?? '',
     state: r.state ?? '',
+    county: r.county,
+    address: r.address ?? null,
+    msa: r.msa ?? null,
+    ownership_type: r.ownership_type ?? null,
+    certification_status: r.certification_status ?? null,
     naics_code: r.naics_code,
     sic_code: r.sic_code,
     employee_size: r.employee_size,

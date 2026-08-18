@@ -44,6 +44,11 @@ type AIResult = {
   company_name: string;
   city: string | null;
   state: string | null;
+  county?: string | null;
+  address?: string | null;
+  msa?: string | null;
+  ownership_type?: string | null;
+  certification_status?: string | null;
   naics_code: string | null;
   sic_code?: string | null;
   phone: string | null;
@@ -68,6 +73,11 @@ const toCompany = (r: AIResult): Company => {
     company_name: r.company_name,
     city: r.city ?? '',
     state: r.state ?? '',
+    county: r.county ?? null,
+    address: r.address ?? null,
+    msa: r.msa ?? null,
+    ownership_type: r.ownership_type ?? null,
+    certification_status: r.certification_status ?? null,
     naics_code: r.naics_code,
     sic_code: r.sic_code ?? null,
     employee_size: r.employee_size,

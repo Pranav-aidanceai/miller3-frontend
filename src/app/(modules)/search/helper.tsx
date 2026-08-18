@@ -151,7 +151,7 @@ export const ContactIcons = ({ c, notAccessibleFields }: { c: Company; notAccess
     );
 };
 
-export const TableSkeleton = ({ perPage }: { perPage: number }) => (
+export const TableSkeleton = ({ perPage, columnsCount = 3 }: { perPage: number; columnsCount?: number }) => (
     <tbody>
         {Array.from({ length: perPage > 10 ? 10 : perPage }).map((_, i) => (
             <tr key={i} className="border-b border-border">
@@ -159,9 +159,9 @@ export const TableSkeleton = ({ perPage }: { perPage: number }) => (
                     <div className="h-4 w-40 rounded bg-muted animate-pulse mb-1" />
                     <div className="h-3 w-24 rounded bg-muted animate-pulse" />
                 </td>
-                <td className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted animate-pulse" /></td>
-                <td className="px-4 py-3 text-right"><div className="h-4 w-12 rounded bg-muted animate-pulse ml-auto" /></td>
-                <td className="px-4 py-3 text-right"><div className="h-4 w-16 rounded bg-muted animate-pulse ml-auto" /></td>
+                {Array.from({ length: columnsCount }).map((_, j) => (
+                    <td key={j} className="px-4 py-3"><div className="h-4 w-16 rounded bg-muted animate-pulse" /></td>
+                ))}
                 <td className="px-4 py-3"><div className="flex justify-center gap-1">
                     <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />
                     <div className="h-2 w-2 rounded-full bg-muted animate-pulse" />

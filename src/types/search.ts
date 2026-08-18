@@ -84,11 +84,16 @@ export interface Company {
   company_name: string;
   city: string;
   state: string;
+  county: string | null;
+  address: string | null;
+  msa: string | null;
   naics_code: string | null;
   sic_code: string | null;
   employee_size: string | null;
   annual_revenue: number | null;
   year_founded: number | null;
+  ownership_type: string | null;
+  certification_status: string | null;
   enrichment_status: 'unenriched' | 'enriched' | 'pending';
   phone: string | null;
   email: string | null;
