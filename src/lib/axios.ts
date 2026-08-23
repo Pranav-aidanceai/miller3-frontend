@@ -26,6 +26,15 @@ AXIOS.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // A role change invalidates the token's claims, not the session's lifetime:
+    // refreshing would either fail or hand back a token whose tier no longer
+    // matches the role cached on the client. Skip the retry and let the 401 +
+    // ROLE_CHANGED body reach the browser, where SessionGuard forces a re-login.
+    const errorCode = (error.response?.data as { error_code?: string } | undefined)?.error_code;
+    if (error.response?.status === 401 && errorCode === "ROLE_CHANGED") {
+      throw error;
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {

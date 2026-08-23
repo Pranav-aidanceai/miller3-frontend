@@ -24,6 +24,7 @@ import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
 import SearchPagination from '../search/SearchPagination';
 import { useBatchEnrich, type EnrichRecordUpdate } from '../search/useBatchEnrich';
+import BucketPickerPopover from '../buckets/BucketPickerPopover';
 import { Company, CompanyData } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
@@ -692,6 +693,20 @@ export default function AISearchPage() {
                 <List className="h-4 w-4" />
               </button>
             </div>
+
+            <BucketPickerPopover
+              companyIds={Array.from(selectedIds)}
+              tooltipId="ai-add-to-bucket-tip"
+              onDone={() => setSelectedIds(new Set())}
+            />
+            <Tooltip
+              id="ai-add-to-bucket-tip"
+              place="bottom"
+              content={selectedIds.size === 0
+                ? 'Select companies to add to a bucket'
+                : 'Add selected companies to a bucket'}
+              className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+            />
 
             <button
               type="button"

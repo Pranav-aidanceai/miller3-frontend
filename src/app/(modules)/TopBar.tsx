@@ -1,7 +1,33 @@
-import { Moon, Sun, Command } from 'lucide-react';
+import { Moon, Sun, Command, Sparkles, Zap, Download } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { useAppSelector } from '@/store/hooks';
+
+// Export is billed per block of companies rather than per company; the block
+// size is fixed by the backend's pricing, not configurable per environment.
+const EXPORT_BLOCK_SIZE = 50;
+
+/** What each action costs, for the breakdown shown on hovering the bar. */
+const CREDIT_COSTS = [
+    {
+        icon: Sparkles,
+        label: 'AI Search',
+        cost: Number(process.env.NEXT_PUBLIC_AI_SEARCH_CREDIT_DEDUCTION) || 5,
+        per: 'search',
+    },
+    {
+        icon: Zap,
+        label: 'Enrichment',
+        cost: Number(process.env.NEXT_PUBLIC_ENRICHMENT_CREDIT_DEDUCTION) || 3,
+        per: 'company',
+    },
+    {
+        icon: Download,
+        label: 'Export',
+        cost: Number(process.env.NEXT_PUBLIC_EXPORT_CREDIT_DEDUCTION) || 1,
+        per: `${EXPORT_BLOCK_SIZE} companies`,
+    },
+];
 
 // Single unified balance shared by AI search, enrichment and export.
 // `limit < 0` means unlimited (admin) — shown as a green infinity symbol
@@ -27,6 +53,35 @@ function CreditBar({ remaining, limit }: { remaining: number; limit: number }) {
             </div>
             <div className={`text-sm font-semibold tabular-nums ${textColor}`}>
                 {unlimited ? '∞' : remaining}
+            </div>
+
+            {/* Cost breakdown, on hover. Purely informational, so it never takes
+                the pointer — that also keeps it from flickering at the edges. */}
+            <div
+                role="tooltip"
+                className="pointer-events-none invisible absolute right-0 top-full z-50 mt-2 w-60 rounded-lg border border-border bg-popover p-3 text-popover-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:visible group-hover:opacity-100"
+            >
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Credit usage
+                </p>
+                <ul className="mt-2 space-y-2">
+                    {CREDIT_COSTS.map(({ icon: Icon, label, cost, per }) => (
+                        <li key={label} className="flex items-start gap-2">
+                            <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0">
+                                <p className="text-xs font-medium leading-tight">{label}</p>
+                                <p className="text-[11px] leading-tight text-muted-foreground">
+                                    {cost} {cost === 1 ? 'credit' : 'credits'} per {per}
+                                </p>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+                {unlimited && (
+                    <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+                        Your account has unlimited credits.
+                    </p>
+                )}
             </div>
         </div>
     );

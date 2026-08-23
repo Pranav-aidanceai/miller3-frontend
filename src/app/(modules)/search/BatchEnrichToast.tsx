@@ -7,7 +7,15 @@ import { CheckCircle2, Loader2, XCircle, X } from 'lucide-react';
 import { store } from '@/store/store';
 import { updateCreditsRemaining } from '@/store/slices/authSlice';
 
-type Phase = 'connecting' | 'running' | 'completed' | 'failed';
+type Phase = 'connecting' | 'running' | 'finalizing' | 'completed' | 'failed';
+
+/**
+ * The backend keeps working for a short while after the last progress frame,
+ * so the enriched rows aren't readable the instant the batch reports done.
+ * We hold the toast — and the refetch it triggers — for this long before
+ * calling the run complete.
+ */
+const FINALIZE_DELAY_SECONDS = Number(process.env.NEXT_PUBLIC_BATCH_ENRICHMENT_DELAY_SECONDS) || 30;
 
 /**
  * A single company's result, emitted as soon as its frame arrives so the list
@@ -82,6 +90,7 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
     const [percent, setPercent] = useState(0);
     const [detail, setDetail] = useState<string | null>(null);
     const [summary, setSummary] = useState({ succeeded: 0, failed: 0, duplicate: 0 });
+    const [secondsLeft, setSecondsLeft] = useState(FINALIZE_DELAY_SECONDS);
 
     useEffect(() => {
         let cancelled = false;
@@ -91,6 +100,10 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
         let succeededCount = 0;
         let failedCount = 0;
         let duplicateCount = 0;
+
+        let finalizeTimer: number | undefined;
+        let countdownTimer: number | undefined;
+        let dismissTimer: number | undefined;
 
         let ws: WebSocket;
         try {
@@ -104,17 +117,36 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
             return;
         }
 
+        const finish = () => {
+            if (cancelled) return;
+            setPhase('completed');
+            onCompleteRef.current?.();
+            dismissTimer = window.setTimeout(() => toast.dismiss(toastId), 4000);
+        };
+
         const settle = (next: Phase, message: string | null) => {
             if (cancelled || settled) return;
             settled = true;
-            setPhase(next);
             setDetail(message);
-            if (next === 'completed') {
-                setProcessed(totalCount);
-                setPercent(100);
-                onCompleteRef.current?.();
-                window.setTimeout(() => toast.dismiss(toastId), 4000);
+            if (next !== 'completed') {
+                setPhase(next);
+                return;
             }
+            setProcessed(totalCount);
+            setPercent(100);
+            if (FINALIZE_DELAY_SECONDS <= 0) {
+                finish();
+                return;
+            }
+            // Hold here so the backend can finish writing the batch; only then
+            // do we report completion and let the list refetch.
+            setPhase('finalizing');
+            setSecondsLeft(FINALIZE_DELAY_SECONDS);
+            countdownTimer = window.setInterval(() => setSecondsLeft(s => Math.max(0, s - 1)), 1000);
+            finalizeTimer = window.setTimeout(() => {
+                window.clearInterval(countdownTimer);
+                finish();
+            }, FINALIZE_DELAY_SECONDS * 1000);
         };
 
         const applyProgress = (explicitPercent?: number) => {
@@ -224,6 +256,9 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
 
         return () => {
             cancelled = true;
+            window.clearTimeout(finalizeTimer);
+            window.clearTimeout(dismissTimer);
+            window.clearInterval(countdownTimer);
             if (ws.readyState === WebSocket.CONNECTING) {
                 ws.onopen = () => ws.close();
             } else {
@@ -264,7 +299,9 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
                         ? 'Batch enrichment complete'
                         : phase === 'failed'
                             ? 'Batch enrichment interrupted'
-                            : 'Batch enrichment started'}
+                            : phase === 'finalizing'
+                                ? 'Finishing up'
+                                : 'Batch enrichment started'}
                 </p>
             </div>
 
@@ -275,7 +312,9 @@ export default function BatchEnrichToast({ toastId, wsUrl, total: initialTotal, 
                     ? (detail ?? 'Something went wrong.')
                     : phase === 'completed'
                         ? completionText
-                        : `${processed} of ${total} compan${total === 1 ? 'y' : 'ies'} enriched (${percent}%)`}
+                        : phase === 'finalizing'
+                            ? `Collecting and organizing enriched data${secondsLeft > 0 ? ` (${secondsLeft}s)` : ''}…`
+                            : `${processed} of ${total} compan${total === 1 ? 'y' : 'ies'} enriched (${percent}%)`}
             </p>
         </div>
     );

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { FilterAutocomplete } from './FilterAutocomplete';
 import { FilterInput, Toggle } from './helper';
 import { SearchFilters } from './replayParams';
+import { validateFilters } from './filterValidation';
 
 interface FiltersProps {
     /** The filters the current results were fetched with. */
@@ -25,6 +26,9 @@ interface FiltersProps {
 const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, initialFilters, onClear }: FiltersProps) => {
 
     const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify(filters);
+    // A bad range would be silently dropped by the backend, so Apply waits.
+    const errors = validateFilters(draftFilters);
+    const isValid = Object.keys(errors).length === 0;
 
     const activeFilterCount = Object.values(filters).reduce((count, value) => {
         if (Array.isArray(value)) return count + value.length;
@@ -33,6 +37,7 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
     }, 0);
 
     const applyFilters = () => {
+        if (!isValid) return;
         setFilters(draftFilters);
         setPage(1);
     };
@@ -53,15 +58,15 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
                 </div>
                 <div className="flex gap-2">
                     <button onClick={clearDraftFilters} className="text-xs text-primary cursor-pointer hover:underline">Clear</button>
-                    <button onClick={applyFilters} disabled={!hasChanges} className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Apply</button>
+                    <button onClick={applyFilters} disabled={!hasChanges || !isValid} className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Apply</button>
                 </div>
             </div>
             <div className="p-4 space-y-5">
                 {/* Location */}
                 <div data-tour="location-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Location</p>
-                    <FilterInput label="City" value={draftFilters.cityFilter} onChange={(v) => setDraftFilters({ ...draftFilters, cityFilter: v })} placeholder="e.g. Austin" />
-                    <FilterInput label="County" value={draftFilters.countyFilter} onChange={(v) => setDraftFilters({ ...draftFilters, countyFilter: v })} placeholder="e.g. Travis" />
+                    <FilterInput letters label="City" value={draftFilters.cityFilter} onChange={(v) => setDraftFilters({ ...draftFilters, cityFilter: v })} placeholder="e.g. Austin" />
+                    <FilterInput letters label="County" value={draftFilters.countyFilter} onChange={(v) => setDraftFilters({ ...draftFilters, countyFilter: v })} placeholder="e.g. Travis" />
                     <div className="mt-2">
                         <label className="text-xs font-medium text-muted-foreground">State</label>
                         <div className="mt-1 flex flex-wrap gap-1 max-h-24 overflow-auto">
@@ -73,7 +78,7 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
                             ))}
                         </div>
                     </div>
-                    <FilterAutocomplete label="Metropolitan Statistical Area (MSA)" field="msa" value={draftFilters.msaFilter} onChange={(v) => setDraftFilters({ ...draftFilters, msaFilter: v })} placeholder="e.g. Austin, TX" />
+                    <FilterAutocomplete label="Metropolitan Statistical Area (MSA)" field="msa" value={draftFilters.msaFilter} onChange={(v) => setDraftFilters({ ...draftFilters, msaFilter: v })} placeholder="e.g. Amsterdam, NY" />
                 </div>
                 {/* Industry */}
                 <div data-tour="industry-filter">
@@ -81,20 +86,20 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
                     <FilterAutocomplete label="NAICS Code" field="naics" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="Code or industry" />
                     <FilterAutocomplete label="SIC Code" field="sic" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="Code or industry" />
                     <div className="grid grid-cols-2 gap-2 mt-2">
-                        <FilterInput label="Min Year Founded" value={draftFilters.minYear} onChange={(v) => setDraftFilters({ ...draftFilters, minYear: v })} placeholder="1900" />
-                        <FilterInput label="Max Year Founded" value={draftFilters.maxYear} onChange={(v) => setDraftFilters({ ...draftFilters, maxYear: v })} placeholder="2023" />
+                        <FilterInput numeric maxLength={4} error={errors.minYear} label="Min Year Founded" value={draftFilters.minYear} onChange={(v) => setDraftFilters({ ...draftFilters, minYear: v })} placeholder="1700" />
+                        <FilterInput numeric maxLength={4} error={errors.maxYear} label="Max Year Founded" value={draftFilters.maxYear} onChange={(v) => setDraftFilters({ ...draftFilters, maxYear: v })} placeholder={new Date().getFullYear().toString()} />
                     </div>
                 </div>
                 {/* Size */}
                 <div data-tour="size-filter">
                     <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Company Size</p>
                     <div className="grid grid-cols-2 gap-2">
-                        <FilterInput label="Min Employees" value={draftFilters.minEmp} onChange={(v) => setDraftFilters({ ...draftFilters, minEmp: v })} placeholder="0" />
-                        <FilterInput label="Max Employees" value={draftFilters.maxEmp} onChange={(v) => setDraftFilters({ ...draftFilters, maxEmp: v })} placeholder="10,000+" />
+                        <FilterInput numeric label="Min Employees" value={draftFilters.minEmp} onChange={(v) => setDraftFilters({ ...draftFilters, minEmp: v })} placeholder="0" />
+                        <FilterInput numeric error={errors.maxEmp} label="Max Employees" value={draftFilters.maxEmp} onChange={(v) => setDraftFilters({ ...draftFilters, maxEmp: v })} placeholder="10000" />
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-2">
-                        <FilterInput label="Min Revenue" value={draftFilters.minRev} onChange={(v) => setDraftFilters({ ...draftFilters, minRev: v })} placeholder="$0" />
-                        <FilterInput label="Max Revenue" value={draftFilters.maxRev} onChange={(v) => setDraftFilters({ ...draftFilters, maxRev: v })} placeholder="$1B+" />
+                        <FilterInput numeric label="Min Revenue" value={draftFilters.minRev} onChange={(v) => setDraftFilters({ ...draftFilters, minRev: v })} placeholder="0" />
+                        <FilterInput numeric error={errors.maxRev} label="Max Revenue" value={draftFilters.maxRev} onChange={(v) => setDraftFilters({ ...draftFilters, maxRev: v })} placeholder="100000000" />
                     </div>
                 </div>
                 {/* Demographics */}

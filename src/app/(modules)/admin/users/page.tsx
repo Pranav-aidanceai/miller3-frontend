@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { cn } from '@/lib/utils';
 import { ListFilter, Check, Search, RefreshCw } from 'lucide-react';
@@ -117,6 +117,13 @@ export default function AdminUsersPage() {
             }
         })();
         return () => { active = false; };
+    }, [page, roleFilter, statusFilter, debouncedSearch]);
+
+    // The table body scrolls on its own, so a new page or filter would otherwise
+    // open wherever the previous list was left — usually at the bottom.
+    const tableScrollRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        tableScrollRef.current?.scrollTo({ top: 0 });
     }, [page, roleFilter, statusFilter, debouncedSearch]);
 
     const [prevSearch, setPrevSearch] = useState(debouncedSearch);
@@ -249,7 +256,7 @@ export default function AdminUsersPage() {
 
             {!error && (
                 <div className="mt-6 rounded-lg border border-border overflow-hidden">
-                    <div className="overflow-y-auto max-h-[60vh]">
+                    <div ref={tableScrollRef} className="overflow-y-auto max-h-[60vh]">
                     <table className="w-full text-sm">
                         <thead className="sticky top-0 z-10">
                             <tr className="border-b border-border bg-muted">

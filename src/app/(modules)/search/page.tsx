@@ -22,6 +22,7 @@ import SortPopover from './SortPopover';
 import { useExport } from './useExport';
 import { useBatchEnrich, type EnrichRecordUpdate } from './useBatchEnrich';
 import { emptyFilters, filtersFromQuery, type SearchFilters } from './replayParams';
+import { hasFilterErrors } from './filterValidation';
 import BucketPickerPopover from '../buckets/BucketPickerPopover';
 
 
@@ -259,8 +260,9 @@ export default function SearchPage() {
             <input
               value={draftFilters.searchText}
               onChange={e => setDraftFilters({ ...draftFilters, searchText: e.target.value })}
-              // Enter is the same commit as the sidebar's Apply button.
-              onKeyDown={e => { if (e.key === 'Enter') setAppliedFilters(draftFilters); }}
+              // Enter is the same commit as the sidebar's Apply button — including
+              // its refusal to apply a range the sidebar is flagging as invalid.
+              onKeyDown={e => { if (e.key === 'Enter' && !hasFilterErrors(draftFilters)) setAppliedFilters(draftFilters); }}
               className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-sm outline-none focus:ring-2 focus:ring-ring"
               placeholder="Search company name..."
             />
@@ -282,7 +284,11 @@ export default function SearchPage() {
             setSortOrder={setSortOrder}
           />
 
-          <BucketPickerPopover companyIds={Array.from(selectedIds)} tooltipId="add-to-bucket-tip" />
+          <BucketPickerPopover
+            companyIds={Array.from(selectedIds)}
+            tooltipId="add-to-bucket-tip"
+            onDone={() => setSelectedIds(new Set())}
+          />
           <Tooltip
             id="add-to-bucket-tip"
             place="bottom"
@@ -317,7 +323,7 @@ export default function SearchPage() {
             type="button"
             data-tooltip-id="enrich-tip"
             onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refreshSearch, applyEnrichUpdate)}
-            disabled={selectedIds.size <= 1 || isEnriching}
+            disabled={role === 'FREE' || selectedIds.size <= 1 || isEnriching}
             className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
               'disabled:cursor-not-allowed disabled:opacity-50'
             )}
@@ -329,9 +335,11 @@ export default function SearchPage() {
           <Tooltip
             id="enrich-tip"
             place="bottom"
-            content={selectedIds.size <= 1
-              ? 'Select at least 2 companies for batch enrichment'
-              : 'Enrich selected companies'}
+            content={role === 'FREE'
+              ? 'Please upgrade to enrich companies'
+              : selectedIds.size <= 1
+                ? 'Select at least 2 companies for batch enrichment'
+                : 'Enrich selected companies'}
             className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
           />
 

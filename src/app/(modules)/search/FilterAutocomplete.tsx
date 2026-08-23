@@ -6,6 +6,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils';
 import { FilterField } from '@/types/search';
 import { filterResultsToOptions, getFilterOptionsAction, type FilterOption } from './searchServices';
+import { lettersOnly } from './filterValidation';
 
 const PAGE_SIZE = 20;
 const DEBOUNCE_MS = 500;
@@ -21,6 +22,12 @@ const FIELD_NOUNS: Record<FilterField, string> = {
 
 /** NAICS/SIC values are numeric codes; MSA/certification values are words. */
 const MONO_FIELDS: FilterField[] = ['naics', 'sic'];
+
+/**
+ * Fields whose query is restricted to words. NAICS/SIC are left alone — their
+ * box takes either a code or an industry name, so it needs both.
+ */
+const WORD_FIELDS: FilterField[] = ['msa', 'certification'];
 
 interface FilterAutocompleteProps {
     label: string;
@@ -50,6 +57,7 @@ export const FilterAutocomplete = ({ label, field, value, onChange, placeholder 
 
     const isOpen = query.trim().length > 0 && !dismissed;
     const isMono = MONO_FIELDS.includes(field);
+    const isWordOnly = WORD_FIELDS.includes(field);
     const selectedTitle = picked?.code === value ? picked.title : null;
 
     useEffect(() => () => {
@@ -94,7 +102,8 @@ export const FilterAutocomplete = ({ label, field, value, onChange, placeholder 
         setActiveIndex(-1);
     };
 
-    const handleQueryChange = (next: string) => {
+    const handleQueryChange = (raw: string) => {
+        const next = isWordOnly ? lettersOnly(raw) : raw;
         setQuery(next);
         setDismissed(false);
         setActiveIndex(-1);
