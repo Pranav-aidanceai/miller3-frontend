@@ -111,7 +111,6 @@ export default function RegisterPage() {
         <>
             {onboarding ?
                 <OnboardingPage
-                    selectedTier={formik.values.role}
                     onTierSelect={(role) => formik.setFieldValue('role', role)}
                     onSubmit={formik.handleSubmit}
                     step={step}

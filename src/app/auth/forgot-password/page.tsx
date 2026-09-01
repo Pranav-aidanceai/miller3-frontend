@@ -361,7 +361,10 @@ export default function ForgotPasswordPage() {
       {/* Step 4 — done */}
       {step === 'done' && (
         <div className="mt-8 rounded-xl border border-border bg-card p-6 text-center">
-          <p className="text-sm">Your password has been reset successfully.</p>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success">
+            <Check className="h-7 w-7" />
+          </div>
+          <p className="mt-4 text-sm">Your password has been reset successfully.</p>
           <button
             type="button"
             onClick={() => router.push('/')}
