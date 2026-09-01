@@ -14,7 +14,8 @@
     "lint:fix": "eslint . --fix",
     "test": "jest",
     "test:watch": "jest --watch",
-    "analyze": "cross-env ANALYZE=true next build --webpack"
+    "analyze": "cross-env ANALYZE=true next build --webpack",
+    "prepare": "husky"
   },
   "dependencies": {
     "@highcharts/react": "^5.1.0",
@@ -60,11 +61,18 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "husky": "^9.1.7",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
+    "lint-staged": "^17.4.1",
     "node-mocks-http": "^1.17.2",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ]
   }
 }
