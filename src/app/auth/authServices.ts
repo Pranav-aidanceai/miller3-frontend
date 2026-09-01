@@ -1,134 +1,82 @@
-'use server'
+// Client-side auth "service" functions — thin wrappers over apiClient calls
+// to this app's own /api/auth/** route handlers (the BFF layer), which are
+// what actually talk to the real backend. Mirrors the same convention as
+// src/app/(modules)/search/searchServices.ts: plain functions (not Next.js
+// Server Actions — the `Action` suffix is this codebase's naming
+// convention for this pattern, not a literal `'use server'` marker),
+// normalizing the response into the `{ data, errors }` shape the calling
+// components already expect.
+//
+// The actual backend calls used to live here directly (bypassing this
+// app's own API layer) — moved into src/app/api/auth/**/route.ts so auth
+// follows the same BFF pattern as every other feature.
 
-import AXIOS from '@/lib/api/server';
-import axios from "axios"
-import { cookies } from 'next/headers';
-
-const API_BASE_URL = process.env.API_BASE_URL
+import apiClient from '@/lib/api/client';
+import axios from 'axios';
 
 export async function loginAction(email: string, password: string) {
     try {
-        const response = await AXIOS.post(
-            `/api/v1/auth/login`,
-            { email, password }
-        );
-
-        const { access_token, refresh_token, role, user_details, role_details, credits_left } = response.data?.data
-
-        const cookieStore = await cookies()
-        cookieStore.set('access_token', access_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-        })
-        cookieStore.set('refresh_token', refresh_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: 7 * 24 * 60 * 60 // 7 days
-        })
-
-        return { data: { role, user_details, role_details, credits_left }, error: null }
+        const response = await apiClient.post('/auth/login', { email, password });
+        return { data: response.data?.data, error: null };
     } catch (error) {
         if (axios.isAxiosError(error)) {
             return {
                 data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Login failed' }]
-            }
+                errors: error.response?.data?.errors ?? [{ message: 'Login failed' }],
+            };
         }
-        return { data: null, errors: [{ message: 'Something went wrong' }] }
-    }
-}
-
-// Deliberately kept on a raw, standalone axios call rather than the shared
-// AXIOS instance from src/lib/api/server.ts: this action is invoked *from
-// inside* that instance's own response interceptor to retry a failed
-// request. Routing the refresh call through the same instance would mean
-// the refresh call's own failures re-enter that interceptor, risking a
-// recursive-retry loop if the refresh endpoint itself ever 401s.
-export async function refreshTokenAction() {
-    try {
-        const cookieStore = await cookies()
-        const token = cookieStore.get('refresh_token')?.value;
-        const response = await axios.post(
-            `${API_BASE_URL}/api/v1/auth/token/refresh`,
-            { refresh_token: token },
-            { headers: { "Content-Type": "application/json" } }
-        );
-        const { access_token } = response.data
-        cookieStore.set('access_token', access_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-        })
-
-        return { data: access_token, error: null }
-    } catch (error) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Token generation failed' }]
-            }
-        }
-        return { data: null, errors: [{ message: 'Something went wrong' }] }
+        return { data: null, errors: [{ message: 'Something went wrong' }] };
     }
 }
 
 export async function registerAction(name: string, email: string, password: string, confirmPassword: string, role: string, tou: boolean) {
     try {
-        const response = await AXIOS.post(
-            `/api/v1/auth/register`, {
-            full_name: name,
-            email: email,
-            password: password,
-            confirm_password: confirmPassword,
-            user_tier_requested: role,
-            tou_accepted: tou
-        }
-        );
-        return { data: response.data?.data, error: null }
+        const response = await apiClient.post('/auth/register', {
+            name,
+            email,
+            password,
+            confirmPassword,
+            role,
+            tou,
+        });
+        return { data: response.data?.data, error: null };
     } catch (error) {
         if (axios.isAxiosError(error)) {
             return {
                 data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Login failed' }]
-            }
+                errors: error.response?.data?.errors ?? [{ message: 'Registration failed' }],
+            };
         }
-        return { data: null, errors: [{ message: 'Something went wrong' }] }
+        return { data: null, errors: [{ message: 'Something went wrong' }] };
     }
 }
 
 export async function resetPasswordAction(email: string) {
     try {
-        const response = await AXIOS.post(
-            `/api/v1/auth/reset-password`, { email }
-        );
-        return { data: response.data?.data, error: null }
+        const response = await apiClient.post('/auth/reset-password', { email });
+        return { data: response.data?.data, error: null };
     } catch (error) {
         if (axios.isAxiosError(error)) {
             return {
                 data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Password reset failed' }]
-            }
+                errors: error.response?.data?.errors ?? [{ message: 'Password reset failed' }],
+            };
         }
-        return { data: null, errors: [{ message: 'Something went wrong' }] }
+        return { data: null, errors: [{ message: 'Something went wrong' }] };
     }
 }
 
 export async function onboardingAction() {
     try {
-        const response = await AXIOS.patch(`/api/v1/auth/onboarding/complete`, {});
-        return { data: response.data?.data, error: null }
+        const response = await apiClient.patch('/auth/onboarding', {});
+        return { data: response.data?.data, error: null };
     } catch (error) {
         if (axios.isAxiosError(error)) {
             return {
                 data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'onboarding failed' }]
-            }
+                errors: error.response?.data?.errors ?? [{ message: 'Onboarding failed' }],
+            };
         }
-        return { data: null, errors: [{ message: 'Something went wrong' }] }
+        return { data: null, errors: [{ message: 'Something went wrong' }] };
     }
 }
