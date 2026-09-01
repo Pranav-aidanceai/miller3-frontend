@@ -41,7 +41,7 @@ const REASON_COPY: Record<SessionNoticeReason, CopyEntry> = {
         tone: 'primary',
         title: 'Approval Pending',
         body: "Your account is pending admin approval. You'll be able to sign in once an administrator has reviewed and approved your access.",
-        note: 'Contact your admin for more information.',
+        note: 'Contact the admin for more information.',
     },
 };
 
@@ -118,7 +118,7 @@ export function SessionEndedNotice(props: SessionEndedNoticeProps) {
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{copy.body}</p>
                 {copy.note && <p className="mt-4 text-xs text-muted-foreground">{copy.note}</p>}
 
-                <Button asChild className="mt-6 w-full">
+                <Button asChild className="mt-6 w-full p-6">
                     <a href={`mailto:${adminEmail}`}>Contact Admin</a>
                 </Button>
             </div>

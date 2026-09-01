@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import ForgotPasswordPage from '@/app/auth/forgot-password/page'
 
@@ -34,11 +34,15 @@ const mockApiClientPost = apiClient.post as jest.Mock
 
 const VALID_OTP = '123456'
 
-/** Drives the form from the email step through to a submitted OTP. */
-const getToOtpStep = async (email = 'user@example.com') => {
+/** Drives the form from the email step through to a submitted OTP. `user`
+ * defaults to the plain userEvent import; tests running under fake timers
+ * pass a `userEvent.setup({ delay: null })` instance instead (see the
+ * "Resend Code" describe block) so its internal waits don't depend on
+ * real/fake timers being advanced. */
+const getToOtpStep = async (email = 'user@example.com', user: Pick<typeof userEvent, 'type' | 'click'> = userEvent) => {
   render(<ForgotPasswordPage />)
-  await userEvent.type(screen.getByTestId('email-input'), email)
-  await userEvent.click(screen.getByRole('button', { name: /send reset code/i }))
+  await user.type(screen.getByTestId('email-input'), email)
+  await user.click(screen.getByRole('button', { name: /send reset code/i }))
   await screen.findByText(new RegExp(`enter the code sent to ${email}`, 'i'))
 }
 
@@ -103,7 +107,7 @@ describe('ForgotPasswordPage', () => {
     it('advances to the OTP step on success', async () => {
       mockResetPasswordAction.mockResolvedValue({ data: true, errors: null })
       await getToOtpStep()
-      expect(screen.getByText(/verification code/i)).toBeInTheDocument()
+      expect(screen.getByTestId('otp-box-0')).toBeInTheDocument()
     })
 
     it('shows a server error and stays on this step on failure', async () => {
@@ -180,6 +184,70 @@ describe('ForgotPasswordPage', () => {
       await getToOtpStep()
       await userEvent.click(screen.getByRole('button', { name: /use a different email/i }))
       expect(screen.getByTestId('email-input')).toBeInTheDocument()
+    })
+
+    it('does not render an inline validation message while typing an incomplete code', async () => {
+      await getToOtpStep()
+      await userEvent.type(screen.getByTestId('otp-box-0'), '1')
+      expect(screen.queryByText(/enter the 6-digit code/i)).not.toBeInTheDocument()
+    })
+
+    describe('Resend Code', () => {
+      // `delay: null` makes userEvent resolve its interactions without any
+      // internal real/fake-timer-based waiting, so it doesn't fight with
+      // jest's fake timers below (which are only there to fast-forward the
+      // countdown itself, not to drive userEvent).
+      const user = userEvent.setup({ delay: null })
+
+      beforeEach(() => {
+        jest.useFakeTimers()
+      })
+
+      afterEach(() => {
+        jest.useRealTimers()
+      })
+
+      it('shows a 30s cooldown instead of an active Resend button right after the code is sent', async () => {
+        await getToOtpStep(undefined, user)
+        expect(screen.getByText(/resend in 30s/i)).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /resend code/i })).not.toBeInTheDocument()
+      })
+
+      it('counts the cooldown down and enables Resend Code once it reaches 0', async () => {
+        await getToOtpStep(undefined, user)
+
+        // The countdown re-schedules its own next setTimeout from a
+        // useEffect keyed on the current count, so each second needs its
+        // own render/effect cycle — advance one tick at a time rather than
+        // jumping the fake clock forward in one big step.
+        for (let i = 0; i < 29; i++) {
+          act(() => { jest.advanceTimersByTime(1000) })
+        }
+        expect(screen.getByText(/resend in 1s/i)).toBeInTheDocument()
+
+        act(() => { jest.advanceTimersByTime(1000) })
+        expect(screen.getByRole('button', { name: /resend code/i })).toBeInTheDocument()
+      })
+
+      it('resends the code and restarts the cooldown when clicked', async () => {
+        mockResetPasswordAction.mockResolvedValue({ data: true, errors: null })
+        await getToOtpStep(undefined, user)
+
+        for (let i = 0; i < 30; i++) {
+          act(() => { jest.advanceTimersByTime(1000) })
+        }
+        const resendButton = screen.getByRole('button', { name: /resend code/i })
+
+        await user.click(resendButton)
+
+        // The click handler's own async body (the resetPasswordAction call)
+        // keeps running after userEvent's click promise resolves — wait for
+        // its result to land rather than asserting immediately.
+        await waitFor(() => {
+          expect(screen.getByText(/resend in 30s/i)).toBeInTheDocument()
+        })
+        expect(mockResetPasswordAction).toHaveBeenCalledTimes(2) // initial send + resend
+      })
     })
   })
 

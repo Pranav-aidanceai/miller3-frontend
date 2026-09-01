@@ -1,7 +1,7 @@
 'use client'
 
 import { useFormik } from 'formik';
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ClipboardEvent as ReactClipboardEvent } from 'react';
 import * as yup from 'yup';
 import { resetPasswordAction } from '../authServices';
@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const OTP_LENGTH = 6;
+const RESEND_COOLDOWN_SECONDS = 30;
 
 type Step = 'email' | 'otp' | 'password' | 'done';
 
@@ -105,6 +106,16 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resending, setResending] = useState(false);
+
+  // Counts down once per second while a resend cooldown is active, regardless
+  // of which step is showing (it only ever matters while on the OTP step).
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const emailFormik = useFormik({
     initialValues: { email: '' },
@@ -121,8 +132,23 @@ export default function ForgotPasswordPage() {
         return;
       }
       setStep('otp');
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     }
   });
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0 || resending) return;
+    setResending(true);
+    setError('');
+    const { errors } = await resetPasswordAction(emailFormik.values.email);
+    setResending(false);
+    if (errors) {
+      setError(errors.map((err: ApiError) => err.message).join(' ') || 'Failed to resend code');
+      return;
+    }
+    otpFormik.resetForm();
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+  };
 
   const otpFormik = useFormik({
     initialValues: { otp: '' },
@@ -233,14 +259,27 @@ export default function ForgotPasswordPage() {
       {step === 'otp' && (
         <form onSubmit={otpFormik.handleSubmit} className="mt-8 space-y-6">
           <div>
-            <Label>Verification Code</Label>
             <OtpInput
               value={otpFormik.values.otp}
               onChange={(otp) => { setError(''); otpFormik.setFieldValue('otp', otp); }}
               disabled={loading}
             />
-            {(otpFormik.values.otp.length > 0 && otpFormik.values.otp.length < OTP_LENGTH && otpFormik.errors.otp) && <p className="mt-2 text-sm text-destructive">{otpFormik.errors.otp}</p>}
           </div>
+          <p className="text-center text-sm text-muted-foreground">
+            Didn&apos;t get a code?{' '}
+            {resendCooldown > 0 ? (
+              <span>Resend in {resendCooldown}s</span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={resending}
+                className="cursor-pointer text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {resending ? 'Sending...' : 'Resend Code'}
+              </button>
+            )}
+          </p>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
@@ -252,7 +291,7 @@ export default function ForgotPasswordPage() {
           <button
             type="button"
             className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={() => { setError(''); otpFormik.resetForm(); setStep('email'); }}
+            onClick={() => { setError(''); otpFormik.resetForm(); setResendCooldown(0); setStep('email'); }}
             disabled={loading}
           >
             Use a different email
