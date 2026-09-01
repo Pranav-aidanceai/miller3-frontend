@@ -2,6 +2,7 @@
 
 import { useFormik } from 'formik';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import * as Yup from 'yup';
 import OnboardingPage from './Onboarding';
@@ -9,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Eye, EyeOff, Check } from 'lucide-react';
 import { registerAction } from '../authServices';
 import { ApiError } from '@/types/common';
+import { tiers } from '@/lib/constants';
 import TermsModal from './TermsOfUse';
 import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
 import { Button } from '@/components/ui/button';
@@ -19,11 +21,12 @@ type RegisterStep = 0 | 1;
 
 export default function RegisterPage() {
 
+    const router = useRouter();
     const [error, setError] = useState('');
     const [showPw, setShowPw] = useState(false);
     const [onboarding, setOnboarding] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [step, setStep] = useState(0);
+    const [successPlanLabel, setSuccessPlanLabel] = useState<string | null>(null);
     const [registerStep, setRegisterStep] = useState<RegisterStep>(0);
     const [showTerms, setShowTerms] = useState(false)
     const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
@@ -83,11 +86,7 @@ export default function RegisterPage() {
                     });
                     return;
                 }
-                if (data.status === "APPROVAL_PENDING") {
-                    setStep(2);
-                } else {
-                    setStep(3);
-                }
+                setSuccessPlanLabel(tiers.find(t => t.role === values.role)?.label ?? `${values.role} Plan`);
             } catch (error: unknown) {
                 setError(error instanceof Error ? error.message : 'An unexpected error occurred');
             }
@@ -113,9 +112,12 @@ export default function RegisterPage() {
                 <OnboardingPage
                     onTierSelect={(role) => formik.setFieldValue('role', role)}
                     onSubmit={formik.handleSubmit}
-                    step={step}
-                    setStep={setStep}
                     loading={loading}
+                    successPlanLabel={successPlanLabel}
+                    onClosePaymentPopup={() => {
+                        setSuccessPlanLabel(null);
+                        router.push('/');
+                    }}
                 /> :
                 <AuthSplitLayout heroSrc="/auth/hero.png" heroAlt="A tradesperson at work in their workshop">
                     <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground">Sign Up</h1>

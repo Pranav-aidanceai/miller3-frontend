@@ -1,14 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import OnboardingPage from '@/app/auth/register/Onboarding' // ← adjust path to your file
+import OnboardingPage from '@/app/auth/register/Onboarding'
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
-
-const mockPush = jest.fn()
-
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
-}))
 
 jest.mock('@/lib/utils', () => ({
   cn: (...args: string[]) => args.filter(Boolean).join(' '),
@@ -40,13 +34,15 @@ jest.mock('@/lib/constants', () => ({
 }))
 
 // ── Default Props ─────────────────────────────────────────────────────────────
+// OnboardingPage is now just the "Choose Your Plan" screen (welcome/approval/
+// ready steps were removed) plus the Plan Payment popup shown on success.
 
 const defaultProps = {
   onTierSelect: jest.fn(),
   onSubmit: jest.fn(),
-  step: 0,
-  setStep: jest.fn(),
   loading: false,
+  successPlanLabel: null as string | null,
+  onClosePaymentPopup: jest.fn(),
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -57,44 +53,18 @@ describe('OnboardingPage', () => {
     jest.clearAllMocks()
   })
 
-  // 1. Step 0 - Welcome
-  describe('Step 0 - Welcome', () => {
-    it('renders welcome heading', () => {
-      render(<OnboardingPage {...defaultProps} step={0} />)
-      expect(screen.getByText(/welcome to/i)).toBeInTheDocument()
-      expect(screen.getByText(/vendorlens/i)).toBeInTheDocument()
-    })
-
-    it('renders get started button', () => {
-      render(<OnboardingPage {...defaultProps} step={0} />)
-      expect(screen.getByRole('button', { name: /get started/i })).toBeInTheDocument()
-    })
-
-    it('calls setStep(1) when Get Started is clicked', async () => {
-      const setStep = jest.fn()
-      render(<OnboardingPage {...defaultProps} step={0} setStep={setStep} />)
-      await userEvent.click(screen.getByRole('button', { name: /get started/i }))
-      expect(setStep).toHaveBeenCalledWith(1)
-    })
-
-    it('does not render plan selection in step 0', () => {
-      render(<OnboardingPage {...defaultProps} step={0} />)
-      expect(screen.queryByText(/choose your plan/i)).not.toBeInTheDocument()
-    })
-  })
-
-  // 2. Step 1 - Choose Plan
+  // 1. Choose Your Plan
   // Each plan card owns its own "Start X Plan" button — clicking it selects
   // that tier AND submits in one action (no separate shared Continue
   // button), per the Figma "Select Plan" reference.
-  describe('Step 1 - Choose Plan', () => {
-    it('renders Choose Your Plan heading', () => {
-      render(<OnboardingPage {...defaultProps} step={1} />)
+  describe('Choose Your Plan', () => {
+    it('renders the Choose Your Plan heading', () => {
+      render(<OnboardingPage {...defaultProps} />)
       expect(screen.getByText(/choose your plan/i)).toBeInTheDocument()
     })
 
     it('renders all tier plans from constants', () => {
-      render(<OnboardingPage {...defaultProps} step={1} />)
+      render(<OnboardingPage {...defaultProps} />)
       expect(screen.getByText('Free Plan')).toBeInTheDocument()
       expect(screen.getByText('Pro Plan')).toBeInTheDocument()
       expect(screen.getByText('$0/month')).toBeInTheDocument()
@@ -102,13 +72,13 @@ describe('OnboardingPage', () => {
     })
 
     it('renders tier descriptions', () => {
-      render(<OnboardingPage {...defaultProps} step={1} />)
+      render(<OnboardingPage {...defaultProps} />)
       expect(screen.getByText('Feature one')).toBeInTheDocument()
       expect(screen.getByText('Pro feature one')).toBeInTheDocument()
     })
 
     it('renders a Start-plan button per tier', () => {
-      render(<OnboardingPage {...defaultProps} step={1} />)
+      render(<OnboardingPage {...defaultProps} />)
       expect(screen.getByRole('button', { name: /start free plan/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /start pro plan/i })).toBeInTheDocument()
     })
@@ -116,7 +86,7 @@ describe('OnboardingPage', () => {
     it('selects and submits a plan when its Start button is clicked', async () => {
       const onTierSelect = jest.fn()
       const onSubmit = jest.fn()
-      render(<OnboardingPage {...defaultProps} step={1} onTierSelect={onTierSelect} onSubmit={onSubmit} />)
+      render(<OnboardingPage {...defaultProps} onTierSelect={onTierSelect} onSubmit={onSubmit} />)
       await userEvent.click(screen.getByRole('button', { name: /start pro plan/i }))
       expect(onTierSelect).toHaveBeenCalledWith('Pro')
       expect(onSubmit).toHaveBeenCalledTimes(1)
@@ -126,13 +96,13 @@ describe('OnboardingPage', () => {
       const order: string[] = []
       const onTierSelect = jest.fn(async () => { order.push('select'); await Promise.resolve() })
       const onSubmit = jest.fn(() => order.push('submit'))
-      render(<OnboardingPage {...defaultProps} step={1} onTierSelect={onTierSelect} onSubmit={onSubmit} />)
+      render(<OnboardingPage {...defaultProps} onTierSelect={onTierSelect} onSubmit={onSubmit} />)
       await userEvent.click(screen.getByRole('button', { name: /start free plan/i }))
       expect(order).toEqual(['select', 'submit'])
     })
 
     it('disables every plan button while loading, with no spinner if nothing was clicked yet', () => {
-      render(<OnboardingPage {...defaultProps} step={1} loading={true} />)
+      render(<OnboardingPage {...defaultProps} loading={true} />)
       expect(screen.getByRole('button', { name: /start free plan/i })).toBeDisabled()
       expect(screen.getByRole('button', { name: /start pro plan/i })).toBeDisabled()
       expect(document.querySelector('.animate-spin')).not.toBeInTheDocument()
@@ -142,10 +112,10 @@ describe('OnboardingPage', () => {
       const onTierSelect = jest.fn()
       const onSubmit = jest.fn()
       const { rerender } = render(
-        <OnboardingPage {...defaultProps} step={1} onTierSelect={onTierSelect} onSubmit={onSubmit} loading={false} />
+        <OnboardingPage {...defaultProps} onTierSelect={onTierSelect} onSubmit={onSubmit} loading={false} />
       )
       await userEvent.click(screen.getByRole('button', { name: /start pro plan/i }))
-      rerender(<OnboardingPage {...defaultProps} step={1} onTierSelect={onTierSelect} onSubmit={onSubmit} loading={true} />)
+      rerender(<OnboardingPage {...defaultProps} onTierSelect={onTierSelect} onSubmit={onSubmit} loading={true} />)
 
       // The clicked (Pro) button now shows only a spinner, no text.
       const freeButton = screen.getByRole('button', { name: /start free plan/i })
@@ -157,60 +127,29 @@ describe('OnboardingPage', () => {
     })
   })
 
-  // 3. Step 2 - Approval Pending
-  // (Shown when the backend returns APPROVAL_PENDING for the chosen tier —
-  // see registerAction's status check in src/app/auth/register/page.tsx —
-  // rather than every registration reaching "ready" directly.)
-  describe('Step 2 - Approval Pending', () => {
-    it('renders approval pending heading', () => {
-      render(<OnboardingPage {...defaultProps} step={2} />)
-      expect(screen.getByText(/approval pending/i)).toBeInTheDocument()
+  // 2. Plan Payment popup
+  describe('Plan Payment popup', () => {
+    it('is not shown when successPlanLabel is null', () => {
+      render(<OnboardingPage {...defaultProps} successPlanLabel={null} />)
+      expect(screen.queryByText(/plan payment/i)).not.toBeInTheDocument()
     })
 
-    it('renders Back to Login button', () => {
-      render(<OnboardingPage {...defaultProps} step={2} />)
-      expect(screen.getByRole('button', { name: /back to login/i })).toBeInTheDocument()
+    it('shows the plan name once successPlanLabel is set', () => {
+      render(<OnboardingPage {...defaultProps} successPlanLabel="Premium Plan" />)
+      expect(screen.getByText(/plan payment/i)).toBeInTheDocument()
+      expect(screen.getByText(/premium plan/i)).toBeInTheDocument()
+      expect(screen.getByText(/payment link/i)).toBeInTheDocument()
     })
 
-    it('redirects to / when Back to Login is clicked', async () => {
-      render(<OnboardingPage {...defaultProps} step={2} />)
-      await userEvent.click(screen.getByRole('button', { name: /back to login/i }))
-      expect(mockPush).toHaveBeenCalledWith('/')
-    })
-  })
-
-  // 4. Step 3 - Ready
-  describe('Step 3 - Ready', () => {
-    it('renders ready heading', () => {
-      render(<OnboardingPage {...defaultProps} step={3} />)
-      expect(screen.getByText(/you're ready/i)).toBeInTheDocument()
-    })
-
-    it('renders start searching message', () => {
-      render(<OnboardingPage {...defaultProps} step={3} />)
-      expect(screen.getByText(/start searching for vendors/i)).toBeInTheDocument()
-    })
-
-    it('renders Login to Start Searching button', () => {
-      render(<OnboardingPage {...defaultProps} step={3} />)
-      expect(screen.getByRole('button', { name: /login to start searching/i })).toBeInTheDocument()
-    })
-
-    it('redirects to / when Login to Start Searching is clicked', async () => {
-      render(<OnboardingPage {...defaultProps} step={3} />)
-      await userEvent.click(screen.getByRole('button', { name: /login to start searching/i }))
-      expect(mockPush).toHaveBeenCalledWith('/')
+    it('calls onClosePaymentPopup when the footer Close button is clicked', async () => {
+      const onClosePaymentPopup = jest.fn()
+      render(<OnboardingPage {...defaultProps} successPlanLabel="Premium Plan" onClosePaymentPopup={onClosePaymentPopup} />)
+      // Both the dialog's built-in header "X" and the footer button render
+      // with the accessible name "Close" (the X's label is screen-reader-only
+      // text) — the footer one is the last in DOM order.
+      const closeButtons = screen.getAllByRole('button', { name: /close/i })
+      await userEvent.click(closeButtons[closeButtons.length - 1])
+      expect(onClosePaymentPopup).toHaveBeenCalledTimes(1)
     })
   })
-
-  // 5. Progress dots
-  describe('Progress dots', () => {
-    it('renders one dot per step (welcome, plan, approval, ready)', () => {
-      render(<OnboardingPage {...defaultProps} step={0} />)
-      const dots = document.querySelectorAll('.rounded-full')
-      // 4 progress dots (steps 0-3) + 1 welcome icon circle
-      expect(dots.length).toBeGreaterThanOrEqual(4)
-    })
-  })
-
 })
