@@ -52,7 +52,7 @@ export default function LoginForm() {
       if (errors || !data) {
         const fieldErrors: Record<string, string> = {};
         errors?.forEach((err: ApiError) => {
-          if (err?.code === "YOUR_ACCOUNT_IS_PENDING_ADMIN_APPROVAL.") {
+          if (err?.code === "ACCOUNT_PENDING") {
             setShowApproval(true);
             return;
           }
@@ -99,10 +99,10 @@ export default function LoginForm() {
   return (
     <>
       <AuthSplitLayout heroSrc="/auth/hero.png" heroAlt="A tradesperson at work in their workshop">
-        <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground">Log In</h1>
+        <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground">Sign In</h1>
         <p className="mt-2 text-sm text-muted-foreground">Find any vendor. Enrich any record.</p>
 
-        <form onSubmit={formik.handleSubmit} className="mt-8 space-y-6">
+        <form onSubmit={formik.handleSubmit} className="mt-8 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -139,7 +139,7 @@ export default function LoginForm() {
               <button
                 type="button"
                 onClick={() => setShowPw(!showPw)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
                 aria-label={showPw ? 'Hide password' : 'Show password'}
               >
                 {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -157,7 +157,7 @@ export default function LoginForm() {
             className="h-12 w-full rounded-xl text-base"
             disabled={!(formik.isValid && formik.dirty) || loading}
           >
-            {loading ? 'Logging In...' : 'Log In'}
+            {loading ? 'Signing In...' : 'Sign In'}
           </Button>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </form>

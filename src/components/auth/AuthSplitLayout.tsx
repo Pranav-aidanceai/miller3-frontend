@@ -36,7 +36,7 @@ export function AuthSplitLayout({ children, heroSrc, heroAlt }: AuthSplitLayoutP
                 <span className="text-xl font-heading font-semibold text-foreground">VendorLens</span>
             </Link>
 
-            <div className="relative z-10 flex w-full flex-1 items-center justify-center px-6 py-24 lg:w-1/2 lg:flex-none lg:px-16">
+            <div className="relative z-10 flex w-full flex-1 items-center justify-center overflow-y-auto px-6 py-12 lg:w-1/2 lg:flex-none lg:px-16">
                 <div className="w-full max-w-md">{children}</div>
             </div>
 

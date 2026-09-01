@@ -49,9 +49,9 @@ describe('LoginForm', () => {
         expect(screen.getByLabelText('Password')).toBeInTheDocument()
     })
 
-    it('renders the Log In button', () => {
+    it('renders the Sign In button', () => {
         render(<LoginForm />)
-        expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
     })
 
     it('renders forgot password link', () => {
@@ -105,7 +105,7 @@ describe('LoginForm', () => {
         render(<LoginForm />)
         await userEvent.type(screen.getByLabelText(/email/i), 'user@example.com')
         await userEvent.type(screen.getByLabelText('Password'), 'password123')
-        fireEvent.click(screen.getByRole('button', { name: /log in/i }))
+        fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
         await waitFor(() => {
             expect(mockPush).toHaveBeenCalledWith('/search')
@@ -122,24 +122,41 @@ describe('LoginForm', () => {
         render(<LoginForm />)
         await userEvent.type(screen.getByLabelText(/email/i), 'user@example.com')
         await userEvent.type(screen.getByLabelText('Password'), 'wrongpassword')
-        fireEvent.click(screen.getByRole('button', { name: /log in/i }))
+        fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
         await waitFor(() => {
             expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument()
         })
     })
 
-    // 6. Loading state
-    it('shows Logging In... while loading', async () => {
+    // 6. Account-state errors
+    it('shows the Approval Pending screen for an ACCOUNT_PENDING error', async () => {
+        mockLoginAction.mockResolvedValue({
+            data: null,
+            errors: [{ code: 'ACCOUNT_PENDING', message: 'Your account is pending admin approval.', field: 'email' }],
+        })
+
+        render(<LoginForm />)
+        await userEvent.type(screen.getByLabelText(/email/i), 'user@example.com')
+        await userEvent.type(screen.getByLabelText('Password'), 'password123')
+        fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+
+        await waitFor(() => {
+            expect(screen.getByText(/approval pending/i)).toBeInTheDocument()
+        })
+    })
+
+    // 7. Loading state
+    it('shows Signing In... while loading', async () => {
         mockLoginAction.mockImplementation(() => new Promise(() => { })) // never resolves
 
         render(<LoginForm />)
         await userEvent.type(screen.getByLabelText(/email/i), 'user@example.com')
         await userEvent.type(screen.getByLabelText('Password'), 'password123')
-        fireEvent.click(screen.getByRole('button', { name: /log in/i }))
+        fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
         await waitFor(() => {
-            expect(screen.getByText(/logging in/i)).toBeInTheDocument()
+            expect(screen.getByText(/signing in/i)).toBeInTheDocument()
         })
     })
 })
