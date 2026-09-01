@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { ListFilter, Check, Search, RefreshCw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -85,7 +85,7 @@ export default function AdminUsersPage() {
             if (roleFilter) params.role = roleFilter;
             if (statusFilter) params.status = statusFilter;
             if (debouncedSearch) params.username = debouncedSearch;
-            const res = await axios.get('/api/admin/users', { params });
+            const res = await apiClient.get('/admin/users', { params });
             const payload: UsersResponse = res.data.data;
             setUsers(payload.users ?? []);
             setTotal(payload.total ?? 0);
@@ -104,7 +104,7 @@ export default function AdminUsersPage() {
                 if (roleFilter) params.role = roleFilter;
                 if (statusFilter) params.status = statusFilter;
                 if (debouncedSearch) params.username = debouncedSearch;
-                const res = await axios.get('/api/admin/users', { params });
+                const res = await apiClient.get('/admin/users', { params });
                 if (!active) return;
                 const payload: UsersResponse = res.data.data;
                 setUsers(payload.users ?? []);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
 import { Check, Loader2, Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -79,7 +79,7 @@ export default function ReviewRequestModal({
 
         setSubmitting(true);
         try {
-            await axios.post('/api/admin/company-request', payload);
+            await apiClient.post('/admin/company-request', payload);
             toast.success(
                 rejectedCount === 0 ? 'Request approved'
                     : approvedCount === 0 ? 'Request rejected'

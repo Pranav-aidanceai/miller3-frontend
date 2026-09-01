@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { X, Save, Loader2, Shield, Gauge, UserCheck, UserX, Ban, RotateCcw, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -139,7 +139,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.get('/api/admin/get-user', { params: { user_id: userId } });
+            const res = await apiClient.get('/admin/get-user', { params: { user_id: userId } });
             const data: GetUserResponse = res.data.data;
             setUser(data);
             setRole(data.role);
@@ -160,7 +160,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
         let active = true;
         (async () => {
             try {
-                const res = await axios.get('/api/admin/get-user', { params: { user_id: userId } });
+                const res = await apiClient.get('/admin/get-user', { params: { user_id: userId } });
                 if (!active) return;
                 const data: GetUserResponse = res.data.data;
                 setUser(data);
@@ -185,7 +185,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
         if (!user || role === user.role) return;
         setSavingRole(true);
         try {
-            await axios.patch('/api/admin/update-role', null, { params: { user_id: user.id, role } });
+            await apiClient.patch('/admin/update-role', null, { params: { user_id: user.id, role } });
             setUser(prev => (prev ? { ...prev, role } : prev));
             toast.success(`Role updated to ${role}`);
             fetchUser();
@@ -206,7 +206,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
         setReasonError(false);
         setSavingQuotas(true);
         try {
-            await axios.patch('/api/admin/update-credits', {
+            await apiClient.patch('/admin/update-credits', {
                 user_id: user.id,
                 enabled: overrideEnabled,
                 unified_quota_monthly: overrideValues.unified_quota_monthly ? Number(overrideValues.unified_quota_monthly) : null,
@@ -231,7 +231,7 @@ export default function UserDetailModal({ userId, status, onClose, onUpdated }: 
         }
         setActionLoading(action.key);
         try {
-            await axios.patch('/api/admin/user-status',
+            await apiClient.patch('/admin/user-status',
                 { action: action.key, reason: action.requiresReason ? reason : undefined },
                 { params: { user_id: user.id } });
             toast.success(action.success);

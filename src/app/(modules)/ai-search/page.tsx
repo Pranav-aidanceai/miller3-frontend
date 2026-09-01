@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
 import {
   ChevronDown,
@@ -384,8 +385,8 @@ export default function AISearchPage() {
 
     setIsExporting(true);
     try {
-      const response = await axios.post(
-        '/api/ai-export',
+      const response = await apiClient.post(
+        '/ai-export',
         { company_ids: Array.from(selectedIds), format: exportFormat },
         { responseType: 'blob' },
       );

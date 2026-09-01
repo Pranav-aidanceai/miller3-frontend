@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import BatchEnrichToast, { type EnrichRecordUpdate } from './BatchEnrichToast';
 import { parseApiError, isCreditError, showCreditLimitToast } from './apiError';
 import { isSessionExpiring } from '@/lib/session';
@@ -34,7 +35,7 @@ export function useBatchEnrich() {
 
         setIsEnriching(true);
         try {
-            const response = await axios.post('/api/batch-enrichment', { records });
+            const response = await apiClient.post('/batch-enrichment', { records });
 
             const data: BatchEnrichResult | undefined = response.data?.data;
             if (!data?.ws_url) {

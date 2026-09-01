@@ -4,7 +4,7 @@ import { Activity, TrendingUp, Database, Phone, Mail, Globe, RefreshCw } from 'l
 import { getErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 
 interface FieldCompleteness {
     count: number;
@@ -32,7 +32,7 @@ export default function AdminDataHealthPage() {
         setLoading(true);
         setError(null);
         try {
-            const res = await axios.get('/api/admin/data-health');
+            const res = await apiClient.get('/admin/data-health');
             setData(res.data.data);
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Failed to load data health metrics'));
@@ -45,7 +45,7 @@ export default function AdminDataHealthPage() {
         let active = true;
         (async () => {
             try {
-                const res = await axios.get('/api/admin/data-health');
+                const res = await apiClient.get('/admin/data-health');
                 if (active) setData(res.data.data);
             } catch (err: unknown) {
                 if (!active) return;

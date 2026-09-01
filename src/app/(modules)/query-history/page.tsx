@@ -1,6 +1,6 @@
 'use client';
 
-import axios from "axios";
+import apiClient from '@/lib/api/client';
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
@@ -51,7 +51,7 @@ export default function QueryHistoryPage() {
       setLoading(true);
       setError(null);
       try {
-        const response = await axios.get('/api/query-history', {
+        const response = await apiClient.get('/query-history', {
           params: { page, limit: perPage },
         });
         if (!active) return;

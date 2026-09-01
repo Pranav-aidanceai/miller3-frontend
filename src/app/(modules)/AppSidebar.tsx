@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { logout } from '@/store/slices/authSlice';
@@ -61,7 +62,7 @@ export function AppSidebar() {
     const handleLogout = async () => {
         setIsLoggingOut(true);
         try {
-            await axios.post('/api/auth/logout');
+            await apiClient.post('/auth/logout');
             clearSearchState();
             dispatch(logout());
             window.location.replace('/');

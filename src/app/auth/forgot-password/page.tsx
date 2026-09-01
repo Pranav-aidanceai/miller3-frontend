@@ -7,7 +7,7 @@ import * as yup from 'yup';
 import { resetPasswordAction } from '../authServices';
 import { ApiError } from '@/types/common';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/apiError';
 import { Eye, EyeOff, Check } from 'lucide-react';
 
@@ -132,7 +132,7 @@ export default function ForgotPasswordPage() {
       setError('');
       setLoading(true);
       try {
-        await axios.post('/api/auth/verify-otp', {
+        await apiClient.post('/auth/verify-otp', {
           email: emailFormik.values.email,
           otp: values.otp.trim(),
         });
@@ -160,7 +160,7 @@ export default function ForgotPasswordPage() {
       setError('');
       setLoading(true);
       try {
-        await axios.post('/api/auth/confirm-password', {
+        await apiClient.post('/auth/confirm-password', {
           email: emailFormik.values.email,
           new_password: values.password,
         });

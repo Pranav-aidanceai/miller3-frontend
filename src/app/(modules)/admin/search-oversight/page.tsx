@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { ListFilter, ChevronDown, Check, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -65,7 +65,7 @@ export default function SearchOversightPage() {
                 if (typeFilter) params.type = typeFilter;
                 if (from) params.from = new Date(from).toISOString();
                 if (to) params.to = new Date(to).toISOString();
-                const res = await axios.get('/api/admin/search-oversight', { params });
+                const res = await apiClient.get('/admin/search-oversight', { params });
                 if (!active) return;
                 const data: OversightResponse = res.data.data;
                 setSearches(data.searches ?? []);

@@ -1,6 +1,6 @@
 'use client';
 
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { useState } from 'react';
 import { Check, Folder, FolderMinus, FolderPlus, Loader2, RotateCcw, Star } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -72,7 +72,7 @@ export default function BucketPickerPopover({
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.get('/api/bucket');
+            const response = await apiClient.get('/bucket');
             const items = sortBuckets(response.data?.items ?? []);
             // In remove mode only the buckets holding the company are offered.
             setBuckets(removing ? items.filter(b => bucketNames?.includes(b.name)) : items);
@@ -98,8 +98,8 @@ export default function BucketPickerPopover({
         setSaving(true);
         try {
             const payload = { bucket_id: bucket.id, company_ids: companyIds };
-            if (removing) await axios.delete('/api/bucket/company', { data: payload });
-            else await axios.post('/api/bucket/company', payload);
+            if (removing) await apiClient.delete('/bucket/company', { data: payload });
+            else await apiClient.post('/bucket/company', payload);
             setOpen(false);
             toast.success(
                 removing

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -75,7 +75,7 @@ export default function LocationMap({ companyId, lat, lng, companyName, address,
         let active = true;
         (async () => {
             try {
-                const res = await axios.get('/api/similar-map', { params: { companyId, limit: 5 } });
+                const res = await apiClient.get('/similar-map', { params: { companyId, limit: 5 } });
                 if (active) setPoints(res.data.data ?? []);
             } catch {
                 if (active) setPoints([]);

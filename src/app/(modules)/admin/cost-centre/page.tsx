@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import { DollarSign, Zap, Cpu, Database, ShieldAlert, Pencil, Check, X, Loader2, RefreshCw } from 'lucide-react';
 import { getErrorMessage } from '@/lib/apiError';
@@ -41,7 +41,7 @@ export default function AdminCostsPage() {
 
     const fetchCost = useCallback(async () => {
         try {
-            const res = await axios.get('/api/admin/cost');
+            const res = await apiClient.get('/admin/cost');
             setData(res.data.data);
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Failed to load cost data'));
@@ -60,7 +60,7 @@ export default function AdminCostsPage() {
         let active = true;
         (async () => {
             try {
-                const res = await axios.get('/api/admin/cost');
+                const res = await apiClient.get('/admin/cost');
                 if (active) setData(res.data.data);
             } catch (err: unknown) {
                 if (!active) return;
@@ -87,7 +87,7 @@ export default function AdminCostsPage() {
         if (!thresholdInput || Number.isNaN(value) || value < 0) return;
         setSaving(true);
         try {
-            await axios.patch('/api/admin/cost', null, { params: { threshold: value } });
+            await apiClient.patch('/admin/cost', null, { params: { threshold: value } });
             setData(prev => (prev ? { ...prev, hard_stop_threshold: value } : prev));
             setEditing(false);
         } catch (err: unknown) {

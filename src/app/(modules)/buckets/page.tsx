@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
 import { Download, FolderMinus, Grid3X3, List, Loader2, RefreshCw, Search, Star, X, Zap } from 'lucide-react';
 import { Tooltip } from 'react-tooltip';
@@ -125,7 +125,7 @@ export default function BucketsPage() {
     const fetchCompanies = useCallback(async (bucketId: string, cursor: string | null = null) => {
         setIsLoading(true);
         try {
-            const response = await axios.get('/api/bucket/company', {
+            const response = await apiClient.get('/bucket/company', {
                 params: {
                     bucket_id: bucketId,
                     limit: perPage,
@@ -257,7 +257,7 @@ export default function BucketsPage() {
         const count = selectedIds.size;
         setIsRemoving(true);
         try {
-            await axios.delete('/api/bucket/company', {
+            await apiClient.delete('/bucket/company', {
                 data: { bucket_id: bucket.id, company_ids: Array.from(selectedIds) },
             });
             toast.success(

@@ -225,7 +225,7 @@ export default function AnalyticsSection() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <AnalyticsChart
-          endpoint="/api/admin/search-analytics/overview"
+          endpoint="/admin/search-analytics/overview"
           icon={BarChart3}
           iconColor="text-blue-500"
           iconBg="bg-blue-500/10"
@@ -234,7 +234,7 @@ export default function AnalyticsSection() {
         />
 
         <AnalyticsChart
-          endpoint="/api/admin/search-analytics/trends"
+          endpoint="/admin/search-analytics/trends"
           filters={TRENDS_FILTERS}
           icon={LineChart}
           iconColor="text-violet-500"
@@ -244,7 +244,7 @@ export default function AnalyticsSection() {
         />
 
         <AnalyticsChart
-          endpoint="/api/admin/search-analytics/user-distribution"
+          endpoint="/admin/search-analytics/user-distribution"
           filters={USER_DISTRIBUTION_FILTERS}
           select={(raw) => (raw as UserDistributionResponse).highcharts.by_role}
           icon={PieChart}
@@ -255,7 +255,7 @@ export default function AnalyticsSection() {
         />
 
         <AnalyticsChart
-          endpoint="/api/admin/search-analytics/user-distribution"
+          endpoint="/admin/search-analytics/user-distribution"
           filters={USER_DISTRIBUTION_FILTERS}
           select={(raw) => (raw as UserDistributionResponse).highcharts.by_status}
           icon={Users}
@@ -266,7 +266,7 @@ export default function AnalyticsSection() {
         />
 
         <AnalyticsChart
-          endpoint="/api/admin/analytics/credit-burn-rate"
+          endpoint="/admin/analytics/credit-burn-rate"
           filters={CREDIT_BURN_FILTERS}
           select={(raw) => (raw as { highcharts: ChartApiResponse }).highcharts}
           wide
@@ -278,7 +278,7 @@ export default function AnalyticsSection() {
         />
 
         <AnalyticsTable<TopQueryRow>
-          endpoint="/api/admin/search-analytics/top-queries"
+          endpoint="/admin/search-analytics/top-queries"
           filters={TOP_QUERIES_FILTERS}
           icon={ListOrdered}
           iconColor="text-cyan-500"
@@ -290,7 +290,7 @@ export default function AnalyticsSection() {
         />
 
         <AnalyticsTable<FailedQueryRow>
-          endpoint="/api/admin/search-analytics/failed-queries"
+          endpoint="/admin/search-analytics/failed-queries"
           filters={FAILED_QUERIES_FILTERS}
           paginated
           icon={AlertTriangle}

@@ -1,6 +1,6 @@
 'use client';
 
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Check,
@@ -83,7 +83,7 @@ export default function BucketList({ selectedId, onSelect, onSelectedDeleted, re
         if (!silent) setLoading(true);
         setError(null);
         try {
-            const response = await axios.get('/api/bucket');
+            const response = await apiClient.get('/bucket');
             const items = sortBuckets(response.data?.items ?? []);
             setBuckets(items);
             setLimits(response.data?.limits ?? null);
@@ -113,7 +113,7 @@ export default function BucketList({ selectedId, onSelect, onSelectedDeleted, re
         if (!name || creating) return;
         setCreating(true);
         try {
-            const response = await axios.post('/api/bucket', { name });
+            const response = await apiClient.post('/bucket', { name });
             const bucket: Bucket = response.data;
             setBuckets(prev => sortBuckets([...prev, bucket]));
             setLimits(prev =>
@@ -141,7 +141,7 @@ export default function BucketList({ selectedId, onSelect, onSelectedDeleted, re
         }
         setBusyId(bucket.id);
         try {
-            const response = await axios.patch('/api/bucket', { bucket_id: bucket.id, name });
+            const response = await apiClient.patch('/bucket', { bucket_id: bucket.id, name });
             const updated: Bucket = response.data;
             setBuckets(prev => sortBuckets(prev.map(b => (b.id === bucket.id ? updated : b))));
             if (selectedId === bucket.id) onSelect(updated);
@@ -158,7 +158,7 @@ export default function BucketList({ selectedId, onSelect, onSelectedDeleted, re
         if (busyId) return;
         setBusyId(bucket.id);
         try {
-            await axios.delete('/api/bucket', { data: { bucket_id: bucket.id } });
+            await apiClient.delete('/bucket', { data: { bucket_id: bucket.id } });
             const rest = buckets.filter(b => b.id !== bucket.id);
             setBuckets(rest);
             setLimits(prev =>

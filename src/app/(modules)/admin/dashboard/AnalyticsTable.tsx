@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw, type LucideIcon } from 'lucide-react';
 import { getErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
@@ -85,7 +85,7 @@ export default function AnalyticsTable<T>({
     let ignore = false;
     (async () => {
       try {
-        const res = await axios.get(endpoint, { params: requestParams });
+        const res = await apiClient.get(endpoint, { params: requestParams });
         if (ignore) return;
         setData(select(res.data.data));
         setError(null);

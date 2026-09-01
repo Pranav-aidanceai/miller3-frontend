@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { Loader2, RefreshCw, type LucideIcon } from 'lucide-react';
 import { getErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
@@ -236,7 +236,7 @@ export default function AnalyticsChart({
     let ignore = false;
     (async () => {
       try {
-        const res = await axios.get(endpoint, { params: requestParams });
+        const res = await apiClient.get(endpoint, { params: requestParams });
         if (ignore) return;
         const raw = res.data.data;
         setOptions(buildOptions(select ? select(raw) : (raw as ChartApiResponse)));

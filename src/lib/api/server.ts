@@ -2,6 +2,12 @@ import { refreshTokenAction } from "@/app/auth/authServices";
 import { cookies } from "next/headers";
 import axios from "axios";
 
+// Server-only axios instance — used inside Next.js Route Handlers (the BFF
+// layer) and server actions to call the real backend. Never import this
+// from a client component; it reads cookies via next/headers, which only
+// exists on the server. For browser-side calls (hitting this app's own
+// /api/** routes) use src/lib/api/client.ts instead.
+
 const API_URL = process.env.API_BASE_URL;
 
 const AXIOS = axios.create({
@@ -29,7 +35,8 @@ AXIOS.interceptors.response.use(
     // A role change invalidates the token's claims, not the session's lifetime:
     // refreshing would either fail or hand back a token whose tier no longer
     // matches the role cached on the client. Skip the retry and let the 401 +
-    // ROLE_CHANGED body reach the browser, where SessionGuard forces a re-login.
+    // ROLE_CHANGED body reach the browser, where the client interceptor
+    // (src/lib/api/client.ts) forces a re-login.
     const errorCode = (error.response?.data as { error_code?: string } | undefined)?.error_code;
     if (error.response?.status === 401 && errorCode === "ROLE_CHANGED") {
       throw error;

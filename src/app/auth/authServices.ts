@@ -1,6 +1,6 @@
 'use server'
 
-import AXIOS from "@/lib/axios";
+import AXIOS from '@/lib/api/server';
 import axios from "axios"
 import { cookies } from 'next/headers';
 
@@ -8,10 +8,9 @@ const API_BASE_URL = process.env.API_BASE_URL
 
 export async function loginAction(email: string, password: string) {
     try {
-        const response = await axios.post(
-            `${API_BASE_URL}/api/v1/auth/login`,
-            { email, password },
-            { headers: { "Content-Type": "application/json" } }
+        const response = await AXIOS.post(
+            `/api/v1/auth/login`,
+            { email, password }
         );
 
         const { access_token, refresh_token, role, user_details, role_details, credits_left } = response.data?.data
@@ -43,6 +42,12 @@ export async function loginAction(email: string, password: string) {
     }
 }
 
+// Deliberately kept on a raw, standalone axios call rather than the shared
+// AXIOS instance from src/lib/api/server.ts: this action is invoked *from
+// inside* that instance's own response interceptor to retry a failed
+// request. Routing the refresh call through the same instance would mean
+// the refresh call's own failures re-enter that interceptor, risking a
+// recursive-retry loop if the refresh endpoint itself ever 401s.
 export async function refreshTokenAction() {
     try {
         const cookieStore = await cookies()
@@ -74,16 +79,15 @@ export async function refreshTokenAction() {
 
 export async function registerAction(name: string, email: string, password: string, confirmPassword: string, role: string, tou: boolean) {
     try {
-        const response = await axios.post(
-            `${API_BASE_URL}/api/v1/auth/register`, {
+        const response = await AXIOS.post(
+            `/api/v1/auth/register`, {
             full_name: name,
             email: email,
             password: password,
             confirm_password: confirmPassword,
             user_tier_requested: role,
             tou_accepted: tou
-        },
-            { headers: { "Content-Type": "application/json" } }
+        }
         );
         return { data: response.data?.data, error: null }
     } catch (error) {
@@ -99,9 +103,8 @@ export async function registerAction(name: string, email: string, password: stri
 
 export async function resetPasswordAction(email: string) {
     try {
-        const response = await axios.post(
-            `${API_BASE_URL}/api/v1/auth/reset-password`, { email },
-            { headers: { "Content-Type": "application/json" } }
+        const response = await AXIOS.post(
+            `/api/v1/auth/reset-password`, { email }
         );
         return { data: response.data?.data, error: null }
     } catch (error) {
@@ -117,16 +120,7 @@ export async function resetPasswordAction(email: string) {
 
 export async function onboardingAction() {
     try {
-        const cookieStore = await cookies()
-        const response = await AXIOS.patch(
-            `${API_BASE_URL}/api/v1/auth/onboarding/complete`,
-            {},
-            {
-                headers: {
-                    "Authorization": `Bearer ${cookieStore.get('access_token')?.value}`
-                }
-            }
-        );
+        const response = await AXIOS.patch(`/api/v1/auth/onboarding/complete`, {});
         return { data: response.data?.data, error: null }
     } catch (error) {
         if (axios.isAxiosError(error)) {

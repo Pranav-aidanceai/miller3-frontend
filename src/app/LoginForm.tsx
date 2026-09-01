@@ -14,7 +14,7 @@ import TermsModal from './auth/register/TermsOfUse';
 import ApprovalPending from './auth/ApprovalPending';
 import AccountRejected from './auth/AccountRejected';
 import AccountDeactivated from './auth/AccountDeactivated';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 
 export default function LoginForm() {
 
@@ -83,7 +83,7 @@ export default function LoginForm() {
 
   const handleTouAccept = async () => {
     try {
-      await axios.post('/api/auth/user-agreement', {});
+      await apiClient.post('/auth/user-agreement', {});
       setShowTouModal(false);
       router.push('/search');
     } catch (error) {
@@ -190,7 +190,7 @@ export default function LoginForm() {
         <TermsModal
           onAccept={() => handleTouAccept()}
           onClose={async () => {
-            const { data } = await axios.post('/api/delete-cookie');
+            const { data } = await apiClient.post('/delete-cookie');
             if (data?.success) {
               dispatch(logout());
               setShowTouModal(false);

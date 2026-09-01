@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { Check, ChevronDown, ChevronUp, Clock, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/apiError';
@@ -181,7 +181,7 @@ export default function MyRequestsPage() {
             setLoading(true);
             setError(null);
             try {
-                const response = await axios.get<CompanyUpdateRequestsResponse>('/api/company-update', {
+                const response = await apiClient.get<CompanyUpdateRequestsResponse>('/company-update', {
                     params: { status: status === 'all' ? undefined : status, page, limit: perPage },
                 });
                 if (!active) return;

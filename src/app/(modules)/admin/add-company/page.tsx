@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
 import { Building2, Eraser, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,7 @@ export default function AddCompanyPage() {
 
         setSubmitting(true);
         try {
-            await axios.post('/api/admin/company', payload);
+            await apiClient.post('/admin/company', payload);
             toast.success(`${draft[REQUIRED_FIELD].trim()} added`);
             handleClear();
         } catch (err: unknown) {

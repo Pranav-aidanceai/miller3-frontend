@@ -1,9 +1,10 @@
 import { AdminCompanyEditPayload, CodeFilterResponse, CompanyDescriptionResponse, CompanySearchPayload, CompanyUpdatePayload, CompanyUpdateResponse, FilterField } from "@/types/search";
 import axios from "axios";
+import apiClient from "@/lib/api/client";
 
 export async function searchAction(payload: CompanySearchPayload) {
     try {
-        const response = await axios.post(`/api/search`, payload);
+        const response = await apiClient.post(`/search`, payload);
         return { data: response.data, error: null }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
@@ -18,7 +19,7 @@ export async function searchAction(payload: CompanySearchPayload) {
 
 export async function getCompanyAction(id: string) {
     try {
-        const response = await axios.get(`/api/companies/${id}`);
+        const response = await apiClient.get(`/companies/${id}`);
         return { data: response.data, error: null }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
@@ -33,7 +34,7 @@ export async function getFilterOptionsAction(
     params: { q: string; cursor?: string | null; limit?: number }
 ) {
     try {
-        const response = await axios.get<CodeFilterResponse>(`/api/${field}-filter`, {
+        const response = await apiClient.get<CodeFilterResponse>(`/${field}-filter`, {
             params: { q: params.q, cursor: params.cursor || undefined, limit: params.limit }
         });
         return { data: response.data, error: null }
@@ -73,7 +74,7 @@ export function filterTitleOf(results: CodeFilterResponse['results'] | undefined
 
 export async function getSimilarCompanyAction(payload: { company_id: string, limit: number, cursor: string | null }) {
     try {
-        const response = await axios.get(`/api/companies/${payload.company_id}/similar`, {
+        const response = await apiClient.get(`/companies/${payload.company_id}/similar`, {
             params: { limit: payload.limit, cursor: payload.cursor }
         });
         return { data: response.data, error: null }
@@ -90,7 +91,7 @@ export async function getSimilarCompanyAction(payload: { company_id: string, lim
 
 export async function generateCompanyDescriptionAction(payload: { company_id: string; regenerate: boolean }) {
     try {
-        const response = await axios.post<CompanyDescriptionResponse>(`/api/company-description`, payload);
+        const response = await apiClient.post<CompanyDescriptionResponse>(`/company-description`, payload);
         return { data: response.data, error: null }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
@@ -106,7 +107,7 @@ export async function generateCompanyDescriptionAction(payload: { company_id: st
 /** Propose an edit to a company record. The change is queued for admin review. */
 export async function requestCompanyUpdateAction(payload: CompanyUpdatePayload) {
     try {
-        const response = await axios.post<CompanyUpdateResponse>(`/api/company-update`, payload);
+        const response = await apiClient.post<CompanyUpdateResponse>(`/company-update`, payload);
         return { data: response.data, error: null }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
@@ -122,7 +123,7 @@ export async function requestCompanyUpdateAction(payload: CompanyUpdatePayload) 
 /** Admin-only direct edit — applied to the company immediately, no review step. */
 export async function updateCompanyRecordAction(payload: AdminCompanyEditPayload) {
     try {
-        const response = await axios.put(`/api/admin/company`, payload);
+        const response = await apiClient.put(`/admin/company`, payload);
         return { data: response.data ?? {}, error: null }
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
@@ -137,7 +138,7 @@ export async function updateCompanyRecordAction(payload: AdminCompanyEditPayload
 
 export async function singleEnrichAction(payload: { company_id?: string, company_name: string, location: string }) {
     try {
-        const response = await axios.post(`/api/enrichment/single`, payload);
+        const response = await apiClient.post(`/enrichment/single`, payload);
         return {
             data: {
                 status: 'SUCCESS',
