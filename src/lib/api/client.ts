@@ -1,7 +1,6 @@
 import axios from "axios";
 import { getApiError } from "@/lib/apiError";
 import { isSessionExpiring, triggerSessionExpired } from "@/lib/session";
-import { store } from "@/store/store";
 
 // Browser-side axios instance — the counterpart to src/lib/api/server.ts.
 // Client components call this app's own /api/** route handlers (the BFF
@@ -41,11 +40,17 @@ apiClient.interceptors.response.use(
     const status = error?.response?.status;
     const url: string = error?.config?.url ?? "";
     const isSessionEndpoint = url.includes("/auth/") || url.includes("/delete-cookie");
-    // Read live Redux state at call time (not a React ref captured at mount)
+    // Read live Redux state at call time (not a React ref captured at mount,
     // so this fires correctly regardless of which component last
-    // mounted/unmounted — a 403/401 on the public login page itself, before
+    // mounted/unmounted) — a 403/401 on the public login page itself, before
     // any user is signed in, should never trigger a "you're being logged
-    // out" modal.
+    // out" modal. Imported lazily/dynamically rather than at module scope:
+    // this file is imported by many components that have nothing to do with
+    // Redux, and eagerly instantiating the real store (redux-persist +
+    // localStorage) on every one of their test files, whether or not a
+    // request ever actually fails, is unnecessary and — inside Jest's jsdom
+    // environment specifically — errors outright.
+    const { store } = await import("@/store/store");
     const loggedIn = !!store.getState().auth.user;
 
     if (!isSessionEndpoint && loggedIn && !isSessionExpiring()) {

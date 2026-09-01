@@ -30,9 +30,20 @@ jest.mock('@/app/auth/authServices', () => ({
   registerAction: jest.fn(),
 }))
 
+// Clicking the Terms checkbox opens TermsOfUse.tsx's modal rather than
+// toggling the field directly; that modal fetches the agreement text via
+// apiClient. Mock it so the fetch resolves instantly instead of attempting
+// a real network call from jsdom.
+jest.mock('@/lib/api/client', () => ({
+  __esModule: true,
+  default: { get: jest.fn().mockResolvedValue({ data: { data: 'Terms of use text.' } }) },
+}))
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// fills the form with valid values
+// fills the form with valid values, including accepting the Terms of Use
+// via its modal (the checkbox itself only opens that modal — see
+// TermsOfUse.tsx — the field is set by its "I accept" button).
 const fillForm = async (overrides: Record<string, string> = {}) => {
   const values = {
     name: 'John Doe',
@@ -46,6 +57,9 @@ const fillForm = async (overrides: Record<string, string> = {}) => {
   await userEvent.type(screen.getByPlaceholderText(/enter your password/i), values.password)
   await userEvent.type(screen.getByPlaceholderText(/confirm your password/i), values.confirm)
   await userEvent.click(screen.getByRole('checkbox'))
+  const acceptButton = await screen.findByRole('button', { name: /i accept/i })
+  await waitFor(() => expect(acceptButton).not.toBeDisabled())
+  await userEvent.click(acceptButton)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -139,7 +153,7 @@ describe('RegisterPage', () => {
     const passwordInput = screen.getByPlaceholderText(/enter your password/i)
     expect(passwordInput).toHaveAttribute('type', 'password')
 
-    await userEvent.click(screen.getByRole('button', { name: '' })) // eye icon button
+    await userEvent.click(screen.getByRole('button', { name: /show password/i })) // eye icon button
     expect(passwordInput).toHaveAttribute('type', 'text')
   })
 

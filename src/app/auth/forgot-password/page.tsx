@@ -10,6 +10,10 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/apiError';
 import { Eye, EyeOff, Check } from 'lucide-react';
+import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const OTP_LENGTH = 6;
 
@@ -87,13 +91,12 @@ function OtpInput({ value, onChange, disabled }: { value: string; onChange: (otp
           autoComplete={i === 0 ? 'one-time-code' : 'off'}
           maxLength={1}
           disabled={disabled}
-          className="h-16 w-full rounded-md border border-input bg-background text-center text-lg font-medium outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+          className="h-14 w-full rounded-xl border border-input bg-background text-center text-lg font-medium outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
         />
       ))}
     </div>
   );
 }
-
 
 export default function ForgotPasswordPage() {
 
@@ -102,8 +105,6 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
-
-  const inputClass = "mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
 
   const emailFormik = useFormik({
     initialValues: { email: '' },
@@ -173,6 +174,12 @@ export default function ForgotPasswordPage() {
     }
   });
 
+  const heading: Record<Step, string> = {
+    email: 'Reset Password',
+    otp: 'Verify Code',
+    password: 'New Password',
+    done: 'All Set',
+  };
   const subtitle: Record<Step, string> = {
     email: 'Reset your password',
     otp: `Enter the code sent to ${emailFormik.values.email}`,
@@ -181,136 +188,150 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <h1 className="text-2xl font-bold"><span className="text-gradient">Vendor Lens</span></h1>
-        <p className="mt-1 text-sm text-muted-foreground">{subtitle[step]}</p>
+    <AuthSplitLayout heroSrc="/auth/hero.png" heroAlt="A tradesperson at work in their workshop">
+      <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground">{heading[step]}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">{subtitle[step]}</p>
 
-        {/* Step 1 — email */}
-        {step === 'email' && (
-          <form onSubmit={emailFormik.handleSubmit} className="mt-8 space-y-4">
-            <div>
-              <label className="text-sm font-medium">Email</label>
-              <input data-testid='email-input' value={emailFormik.values.email} onChange={emailFormik.handleChange} onBlur={emailFormik.handleBlur} name="email" type="email" className={inputClass} placeholder="Enter your email" />
-              {(emailFormik.touched.email && emailFormik.errors.email) && <p className="text-sm text-destructive">{emailFormik.errors.email}</p>}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <button
-              type="submit"
-              className="flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!(emailFormik.isValid && emailFormik.dirty) || loading}
-            >
-              {loading ? 'Sending...' : 'Send Reset Code'}
-            </button>
-            <button
-              type="button"
-              className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => router.push('/')}
-              disabled={loading}
-            >
-              Back to login
-            </button>
-          </form>
-        )}
-
-        {/* Step 2 — OTP */}
-        {step === 'otp' && (
-          <form onSubmit={otpFormik.handleSubmit} className="mt-8 space-y-4">
-            <div>
-              <label className="text-sm font-medium">Verification Code</label>
-              <OtpInput
-                value={otpFormik.values.otp}
-                onChange={(otp) => { setError(''); otpFormik.setFieldValue('otp', otp); }}
-                disabled={loading}
-              />
-              {(otpFormik.values.otp.length > 0 && otpFormik.values.otp.length < OTP_LENGTH && otpFormik.errors.otp) && <p className="mt-2 text-sm text-destructive">{otpFormik.errors.otp}</p>}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <button
-              type="submit"
-              className="flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!(otpFormik.isValid && otpFormik.dirty) || loading}
-            >
-              {loading ? 'Verifying...' : 'Verify Code'}
-            </button>
-            <button
-              type="button"
-              className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => { setError(''); otpFormik.resetForm(); setStep('email'); }}
-              disabled={loading}
-            >
-              Use a different email
-            </button>
-          </form>
-        )}
-
-        {/* Step 3 — new password */}
-        {step === 'password' && (
-          <form onSubmit={passwordFormik.handleSubmit} className="mt-8 space-y-4">
-            <div>
-              <div className="relative">
-                <label htmlFor="password" className="text-sm font-medium">New Password</label>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPw ? 'text' : 'password'}
-                  value={passwordFormik.values.password}
-                  onChange={passwordFormik.handleChange}
-                  onBlur={passwordFormik.handleBlur}
-                  className={inputClass}
-                  placeholder="Enter your new password"
-                />
-                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-5/8 text-muted-foreground hover:text-foreground cursor-pointer">
-                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {(passwordFormik.touched.password && passwordFormik.errors.password) && <p className="text-sm text-destructive">{passwordFormik.errors.password}</p>}
-            </div>
-            <div>
-              <label className="text-sm font-medium">Confirm Password</label>
-              <div className="relative">
-                <input
-                  name="confirm"
-                  type="password"
-                  value={passwordFormik.values.confirm}
-                  onChange={passwordFormik.handleChange}
-                  onBlur={passwordFormik.handleBlur}
-                  className={inputClass}
-                  placeholder="Confirm your new password"
-                />
-                {passwordFormik.values.confirm && passwordFormik.values.password === passwordFormik.values.confirm && (
-                  <div className="absolute right-3 top-3/8 text-green-500">
-                    <Check className="h-4 w-4" />
-                  </div>
-                )}
-              </div>
-              {(passwordFormik.touched.confirm && passwordFormik.errors.confirm) && <p className="text-sm text-destructive">{passwordFormik.errors.confirm}</p>}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <button
-              type="submit"
-              className="flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!(passwordFormik.isValid && passwordFormik.dirty) || loading}
-            >
-              {loading ? 'Updating...' : 'Reset Password'}
-            </button>
-          </form>
-        )}
-
-        {/* Step 4 — done */}
-        {step === 'done' && (
-          <div className="mt-8 rounded-lg border border-border bg-card p-6 text-center">
-            <p className="text-sm">Your password has been reset successfully.</p>
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="mt-4 inline-block text-sm text-primary hover:underline cursor-pointer"
-            >
-              Back to login
-            </button>
+      {/* Step 1 — email */}
+      {step === 'email' && (
+        <form onSubmit={emailFormik.handleSubmit} className="mt-8 space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              data-testid="email-input"
+              value={emailFormik.values.email}
+              onChange={emailFormik.handleChange}
+              onBlur={emailFormik.handleBlur}
+              name="email"
+              type="email"
+              className="h-12 rounded-xl px-4 text-base"
+              placeholder="Enter your email"
+            />
+            {(emailFormik.touched.email && emailFormik.errors.email) && <p className="text-sm text-destructive">{emailFormik.errors.email}</p>}
           </div>
-        )}
-      </div>
-    </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-xl text-base"
+            disabled={!(emailFormik.isValid && emailFormik.dirty) || loading}
+          >
+            {loading ? 'Sending...' : 'Send Reset Code'}
+          </Button>
+          <button
+            type="button"
+            className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => router.push('/')}
+            disabled={loading}
+          >
+            Back to login
+          </button>
+        </form>
+      )}
+
+      {/* Step 2 — OTP */}
+      {step === 'otp' && (
+        <form onSubmit={otpFormik.handleSubmit} className="mt-8 space-y-6">
+          <div>
+            <Label>Verification Code</Label>
+            <OtpInput
+              value={otpFormik.values.otp}
+              onChange={(otp) => { setError(''); otpFormik.setFieldValue('otp', otp); }}
+              disabled={loading}
+            />
+            {(otpFormik.values.otp.length > 0 && otpFormik.values.otp.length < OTP_LENGTH && otpFormik.errors.otp) && <p className="mt-2 text-sm text-destructive">{otpFormik.errors.otp}</p>}
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-xl text-base"
+            disabled={!(otpFormik.isValid && otpFormik.dirty) || loading}
+          >
+            {loading ? 'Verifying...' : 'Verify Code'}
+          </Button>
+          <button
+            type="button"
+            className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => { setError(''); otpFormik.resetForm(); setStep('email'); }}
+            disabled={loading}
+          >
+            Use a different email
+          </button>
+        </form>
+      )}
+
+      {/* Step 3 — new password */}
+      {step === 'password' && (
+        <form onSubmit={passwordFormik.handleSubmit} className="mt-8 space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New Password</Label>
+            <div className="relative">
+              <Input
+                id="new-password"
+                name="password"
+                type={showPw ? 'text' : 'password'}
+                value={passwordFormik.values.password}
+                onChange={passwordFormik.handleChange}
+                onBlur={passwordFormik.handleBlur}
+                className="h-12 rounded-xl px-4 pr-11 text-base"
+                placeholder="At least 8 characters"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                aria-label={showPw ? 'Hide password' : 'Show password'}
+              >
+                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {(passwordFormik.touched.password && passwordFormik.errors.password) && <p className="text-sm text-destructive">{passwordFormik.errors.password}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm Password</Label>
+            <div className="relative">
+              <Input
+                id="confirm-password"
+                name="confirm"
+                type="password"
+                value={passwordFormik.values.confirm}
+                onChange={passwordFormik.handleChange}
+                onBlur={passwordFormik.handleBlur}
+                className="h-12 rounded-xl px-4 text-base"
+                placeholder="Confirm your new password"
+              />
+              {passwordFormik.values.confirm && passwordFormik.values.password === passwordFormik.values.confirm && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-success">
+                  <Check className="h-4 w-4" />
+                </div>
+              )}
+            </div>
+            {(passwordFormik.touched.confirm && passwordFormik.errors.confirm) && <p className="text-sm text-destructive">{passwordFormik.errors.confirm}</p>}
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-xl text-base"
+            disabled={!(passwordFormik.isValid && passwordFormik.dirty) || loading}
+          >
+            {loading ? 'Updating...' : 'Reset Password'}
+          </Button>
+        </form>
+      )}
+
+      {/* Step 4 — done */}
+      {step === 'done' && (
+        <div className="mt-8 rounded-xl border border-border bg-card p-6 text-center">
+          <p className="text-sm">Your password has been reset successfully.</p>
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="mt-4 inline-block text-sm text-primary hover:underline cursor-pointer"
+          >
+            Back to login
+          </button>
+        </div>
+      )}
+    </AuthSplitLayout>
   );
 }

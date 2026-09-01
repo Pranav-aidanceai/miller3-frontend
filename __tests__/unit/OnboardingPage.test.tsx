@@ -63,7 +63,7 @@ describe('OnboardingPage', () => {
     it('renders welcome heading', () => {
       render(<OnboardingPage {...defaultProps} step={0} />)
       expect(screen.getByText(/welcome to/i)).toBeInTheDocument()
-      expect(screen.getByText(/miller3/i)).toBeInTheDocument()
+      expect(screen.getByText(/vendorlens/i)).toBeInTheDocument()
     })
 
     it('renders get started button', () => {
@@ -133,37 +133,59 @@ describe('OnboardingPage', () => {
     })
   })
 
-  // 3. Step 2 - Ready
-  describe('Step 2 - Ready', () => {
-    it('renders ready heading', () => {
+  // 3. Step 2 - Approval Pending
+  // (Shown when the backend returns APPROVAL_PENDING for the chosen tier —
+  // see registerAction's status check in src/app/auth/register/page.tsx —
+  // rather than every registration reaching "ready" directly.)
+  describe('Step 2 - Approval Pending', () => {
+    it('renders approval pending heading', () => {
       render(<OnboardingPage {...defaultProps} step={2} />)
+      expect(screen.getByText(/approval pending/i)).toBeInTheDocument()
+    })
+
+    it('renders Back to Login button', () => {
+      render(<OnboardingPage {...defaultProps} step={2} />)
+      expect(screen.getByRole('button', { name: /back to login/i })).toBeInTheDocument()
+    })
+
+    it('redirects to / when Back to Login is clicked', async () => {
+      render(<OnboardingPage {...defaultProps} step={2} />)
+      await userEvent.click(screen.getByRole('button', { name: /back to login/i }))
+      expect(mockPush).toHaveBeenCalledWith('/')
+    })
+  })
+
+  // 4. Step 3 - Ready
+  describe('Step 3 - Ready', () => {
+    it('renders ready heading', () => {
+      render(<OnboardingPage {...defaultProps} step={3} />)
       expect(screen.getByText(/you're ready/i)).toBeInTheDocument()
     })
 
     it('renders start searching message', () => {
-      render(<OnboardingPage {...defaultProps} step={2} />)
+      render(<OnboardingPage {...defaultProps} step={3} />)
       expect(screen.getByText(/start searching for vendors/i)).toBeInTheDocument()
     })
 
     it('renders Login to Start Searching button', () => {
-      render(<OnboardingPage {...defaultProps} step={2} />)
+      render(<OnboardingPage {...defaultProps} step={3} />)
       expect(screen.getByRole('button', { name: /login to start searching/i })).toBeInTheDocument()
     })
 
     it('redirects to / when Login to Start Searching is clicked', async () => {
-      render(<OnboardingPage {...defaultProps} step={2} />)
+      render(<OnboardingPage {...defaultProps} step={3} />)
       await userEvent.click(screen.getByRole('button', { name: /login to start searching/i }))
       expect(mockPush).toHaveBeenCalledWith('/')
     })
   })
 
-  // 4. Progress dots
+  // 5. Progress dots
   describe('Progress dots', () => {
-    it('renders 3 progress dots', () => {
+    it('renders one dot per step (welcome, plan, approval, ready)', () => {
       render(<OnboardingPage {...defaultProps} step={0} />)
       const dots = document.querySelectorAll('.rounded-full')
-      // 3 progress dots + 1 welcome icon circle
-      expect(dots.length).toBeGreaterThanOrEqual(3)
+      // 4 progress dots (steps 0-3) + 1 welcome icon circle
+      expect(dots.length).toBeGreaterThanOrEqual(4)
     })
   })
 
