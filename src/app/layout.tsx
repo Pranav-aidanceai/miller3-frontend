@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import "./globals.css";
 import { Providers } from "./Providers";
 import { Toaster } from "sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
   title: "Miller 3",
@@ -34,7 +35,9 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <Providers>
-              {children}
+              <TooltipProvider delayDuration={200}>
+                {children}
+              </TooltipProvider>
             </Providers>
           </ThemeProvider>
         </body>

@@ -5,6 +5,7 @@ import { AppSidebar } from './AppSidebar';
 import { TopBar } from './TopBar';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { WelcomeScreen } from '../WelcomeScreen';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 export function ModuleShell({
   children,
@@ -29,14 +30,14 @@ export function ModuleShell({
   }
 
   return (
-    <div className="flex h-screen w-full bg-background">
+    <SidebarProvider className="h-screen">
       <AppSidebar />
-      <main className="flex-1 flex flex-col max-h-screen overflow-hidden">
+      <SidebarInset className="flex max-h-screen flex-col overflow-hidden">
         <TopBar />
         <div className="flex-1 overflow-hidden w-full">
           {children}
         </div>
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

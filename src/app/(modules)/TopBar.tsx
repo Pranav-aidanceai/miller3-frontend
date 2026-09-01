@@ -2,6 +2,7 @@ import { Moon, Sun, Command, Sparkles, Zap, Download } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { useAppSelector } from '@/store/hooks';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 // Export is billed per block of companies rather than per company; the block
 // size is fixed by the backend's pricing, not configurable per environment.
@@ -107,14 +108,20 @@ export function TopBar() {
 
     return (
         <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:px-6">
-            <div className="flex items-center gap-4 invisible">
-                <button
-                    className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
-                >
-                    <Command className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Search...</span>
-                    <kbd className="hidden rounded border border-border px-1.5 py-0.5 text-[10px] font-mono sm:inline">⌘K</kbd>
-                </button>
+            <div className="flex items-center gap-4">
+                {/* The desktop trigger lives in AppSidebar's own header; on
+                    mobile the sidebar renders as an off-canvas sheet, so it
+                    needs a trigger here instead. */}
+                <SidebarTrigger className="md:hidden" />
+                <div className="hidden items-center gap-4 invisible md:flex">
+                    <button
+                        className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                    >
+                        <Command className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Search...</span>
+                        <kbd className="hidden rounded border border-border px-1.5 py-0.5 text-[10px] font-mono sm:inline">⌘K</kbd>
+                    </button>
+                </div>
             </div>
 
             <div className="flex items-center gap-2">
