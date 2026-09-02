@@ -107,7 +107,7 @@ export function TopBar() {
     }, [setTheme]);
 
     return (
-        <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:px-6">
+        <header className="flex h-14 items-center justify-between border-b border-border bg-[#F9F9F9] px-4 md:px-6">
             <div className="flex items-center gap-4">
                 {/* The desktop trigger lives in AppSidebar's own header; on
                     mobile the sidebar renders as an off-canvas sheet, so it

@@ -1,6 +1,7 @@
 'use client';
 
 import { LogOut } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -86,9 +87,10 @@ export function AppSidebar() {
                 <SidebarHeader className="flex-row items-center justify-between">
                     <Link
                         href="/search"
-                        className="flex min-w-0 items-center gap-2 px-2 text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden"
+                        className="flex min-w-0 items-center gap-2 px-2 pt-2 text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden"
                     >
-                        <span className="text-gradient truncate">Vendor Lens</span>
+                        <Image src="/brand/logomark.svg" alt="" width={34} height={29} />
+                        <span className="text-[#1E1E1E] truncate">VendorLens</span>
                     </Link>
                     <SidebarTrigger />
                 </SidebarHeader>

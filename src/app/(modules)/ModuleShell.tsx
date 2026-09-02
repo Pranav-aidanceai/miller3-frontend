@@ -34,7 +34,7 @@ export function ModuleShell({
       <AppSidebar />
       <SidebarInset className="flex max-h-screen flex-col overflow-hidden">
         <TopBar />
-        <div className="flex-1 overflow-hidden w-full">
+        <div className="flex-1 overflow-hidden w-full bg-white">
           {children}
         </div>
       </SidebarInset>
