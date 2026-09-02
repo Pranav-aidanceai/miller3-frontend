@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import apiClient from '@/lib/api/client';
-import { ChevronLeft, ChevronRight, Loader2, RefreshCw, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import { getErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
 import FilterPopover, { type FilterDef } from './FilterPopover';
@@ -26,9 +26,6 @@ interface AnalyticsTableProps<T> {
   endpoint: string;
   params?: Record<string, string>;
   filters?: FilterDef[];
-  icon: LucideIcon;
-  iconColor?: string;
-  iconBg?: string;
   title: string;
   subtitle?: string;
   columns: TableColumn<T>[];
@@ -41,9 +38,6 @@ export default function AnalyticsTable<T>({
   endpoint,
   params,
   filters,
-  icon: Icon,
-  iconColor = 'text-blue-500',
-  iconBg = 'bg-blue-500/10',
   title,
   subtitle,
   columns,
@@ -118,14 +112,9 @@ export default function AnalyticsTable<T>({
   return (
     <div className="min-w-0 xl:col-span-2 rounded-xl border border-border bg-card p-5 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between mb-4 gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className={cn('w-9 h-9 shrink-0 rounded-lg flex items-center justify-center', iconBg)}>
-            <Icon className={cn('h-4 w-4', iconColor)} />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold truncate">{title}</h3>
-            {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
-          </div>
+        <div className="min-w-0">
+          <h3 className="font-heading text-sm font-semibold truncate">{title}</h3>
+          {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
@@ -145,7 +134,7 @@ export default function AnalyticsTable<T>({
       </div>
 
       {error ? (
-        <div className="flex h-40 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-sm text-red-600">
+        <div className="flex h-40 items-center justify-center rounded-lg border border-destructive/20 bg-destructive/10 px-4 text-sm text-destructive">
           {error}
         </div>
       ) : (

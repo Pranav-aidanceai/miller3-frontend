@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import apiClient from '@/lib/api/client';
-import { Loader2, RefreshCw, type LucideIcon } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { getErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/utils';
 import { Chart, type ChartOptions } from '@highcharts/react';
@@ -25,15 +25,23 @@ export interface ChartApiResponse {
   series: ChartSeries[];
 }
 
-// Palette aligned with the dashboard stat cards.
+// CSS custom-property references rather than static hex — Highcharts applies
+// these as plain SVG fill/stroke values, which the browser resolves against
+// the design tokens in src/styles/tokens.css, so charts stay in sync with
+// the brand palette and repaint correctly for dark mode with no extra code.
+// Order matches the Figma "Search Analytics Overview" chart's own legend
+// (blue, discovery teal, deep teal, …) for the generic multi-series charts;
+// src/app/(modules)/admin/dashboard/AnalyticsSection.tsx overrides this via
+// `seriesColors` for the two charts with their own fixed category colors
+// (Users by Roles, Users by Status).
 const SERIES_COLORS = [
-  '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#f59e0b', // amber
-  '#10b981', // emerald
-  '#ef4444', // red
-  '#06b6d4', // cyan
-  '#ec4899', // pink
+  'var(--brand-accent)',
+  'var(--brand-secondary)',
+  'var(--primary)',
+  'var(--warning)',
+  'var(--success)',
+  'var(--ai)',
+  'var(--destructive)',
 ];
 
 // Format date-like category labels (e.g. "2026-06", "2026-05-19", "2026-05-19 14:00")
@@ -82,12 +90,16 @@ interface TooltipContext extends TooltipPoint {
   points?: TooltipPoint[];
 }
 
-function buildOptions(data: ChartApiResponse): ChartOptions {
+function buildOptions(data: ChartApiResponse, seriesColors: string[] = SERIES_COLORS): ChartOptions {
   const isLine = data.chart_type === 'line';
   const isPie = data.chart_type === 'pie';
   // The API labels grouped category charts as "bar"; render them as vertical columns.
   const seriesType = isPie ? 'pie' : isLine ? 'line' : 'column';
   const showLegend = !isPie && data.series.length > 1;
+  // A single-series column chart (e.g. "Users by Status") has nothing else
+  // to distinguish its bars by color — color each point individually, same
+  // as pie slices already do by default.
+  const colorByPoint = seriesType === 'column' && data.series.length === 1;
 
   return {
     chart: {
@@ -96,7 +108,7 @@ function buildOptions(data: ChartApiResponse): ChartOptions {
       spacing: [8, 8, 8, 8],
       style: { fontFamily: 'inherit' },
     },
-    colors: SERIES_COLORS,
+    colors: seriesColors,
     title: { text: undefined },
     credits: { enabled: false },
     accessibility: { enabled: false },
@@ -151,6 +163,7 @@ function buildOptions(data: ChartApiResponse): ChartOptions {
         borderWidth: 0,
         pointPadding: 0.05,
         groupPadding: 0.12,
+        colorByPoint,
       },
       line: {
         lineWidth: 2,
@@ -177,29 +190,28 @@ interface AnalyticsChartProps {
   endpoint: string;
   params?: Record<string, string>;
   filters?: FilterDef[];
-  icon: LucideIcon;
-  iconColor?: string;
-  iconBg?: string;
   title: string;
   subtitle?: string;
   height?: number;
   wide?: boolean;
   /** Pick the chart payload out of the API response (e.g. nested `highcharts.by_role`). */
   select?: (raw: unknown) => ChartApiResponse;
+  /** Overrides the default categorical palette — for charts with their own
+   * fixed, meaningful category colors (e.g. status: active/rejected/…)
+   * rather than an arbitrary series order. */
+  seriesColors?: string[];
 }
 
 export default function AnalyticsChart({
   endpoint,
   params,
   filters,
-  icon: Icon,
-  iconColor = 'text-blue-500',
-  iconBg = 'bg-blue-500/10',
   title,
   subtitle,
   height = 340,
   wide = false,
   select,
+  seriesColors,
 }: AnalyticsChartProps) {
   const [options, setOptions] = useState<ChartOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -239,7 +251,7 @@ export default function AnalyticsChart({
         const res = await apiClient.get(endpoint, { params: requestParams });
         if (ignore) return;
         const raw = res.data.data;
-        setOptions(buildOptions(select ? select(raw) : (raw as ChartApiResponse)));
+        setOptions(buildOptions(select ? select(raw) : (raw as ChartApiResponse), seriesColors));
         setError(null);
       } catch (err: unknown) {
         if (ignore) return;
@@ -266,14 +278,9 @@ export default function AnalyticsChart({
       )}
     >
       <div className="flex items-center justify-between mb-4 gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className={cn('w-9 h-9 shrink-0 rounded-lg flex items-center justify-center', iconBg)}>
-            <Icon className={cn('h-4 w-4', iconColor)} />
-          </div>
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold truncate">{title}</h3>
-            {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
-          </div>
+        <div className="min-w-0">
+          <h3 className="font-heading text-sm font-semibold truncate">{title}</h3>
+          {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
@@ -294,7 +301,7 @@ export default function AnalyticsChart({
 
       {error ? (
         <div
-          className="flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-sm text-red-600"
+          className="flex items-center justify-center rounded-lg border border-destructive/20 bg-destructive/10 px-4 text-sm text-destructive"
           style={{ height }}
         >
           {error}
