@@ -108,6 +108,40 @@ export function structuredFiltersToQuery(filters: StructuredFilters): string {
 }
 
 /**
+ * A short "Label : value" summary of a structured history entry — e.g.
+ * "NAICS : 6223456" — for display where there's no `raw_input` to show
+ * (structured searches don't have one; only AI searches do). Picks the
+ * single most identifying filter that was applied, in the order a user is
+ * most likely to have searched by; falls back to a plain description when
+ * nothing recognizable was applied.
+ */
+export function describeStructuredFilters(filters: StructuredFilters | null | undefined): string {
+    if (!filters) return 'All companies';
+
+    const first = (values?: string[] | null) => (values && values.length > 0 ? values[0] : null);
+
+    const candidates: [string, string | null][] = [
+        ['NAICS', first(filters.naics_code)],
+        ['SIC', first(filters.sic_code)],
+        ['City', first(filters.city)],
+        ['County', first(filters.county)],
+        ['State', first(filters.state)],
+        ['MSA', first(filters.msa)],
+        ['Certification', first(filters.certification_status)],
+    ];
+    const match = candidates.find(([, value]) => !!value);
+    if (match) return `${match[0]} : ${match[1]}`;
+
+    if (filters.employee_size_range?.min != null || filters.employee_size_range?.max != null) return 'Employee size filter';
+    if (filters.annual_revenue?.min != null || filters.annual_revenue?.max != null) return 'Revenue filter';
+    if (filters.year_founded?.min != null || filters.year_founded?.max != null) return 'Year founded filter';
+    if (filters.minority_owned || filters.women_owned || filters.veteran_owned) return 'Ownership filter';
+    if (filters.has_email || filters.has_website || filters.has_mobile_number) return 'Contact info filter';
+
+    return 'All companies';
+}
+
+/**
  * Rebuild filter state from URL params. Returns null when the URL carries no
  * replay params at all, so callers can fall back to their own persisted state.
  */

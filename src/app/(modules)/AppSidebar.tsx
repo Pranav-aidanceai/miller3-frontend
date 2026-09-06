@@ -96,8 +96,10 @@ export function AppSidebar() {
                 </SidebarHeader>
 
                 <SidebarContent>
+                    {/* Figma's sidebar (fileKey nPLWw73lkfNSi2MZX2bIsU, node
+                        2:15818) has no header above the main nav items — only
+                        the admin section below gets a label ("Admin Actions"). */}
                     <SidebarGroup>
-                        <SidebarGroupLabel>Main</SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 {/* Admins raise no update requests of their own — they edit
@@ -124,7 +126,7 @@ export function AppSidebar() {
 
                     {isAdmin && (
                         <SidebarGroup>
-                            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                            <SidebarGroupLabel>Admin Actions</SidebarGroupLabel>
                             <SidebarGroupContent>
                                 <SidebarMenu>
                                     {adminNav.map((item) => (

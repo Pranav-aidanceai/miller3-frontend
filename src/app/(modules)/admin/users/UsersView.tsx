@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '@/lib/api/client';
 import { cn } from '@/lib/utils';
-import { ListFilter, Check, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useDebounce } from '@/hooks/useDebounce';
 import { getErrorMessage } from '@/lib/apiError';

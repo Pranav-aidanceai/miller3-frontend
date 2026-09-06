@@ -2,7 +2,7 @@ import {
   Search, LayoutDashboard,
   Users, DollarSign, Database,
   Sparkles, History,
-  Eye, Folder, ClipboardList, ClipboardCheck, Building2
+  Eye, PaintBucket, ClipboardList, ClipboardCheck, Building2
 } from "lucide-react";
 
 // Copy matches the Figma "Select Plan" reference (fileKey
@@ -44,8 +44,10 @@ export const tiers = [
 export const mainNav = [
   { to: '/search', icon: Search, label: 'Search' },
   { to: '/ai-search', icon: Sparkles, label: 'AI Search' },
-  { to: '/buckets', icon: Folder, label: 'My Buckets' },
-  { to: '/query-history', icon: History, label: 'Query History' },
+  // Figma's sidebar frame (fileKey nPLWw73lkfNSi2MZX2bIsU, node 2:15818)
+  // literally reads "Bucket List" — supersedes the earlier "Preferred List" name.
+  { to: '/buckets', icon: PaintBucket, label: 'Preferred List' },
+  { to: '/query-history', icon: History, label: 'Search History' },
   { to: '/my-requests', icon: ClipboardList, label: 'My Requests' },
 ];
 

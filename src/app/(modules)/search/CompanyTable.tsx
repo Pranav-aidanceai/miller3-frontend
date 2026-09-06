@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Company } from '@/types/search';
 import { ContactIcons, TableSkeleton } from './helper';
-import ColumnPickerPopover from './ColumnPickerPopover';
+// import ColumnPickerPopover from './ColumnPickerPopover';
 import { DEFAULT_VISIBLE_COLUMNS, OPTIONAL_COLUMNS, TABLE_COLUMNS_STORAGE_KEY } from './tableColumns';
 
 interface CompanyTableProps {
@@ -47,30 +47,37 @@ export default function CompanyTable({
     // Column choice is per-browser, not per-search — it applies the same way
     // across Search, AI Search, and Buckets tables.
     const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
+    // Deliberately not a lazy useState initializer: the server always renders
+    // DEFAULT_VISIBLE_COLUMNS (no localStorage there), so seeding state with
+    // the real saved value here — before the client's first paint settles —
+    // would render a different set of columns than the server did and trip a
+    // hydration mismatch. Swapping in the saved value post-mount is a plain
+    // update instead.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { setVisibleColumns(loadVisibleColumns()); }, []);
 
-    const handleColumnsChange = (keys: string[]) => {
-        setVisibleColumns(keys);
-        try {
-            localStorage.setItem(TABLE_COLUMNS_STORAGE_KEY, JSON.stringify(keys));
-        } catch {
-            // Ignore quota/serialization errors — persistence is best-effort.
-        }
-    };
+    // const handleColumnsChange = (keys: string[]) => {
+    //     setVisibleColumns(keys);
+    //     try {
+    //         localStorage.setItem(TABLE_COLUMNS_STORAGE_KEY, JSON.stringify(keys));
+    //     } catch {
+    //         // Ignore quota/serialization errors — persistence is best-effort.
+    //     }
+    // };
 
     const columns = OPTIONAL_COLUMNS.filter(c => visibleColumns.includes(c.key));
     const colSpan = columns.length + 3; // checkbox + Company + Contact
 
     return (
-        <div className="rounded-lg border border-border overflow-hidden">
-            <div className="flex items-center justify-end border-b border-border bg-muted/50 px-2 py-1.5">
+        <div className="overflow-hidden">
+            {/* <div className="flex items-center justify-end border-b border-border bg-muted/50 px-2 py-1.5">
                 <ColumnPickerPopover selected={visibleColumns} onChange={handleColumnsChange} />
-            </div>
+            </div> */}
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b border-border bg-muted/50">
-                            <th className="px-4 py-3 w-10">
+                    <thead className='border-b border-t'>
+                        <tr className="border-collapse">
+                            <th className="px-4 py-3 w-10 border-r">
                                 <input
                                     type="checkbox"
                                     checked={allSelected}
@@ -78,23 +85,23 @@ export default function CompanyTable({
                                     className="h-4 w-4 cursor-pointer accent-primary"
                                 />
                             </th>
-                            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
+                            <th className="px-4 py-3 text-left font-heading text-sm font-normal text-[#5A5A5A] border-r">Company</th>
                             {columns.map(col => (
                                 <th
                                     key={col.key}
-                                    className={`px-4 py-3 font-medium text-muted-foreground ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                                    className={`px-4 py-3 font-heading text-sm font-normal text-[#5A5A5A] border-r ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
                                 >
                                     {col.label}
                                 </th>
                             ))}
-                            <th className="px-4 py-3 text-center font-medium text-muted-foreground">Contact</th>
+                            <th className="px-4 py-3 text-center font-heading text-sm font-normal text-[#5A5A5A]">Contact</th>
                         </tr>
                     </thead>
                     {isLoading ? <TableSkeleton perPage={perPage} columnsCount={columns.length} /> : (
                         <tbody>
                             {companies.length === 0 ? (
                                 <tr>
-                                    <td colSpan={colSpan} className="py-16 text-center text-muted-foreground">
+                                    <td colSpan={colSpan} className="py-16 text-center font-heading text-muted-foreground">
                                         <p className="text-lg font-medium">No companies match your filters</p>
                                         <p className="mt-1 text-sm">Try loosening your criteria or switching to AI Search</p>
                                     </td>
@@ -102,7 +109,7 @@ export default function CompanyTable({
                             ) : companies.map(c => (
                                 <tr key={c.id} onClick={() => onRowClick(c)}
                                     className="border-b border-border cursor-pointer transition-colors hover:bg-accent/50">
-                                    <td className="px-4 py-3 w-10" onClick={e => e.stopPropagation()}>
+                                    <td className="px-4 py-3 w-10 border-r" onClick={e => e.stopPropagation()}>
                                         <input
                                             type="checkbox"
                                             checked={selectedIds.has(c.id)}
@@ -110,14 +117,14 @@ export default function CompanyTable({
                                             className="h-4 w-4 cursor-pointer accent-primary"
                                         />
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <p className="font-medium">{c.company_name}</p>
-                                        <p className="text-xs text-muted-foreground">{c.city}, {c.state}</p>
+                                    <td className="px-4 py-3 border-r">
+                                        <p className="font-medium font-heading">{c.company_name}</p>
+                                        <p className="text-xsfont-heading text-muted-foreground">{c.city}, {c.state}</p>
                                     </td>
                                     {columns.map(col => (
                                         <td
                                             key={col.key}
-                                            className={`px-4 py-3 text-xs ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
+                                            className={`font-medium font-heading text-sm px-4 py-3 border-r ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}
                                         >
                                             {col.render(c, notAccessibleFields)}
                                         </td>
