@@ -40,7 +40,10 @@ export default function OnboardingPage({ onTierSelect, onSubmit, loading, succes
     };
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center p-6">
+        <div 
+            className="flex min-h-screen flex-col items-center justify-center p-6 bg-cover bg-center bg-no-repeat mix-blend-multiply dark:hidden"
+            style={{ backgroundImage: "url('/auth/plan-page-bg.png')" }}
+        >
             <div className="relative w-full overflow-hidden py-12">
                 <div className="absolute left-0 top-0 z-10 flex items-center gap-3">
                     <Image src="/brand/logomark.svg" alt="" width={28} height={24} />
