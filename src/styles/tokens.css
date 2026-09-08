@@ -1,0 +1,167 @@
+/**
+ * Design tokens — derived from the VendorLens Figma brand palette
+ * (fileKey pskj0D4uvWBsvAB5Csxyt4, "Visual Identity" section, node 504:3643):
+ *
+ *   Primary   — Deep Teal        #005F73
+ *   Secondary — Discovery Teal   #0D9A94  (brand-secondary — NOT shadcn's neutral --secondary)
+ *   Tertiary  — Intelligence Blue #1D69FF (brand-accent    — NOT shadcn's neutral --accent)
+ *   Neutral   — Soft White       #F6F8FA  (background)
+ *   Neutral   — Charcoal Black   #1E1E1E  (foreground)
+ *
+ * Converted to OKLCH via the standard sRGB -> OKLab -> OKLCH formulas
+ * (Björn Ottosson's reference matrices), matching the precision/format the
+ * rest of this codebase already uses. Figma only specifies light-mode
+ * brand swatches — the `.dark` block below is derived, not designed:
+ * neutrals are re-lit for a dark surface, brand hues (primary/
+ * brand-secondary/brand-accent) keep the same OKLCH lightness across both
+ * themes (matching the app's pre-existing convention), and every
+ * foreground/background text pairing has been checked against WCAG 2.1
+ * contrast minimums (see PR description / plan for the numbers).
+ *
+ * Two neutral hue families are used throughout, mirroring the previous
+ * palette's own convention:
+ *   - 89.876deg — true achromatic (zero-chroma) white/black/text, the hue
+ *     any perfectly-equal-RGB gray resolves to under this conversion.
+ *   - 247.858deg — the very subtle cool tint actually present in Soft
+ *     White (#F6F8FA is not a perfectly neutral gray), reused across all
+ *     "tinted neutral" surfaces (card, secondary, muted, accent, border,
+ *     sidebar) so they read as one coherent family instead of competing
+ *     undertones.
+ *
+ * shadcn's own --secondary/--accent stay neutral grays (their conventional
+ * role as UI hover/surface colors) — the two new brand hues live in
+ * --brand-secondary/--brand-accent instead, used deliberately per screen
+ * rather than repainting every secondary button/hover state.
+ */
+
+:root {
+  /* `--font-sans`/`--font-heading` are supplied by next/font (src/lib/fonts.ts)
+     via .variable classes on <html> — see src/app/layout.tsx. No Figma
+     spec exists for monospace text (used for IDs/codes via the `font-mono`
+     utility in several components); previously pointed at an undefined
+     `--font-geist-mono`, silently falling back to the inherited body font.
+     Defined directly here instead of pulling in another next/font family. */
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --background: oklch(0.978 0.003 247.858);
+  --foreground: oklch(0.235 0 89.876);
+
+  --card: oklch(1 0 89.876);
+  --card-foreground: oklch(0.235 0 89.876);
+  --popover: oklch(1 0 89.876);
+  --popover-foreground: oklch(0.235 0 89.876);
+
+  --primary: oklch(0.448 0.081 218.734);
+  --primary-foreground: oklch(1 0 89.876);
+
+  /* Brand accent colors — used deliberately (CTAs, links, highlights,
+     chart series), not mapped onto shadcn's neutral secondary/accent. */
+  --brand-secondary: oklch(0.62 0.105 189.866);
+  --brand-secondary-foreground: oklch(0.235 0 89.876); /* dark text: white-on-teal fails AA for body text (3.46:1), charcoal passes (4.82:1) */
+  --brand-accent: oklch(0.572 0.235 262.06);
+  --brand-accent-foreground: oklch(1 0 89.876); /* white passes AA (4.65:1) */
+
+  --secondary: oklch(0.968 0.003 247.858);
+  --secondary-foreground: oklch(0.235 0 89.876);
+  --muted: oklch(0.968 0.003 247.858);
+  --muted-foreground: oklch(0.552 0.01 247.858);
+  --accent: oklch(0.968 0.003 247.858);
+  --accent-foreground: oklch(0.235 0 89.876);
+
+  --destructive: oklch(0.637 0.208 25.326);
+  --destructive-foreground: oklch(1 0 89.876);
+  --success: oklch(0.69 0.148 162.368);
+  --success-foreground: oklch(1 0 89.876);
+  --warning: oklch(0.77 0.165 70.606);
+  --warning-foreground: oklch(1 0 89.876);
+
+  /* Reserved for AI-assisted actions, kept off both brand hues so a
+     generated result never reads as ordinary stored data or a CTA. */
+  --ai: oklch(0.556 0.226 305.1);
+  --ai-foreground: oklch(1 0 89.876);
+  --ai-soft: oklch(0.74 0.13 305.1);
+
+  --border: oklch(0.92 0.004 247.858);
+  --input: oklch(0.92 0.004 247.858);
+  --ring: oklch(0.448 0.081 218.734);
+  --radius: 0.5rem;
+
+  --sidebar-background: oklch(0.978 0.003 247.858);
+  --sidebar-foreground: oklch(0.37 0.012 247.858);
+  --sidebar-primary: oklch(0.448 0.081 218.734);
+  --sidebar-primary-foreground: oklch(1 0 89.876);
+  --sidebar-accent: oklch(0.968 0.003 247.858);
+  --sidebar-accent-foreground: oklch(0.235 0 89.876);
+  --sidebar-border: oklch(0.92 0.004 247.858);
+  --sidebar-ring: oklch(0.448 0.081 218.734);
+
+  --surface: oklch(1 0 89.876);
+  --surface-elevated: oklch(0.968 0.003 247.858);
+
+  /* Categorical series for Highcharts dashboards — spread across the hue
+     wheel (teal/blue/teal-green/orange/violet) for visual separation. */
+  --chart-1: oklch(0.448 0.081 218.734);
+  --chart-2: oklch(0.572 0.235 262.06);
+  --chart-3: oklch(0.62 0.105 189.866);
+  --chart-4: oklch(0.77 0.165 70.606);
+  --chart-5: oklch(0.556 0.226 305.1);
+}
+
+.dark {
+  --background: oklch(0.143 0.003 247.858);
+  --foreground: oklch(0.985 0 89.876);
+
+  --card: oklch(0.178 0.004 247.858);
+  --card-foreground: oklch(0.985 0 89.876);
+  --popover: oklch(0.178 0.004 247.858);
+  --popover-foreground: oklch(0.985 0 89.876);
+
+  --primary: oklch(0.448 0.081 218.734);
+  --primary-foreground: oklch(1 0 89.876);
+
+  --brand-secondary: oklch(0.62 0.105 189.866);
+  --brand-secondary-foreground: oklch(0.235 0 89.876);
+  --brand-accent: oklch(0.572 0.235 262.06);
+  --brand-accent-foreground: oklch(1 0 89.876);
+
+  --secondary: oklch(0.212 0.004 247.858);
+  --secondary-foreground: oklch(0.985 0 89.876);
+  --muted: oklch(0.212 0.004 247.858);
+  --muted-foreground: oklch(0.712 0.013 247.858);
+  --accent: oklch(0.212 0.004 247.858);
+  --accent-foreground: oklch(0.985 0 89.876);
+
+  --destructive: oklch(0.562 0.197 26.284);
+  --destructive-foreground: oklch(0.985 0 89.876);
+  --success: oklch(0.69 0.148 162.368);
+  --success-foreground: oklch(1 0 89.876);
+  --warning: oklch(0.77 0.165 70.606);
+  --warning-foreground: oklch(1 0 89.876);
+
+  --ai: oklch(0.65 0.21 305.1);
+  --ai-foreground: oklch(1 0 89.876);
+  --ai-soft: oklch(0.5 0.14 305.1);
+
+  --border: oklch(0.275 0.006 247.858);
+  --input: oklch(0.275 0.006 247.858);
+  --ring: oklch(0.448 0.081 218.734);
+
+  --sidebar-background: oklch(0.178 0.004 247.858);
+  --sidebar-foreground: oklch(0.968 0.003 247.858);
+  --sidebar-primary: oklch(0.448 0.081 218.734);
+  --sidebar-primary-foreground: oklch(1 0 89.876);
+  --sidebar-accent: oklch(0.212 0.004 247.858);
+  --sidebar-accent-foreground: oklch(0.968 0.003 247.858);
+  --sidebar-border: oklch(0.275 0.006 247.858);
+  --sidebar-ring: oklch(0.448 0.081 218.734);
+
+  --surface: oklch(0.178 0.004 247.858);
+  --surface-elevated: oklch(0.212 0.004 247.858);
+
+  --chart-1: oklch(0.448 0.081 218.734);
+  --chart-2: oklch(0.572 0.235 262.06);
+  --chart-3: oklch(0.62 0.105 189.866);
+  --chart-4: oklch(0.77 0.165 70.606);
+  --chart-5: oklch(0.556 0.226 305.1);
+}

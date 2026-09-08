@@ -1,5 +1,5 @@
 import { AxiosError } from 'axios';
-import AXIOS from '@/lib/axios';
+import AXIOS from '@/lib/api/server';
 import { NextResponse } from 'next/server';
 
 export async function GET(
@@ -11,6 +11,7 @@ export async function GET(
         const response = await AXIOS.get(`/api/v1/companies/${id}`);
         return NextResponse.json(response.data, { status: response.status || 200 });
     } catch (error: unknown) {
+        console.error('Error fetching company:', error);
         if (error instanceof AxiosError) {
             return NextResponse.json(
                 error.response?.data ?? { detail: 'Fetch company failed' },

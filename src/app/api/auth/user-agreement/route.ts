@@ -1,12 +1,11 @@
-import axios, { AxiosError } from 'axios';
-import { cookies } from 'next/headers';
+import { AxiosError } from 'axios';
+import AXIOS from '@/lib/api/server';
 import { NextResponse } from 'next/server';
-const API_URL = process.env.API_BASE_URL;
 
 export async function GET() {
     try {
 
-        const response = await axios.get(`${API_URL}/api/v1/tou`);
+        const response = await AXIOS.get(`/api/v1/tou`);
 
         return NextResponse.json({
             data: response.data
@@ -40,15 +39,10 @@ export async function GET() {
 
 export async function POST(_request: Request) {
     try {
-
-        const cookieStore = await cookies();
-        const response = await axios.post(`${API_URL}/api/v1/auth/tou/accept`, {}, {
-            headers: {
-                Authorization: `Bearer ${cookieStore.get(
-                    'access_token'
-                )?.value}`,
-            }
-        });
+        // Authorization is attached automatically by AXIOS's own request
+        // interceptor (reads the access_token cookie) — no need to read the
+        // cookie and build the header manually here anymore.
+        const response = await AXIOS.post(`/api/v1/auth/tou/accept`, {});
 
         return NextResponse.json({
             data: response.data

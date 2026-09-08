@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/providers/theme-provider"
+import { fontHeading, fontSans } from "@/lib/fonts";
+import { cn } from "@/lib/utils";
 import "./globals.css";
 import { Providers } from "./Providers";
 import { Toaster } from "sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
   title: "Miller 3",
@@ -17,7 +20,11 @@ export default function RootLayout({
 
   return (
     <>
-      <html lang="en" suppressHydrationWarning>
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={cn(fontSans.variable, fontHeading.variable)}
+      >
         <head />
         <body>
           <Toaster />
@@ -28,7 +35,9 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <Providers>
-              {children}
+              <TooltipProvider delayDuration={200}>
+                {children}
+              </TooltipProvider>
             </Providers>
           </ThemeProvider>
         </body>

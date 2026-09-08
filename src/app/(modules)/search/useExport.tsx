@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { toast } from 'sonner';
 import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { updateCreditsRemaining } from '@/store/slices/authSlice';
 import { parseApiError, isCreditError, showCreditLimitToast } from './apiError';
 import { isSessionExpiring } from '@/lib/session';
@@ -23,7 +24,7 @@ export function useExport() {
         setIsExporting(true);
         try {
             const payload = { company_ids: companyIds, format: exportFormat };
-            const response = await axios.post('/api/export', payload, {
+            const response = await apiClient.post('/export', payload, {
                 responseType: 'blob',
             });
             const blob = response.data as Blob;

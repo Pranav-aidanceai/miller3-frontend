@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import axios from 'axios'
+import apiClient from '@/lib/api/client'
 import { getErrorMessage } from '@/lib/apiError'
 
 interface TermsModalProps {
@@ -23,7 +23,7 @@ export default function TermsModal({ onAccept, onClose }: TermsModalProps) {
 
     const fetchAgreement = async () => {
       try {
-        const res = await axios.get('/api/auth/user-agreement')
+        const res = await apiClient.get('/auth/user-agreement')
 
         // The route wraps the upstream response as { data: ... }. The markdown
         // may be the string itself or nested under a common key.

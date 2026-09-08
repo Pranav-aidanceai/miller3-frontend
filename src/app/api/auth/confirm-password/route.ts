@@ -2,6 +2,10 @@ import axios, { AxiosError } from 'axios';
 import { NextResponse } from 'next/server';
 const API_URL = process.env.API_BASE_URL;
 
+// Deliberately NOT routed through the shared src/lib/api/server.ts instance —
+// see the identical note in ../verify-otp/route.ts: this is a pre-auth flow,
+// and that instance's 401-retry-via-refresh logic would misinterpret a
+// legitimate "invalid/expired reset code" 401 as an expired session.
 export async function POST(req: Request) {
     try {
         const data = await req.json();

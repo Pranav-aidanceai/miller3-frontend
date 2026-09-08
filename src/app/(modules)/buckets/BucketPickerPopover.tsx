@@ -1,6 +1,6 @@
 'use client';
 
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { useState } from 'react';
 import { Check, Folder, FolderMinus, FolderPlus, Loader2, RotateCcw, Star } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -32,6 +32,8 @@ interface BucketPickerPopoverProps {
      * selection, noise in the drawer where it is always the one company open.
      */
     showCount?: boolean;
+    /** Merged over the trigger's own classes, for toolbars with their own button style. */
+    className?: string;
     /** Fires after a successful add/remove, e.g. to refresh the row or drawer. */
     onDone?: (bucket: Bucket) => void;
 }
@@ -49,6 +51,7 @@ export default function BucketPickerPopover({
     bucketNames,
     tooltipId,
     showCount = true,
+    className,
     onDone,
 }: BucketPickerPopoverProps) {
 
@@ -72,7 +75,7 @@ export default function BucketPickerPopover({
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.get('/api/bucket');
+            const response = await apiClient.get('/bucket');
             const items = sortBuckets(response.data?.items ?? []);
             // In remove mode only the buckets holding the company are offered.
             setBuckets(removing ? items.filter(b => bucketNames?.includes(b.name)) : items);
@@ -98,8 +101,8 @@ export default function BucketPickerPopover({
         setSaving(true);
         try {
             const payload = { bucket_id: bucket.id, company_ids: companyIds };
-            if (removing) await axios.delete('/api/bucket/company', { data: payload });
-            else await axios.post('/api/bucket/company', payload);
+            if (removing) await apiClient.delete('/bucket/company', { data: payload });
+            else await apiClient.post('/bucket/company', payload);
             setOpen(false);
             toast.success(
                 removing
@@ -131,7 +134,8 @@ export default function BucketPickerPopover({
                         removing
                             ? 'border border-border hover:bg-accent'
                             : 'bg-primary text-primary-foreground hover:bg-primary/90',
-                        disabled && 'cursor-not-allowed opacity-50'
+                        disabled && 'cursor-not-allowed opacity-50',
+                        className
                     )}
                 >
                     {removing
@@ -174,7 +178,7 @@ export default function BucketPickerPopover({
                         <p className="px-2 py-2 text-xs text-muted-foreground">
                             {removing
                                 ? 'This company is not in any bucket.'
-                                : 'No buckets yet — create one from My Buckets.'}
+                                : 'No buckets yet — create one from Bucket List.'}
                         </p>
                     )}
 

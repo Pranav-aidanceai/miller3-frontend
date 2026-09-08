@@ -14,7 +14,11 @@ import TermsModal from './auth/register/TermsOfUse';
 import ApprovalPending from './auth/ApprovalPending';
 import AccountRejected from './auth/AccountRejected';
 import AccountDeactivated from './auth/AccountDeactivated';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
+import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function LoginForm() {
 
@@ -48,7 +52,7 @@ export default function LoginForm() {
       if (errors || !data) {
         const fieldErrors: Record<string, string> = {};
         errors?.forEach((err: ApiError) => {
-          if (err?.code === "YOUR_ACCOUNT_IS_PENDING_ADMIN_APPROVAL.") {
+          if (err?.code === "ACCOUNT_PENDING") {
             setShowApproval(true);
             return;
           }
@@ -83,7 +87,7 @@ export default function LoginForm() {
 
   const handleTouAccept = async () => {
     try {
-      await axios.post('/api/auth/user-agreement', {});
+      await apiClient.post('/auth/user-agreement', {});
       setShowTouModal(false);
       router.push('/search');
     } catch (error) {
@@ -94,103 +98,79 @@ export default function LoginForm() {
 
   return (
     <>
-      <div className="flex min-h-screen">
-        <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:px-20">
-          <div className="mx-auto w-full max-w-md">
-            <h1 className="text-3xl font-bold tracking-tight flex gap-2">
-              <span className="bg-clip-text text-transparent bg-linear-to-r from-primary to-indigo-500">Vendor Lens</span>
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">Find any vendor. Enrich any record.</p>
+      <AuthSplitLayout heroSrc="/auth/hero.png" heroAlt="A tradesperson at work in their workshop">
+        <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground">Sign In</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Find any vendor. Enrich any record.</p>
 
-            <form onSubmit={formik.handleSubmit} className={'mt-8 space-y-4'}>
-              <div>
-                <label className="text-sm font-medium" htmlFor="email">Email</label>
-                <input
-                  id="email"
-                  type="email"
-                  value={formik.values.email}
-                  onChange={(e) => {
-                    formik.handleChange(e);
-                    setServerErrors(prev => ({ ...prev, email: '' }));
-                  }}
-                  onBlur={formik.handleBlur}
-                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
-                  placeholder="Enter your email"
-                />
-                {(serverErrors.email || (formik.touched.email && formik.errors.email)) && (
-                  <p className="mt-1 text-sm text-destructive">{serverErrors.email || formik.errors.email}</p>
-                )}
-              </div>
-              <div>
-                <label className="text-sm font-medium" htmlFor="password">Password</label>
-                <div className="relative mt-1">
-                  <input
-                    id="password"
-                    type={showPw ? 'text' : 'password'}
-                    value={formik.values.password}
-                    onChange={(e) => {
-                      formik.handleChange(e);
-                      setServerErrors(prev => ({ ...prev, password: '' }));
-                    }}
-                    onBlur={formik.handleBlur}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 pr-10 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
-                    placeholder="Enter your password"
-                  />
-                  <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                    {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {(serverErrors.password || (formik.touched.password && formik.errors.password)) && (
-                  <p className="mt-1 text-sm text-destructive">{serverErrors.password || formik.errors.password}</p>
-                )}
-              </div>
-              <div className="flex items-center justify-end">
-                <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">Forgot password?</Link>
-              </div>
+        <form onSubmit={formik.handleSubmit} className="mt-8 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formik.values.email}
+              onChange={(e) => {
+                formik.handleChange(e);
+                setServerErrors(prev => ({ ...prev, email: '' }));
+              }}
+              onBlur={formik.handleBlur}
+              className="h-12 rounded-xl px-4 text-base"
+              placeholder="Example@email.com"
+            />
+            {(serverErrors.email || (formik.touched.email && formik.errors.email)) && (
+              <p className="text-sm text-destructive">{serverErrors.email || formik.errors.email}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPw ? 'text' : 'password'}
+                value={formik.values.password}
+                onChange={(e) => {
+                  formik.handleChange(e);
+                  setServerErrors(prev => ({ ...prev, password: '' }));
+                }}
+                onBlur={formik.handleBlur}
+                className="h-12 rounded-xl px-4 pr-11 text-base"
+                placeholder="Enter your password"
+              />
               <button
-                type="submit"
-                className="flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!(formik.isValid && formik.dirty) || loading}
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
+                aria-label={showPw ? 'Hide password' : 'Show password'}
               >
-                {loading ? 'Signing In...' : 'Sign In'}
+                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-            </form>
-
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              Don&apos;t have an account? <Link href="/auth/register" className="text-primary hover:underline">Sign up</Link>
-            </p>
-          </div>
-        </div>
-
-        <div className="hidden lg:flex flex-1 items-center justify-center bg-linear-to-br from-primary/10 via-background to-indigo-500/10 relative overflow-hidden">
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'radial-gradient(circle at 1px 1px, hsl(var(--border)) 1px, transparent 0)',
-            backgroundSize: '32px 32px',
-          }} />
-          <div className="relative z-10 text-center">
-            <div className="text-6xl font-bold text-gradient">16M+</div>
-            <p className="mt-2 text-lg text-muted-foreground">Companies in our database</p>
-            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
-              A nationwide vendor discovery platform featuring{' '}
-              <span className="font-semibold text-foreground">250K women-owned</span>,{' '}
-              <span className="font-semibold text-foreground">300K minority-owned</span> and{' '}
-              <span className="font-semibold text-foreground">100K veteran-owned</span> businesses
-              across every major industry.
-            </p>
-            <div className="mt-8 flex gap-4 justify-center">
-              {['NAICS Codes', 'Contact Info', 'Revenue Data', 'Demographics'].map(tag => (
-                <span key={tag} className="rounded-pill border border-border bg-card px-3 py-1 text-xs font-medium">{tag}</span>
-              ))}
             </div>
+            {(serverErrors.password || (formik.touched.password && formik.errors.password)) && (
+              <p className="text-sm text-destructive">{serverErrors.password || formik.errors.password}</p>
+            )}
           </div>
-        </div>
-      </div>
+          <div className="flex items-center justify-end">
+            <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">Forgot password?</Link>
+          </div>
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-xl text-base"
+            disabled={!(formik.isValid && formik.dirty) || loading}
+          >
+            {loading ? 'Signing In...' : 'Sign In'}
+          </Button>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Don&apos;t have an account? <Link href="/auth/register" className="text-primary hover:underline">Sign up</Link>
+        </p>
+      </AuthSplitLayout>
       {showTouModal &&
         <TermsModal
           onAccept={() => handleTouAccept()}
           onClose={async () => {
-            const { data } = await axios.post('/api/delete-cookie');
+            const { data } = await apiClient.post('/delete-cookie');
             if (data?.success) {
               dispatch(logout());
               setShowTouModal(false);

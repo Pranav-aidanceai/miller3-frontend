@@ -7,7 +7,7 @@ import { X, Copy, AlertCircle, Info, Zap, Folder, Sparkles, RefreshCw, Pencil } 
 import { cn } from '@/lib/utils';
 import { filterTitleOf, generateCompanyDescriptionAction, getCompanyAction, getFilterOptionsAction, getSimilarCompanyAction, singleEnrichAction } from './searchServices';
 import { isSessionExpiring } from '@/lib/session';
-import { CompanyData } from '@/types/search';
+import { CodeFilterResponse, CompanyData } from '@/types/search';
 import SimilarPage from './Similar';
 import { ApiErrorResponse } from '@/types/common';
 import { Tooltip } from 'react-tooltip';
@@ -18,6 +18,16 @@ import BucketPickerPopover from '../buckets/BucketPickerPopover';
 import EditCompanyModal from './EditCompanyModal';
 
 const ENRICHMENT_STALE_DAYS = 90;
+
+/**
+ * SIC labels are looked up by 4-digit prefix, and the catalogue may key its
+ * entry by that prefix or by a longer padded code — either way the industry is
+ * the same, so match on the prefix rather than on an exact key.
+ */
+function sicTitleOf(results: CodeFilterResponse['results'] | undefined, prefix: string): string | null {
+    if (!results || Array.isArray(results)) return null;
+    return Object.entries(results).find(([code]) => code.slice(0, 4) === prefix)?.[1] ?? null;
+}
 
 function formatEnrichedAt(iso: string): { text: string; isStale: boolean } {
     const d = new Date(iso);
@@ -348,8 +358,12 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
         if (!sicCode || isLocked('sic_code')) return;
         let active = true;
         (async () => {
-            const response = await getFilterOptionsAction('sic', { q: sicCode, limit: 1 });
-            if (active) setSicInfo({ code: sicCode, label: filterTitleOf(response.data?.results, sicCode) });
+            // A record's SIC can carry trailing detail digits, but the catalogue
+            // is keyed by the 4-digit industry — query and match on that prefix,
+            // not on the full code, or the lookup finds nothing.
+            const prefix = sicCode.slice(0, 4);
+            const response = await getFilterOptionsAction('sic', { q: prefix, limit: 1 });
+            if (active) setSicInfo({ code: sicCode, label: sicTitleOf(response.data?.results, prefix) });
         })();
         return () => { active = false; };
         // eslint-disable-next-line react-hooks/exhaustive-deps

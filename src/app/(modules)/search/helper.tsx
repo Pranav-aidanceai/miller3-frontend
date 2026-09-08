@@ -1,13 +1,31 @@
 import { cn } from "@/lib/utils";
 import { Company } from "@/types/search";
+import { digitsOnly, lettersOnly } from "./filterValidation";
 import { Globe, Info, Mail, Phone } from "lucide-react";
 import { Tooltip } from "react-tooltip";
 
-export const FilterInput = ({ label, value, onChange, placeholder, mono }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; mono?: boolean }) => (
+/**
+ * `numeric`/`letters` restrict what the field accepts. The input stays a text
+ * one — `type="number"` would let through `e`, `+`, `-` and a scroll wheel that
+ * silently changes the value — and characters are stripped as you type, so
+ * pasted text is cleaned the same way keystrokes are.
+ */
+export const FilterInput = ({ label, value, onChange, placeholder, mono, numeric, letters, maxLength, error }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; mono?: boolean; numeric?: boolean; letters?: boolean; maxLength?: number; error?: string }) => (
     <div>
         <label className="text-xs font-medium text-muted-foreground">{label}</label>
-        <input value={value} onChange={e => { onChange(e.target.value) }} placeholder={placeholder}
-            className={cn('mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring', mono && 'font-mono')} />
+        <input
+            value={value}
+            onChange={e => { onChange(numeric ? digitsOnly(e.target.value) : letters ? lettersOnly(e.target.value) : e.target.value) }}
+            placeholder={placeholder}
+            inputMode={numeric ? 'numeric' : undefined}
+            maxLength={maxLength}
+            aria-invalid={!!error}
+            className={cn(
+                'mt-1 flex h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-1',
+                error ? 'border-destructive focus:ring-destructive' : 'border-input focus:ring-ring',
+                mono && 'font-mono',
+            )} />
+        {error && <p className="mt-1 text-[11px] text-destructive">{error}</p>}
     </div>
 );
 

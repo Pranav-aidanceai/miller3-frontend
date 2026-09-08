@@ -1,17 +1,22 @@
 'use client'
 
 import { useFormik } from 'formik';
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ClipboardEvent as ReactClipboardEvent } from 'react';
 import * as yup from 'yup';
 import { resetPasswordAction } from '../authServices';
 import { ApiError } from '@/types/common';
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/apiError';
 import { Eye, EyeOff, Check } from 'lucide-react';
+import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const OTP_LENGTH = 6;
+const RESEND_COOLDOWN_SECONDS = 30;
 
 type Step = 'email' | 'otp' | 'password' | 'done';
 
@@ -87,13 +92,12 @@ function OtpInput({ value, onChange, disabled }: { value: string; onChange: (otp
           autoComplete={i === 0 ? 'one-time-code' : 'off'}
           maxLength={1}
           disabled={disabled}
-          className="h-16 w-full rounded-md border border-input bg-background text-center text-lg font-medium outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+          className="h-14 w-full rounded-xl border border-input bg-background text-center text-lg font-medium outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
         />
       ))}
     </div>
   );
 }
-
 
 export default function ForgotPasswordPage() {
 
@@ -102,8 +106,16 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resending, setResending] = useState(false);
 
-  const inputClass = "mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring";
+  // Counts down once per second while a resend cooldown is active, regardless
+  // of which step is showing (it only ever matters while on the OTP step).
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const emailFormik = useFormik({
     initialValues: { email: '' },
@@ -120,8 +132,23 @@ export default function ForgotPasswordPage() {
         return;
       }
       setStep('otp');
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     }
   });
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0 || resending) return;
+    setResending(true);
+    setError('');
+    const { errors } = await resetPasswordAction(emailFormik.values.email);
+    setResending(false);
+    if (errors) {
+      setError(errors.map((err: ApiError) => err.message).join(' ') || 'Failed to resend code');
+      return;
+    }
+    otpFormik.resetForm();
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+  };
 
   const otpFormik = useFormik({
     initialValues: { otp: '' },
@@ -132,7 +159,7 @@ export default function ForgotPasswordPage() {
       setError('');
       setLoading(true);
       try {
-        await axios.post('/api/auth/verify-otp', {
+        await apiClient.post('/auth/verify-otp', {
           email: emailFormik.values.email,
           otp: values.otp.trim(),
         });
@@ -160,7 +187,7 @@ export default function ForgotPasswordPage() {
       setError('');
       setLoading(true);
       try {
-        await axios.post('/api/auth/confirm-password', {
+        await apiClient.post('/auth/confirm-password', {
           email: emailFormik.values.email,
           new_password: values.password,
         });
@@ -173,6 +200,12 @@ export default function ForgotPasswordPage() {
     }
   });
 
+  const heading: Record<Step, string> = {
+    email: 'Reset Password',
+    otp: 'Verify Code',
+    password: 'New Password',
+    done: 'All Set',
+  };
   const subtitle: Record<Step, string> = {
     email: 'Reset your password',
     otp: `Enter the code sent to ${emailFormik.values.email}`,
@@ -181,136 +214,166 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        <h1 className="text-2xl font-bold"><span className="text-gradient">Vendor Lens</span></h1>
-        <p className="mt-1 text-sm text-muted-foreground">{subtitle[step]}</p>
+    <AuthSplitLayout heroSrc="/auth/hero.png" heroAlt="A tradesperson at work in their workshop">
+      <h1 className="font-heading text-4xl font-semibold tracking-tight text-foreground">{heading[step]}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">{subtitle[step]}</p>
 
-        {/* Step 1 — email */}
-        {step === 'email' && (
-          <form onSubmit={emailFormik.handleSubmit} className="mt-8 space-y-4">
-            <div>
-              <label className="text-sm font-medium">Email</label>
-              <input data-testid='email-input' value={emailFormik.values.email} onChange={emailFormik.handleChange} onBlur={emailFormik.handleBlur} name="email" type="email" className={inputClass} placeholder="Enter your email" />
-              {(emailFormik.touched.email && emailFormik.errors.email) && <p className="text-sm text-destructive">{emailFormik.errors.email}</p>}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <button
-              type="submit"
-              className="flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!(emailFormik.isValid && emailFormik.dirty) || loading}
-            >
-              {loading ? 'Sending...' : 'Send Reset Code'}
-            </button>
-            <button
-              type="button"
-              className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => router.push('/')}
-              disabled={loading}
-            >
-              Back to login
-            </button>
-          </form>
-        )}
-
-        {/* Step 2 — OTP */}
-        {step === 'otp' && (
-          <form onSubmit={otpFormik.handleSubmit} className="mt-8 space-y-4">
-            <div>
-              <label className="text-sm font-medium">Verification Code</label>
-              <OtpInput
-                value={otpFormik.values.otp}
-                onChange={(otp) => { setError(''); otpFormik.setFieldValue('otp', otp); }}
-                disabled={loading}
-              />
-              {(otpFormik.values.otp.length > 0 && otpFormik.values.otp.length < OTP_LENGTH && otpFormik.errors.otp) && <p className="mt-2 text-sm text-destructive">{otpFormik.errors.otp}</p>}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <button
-              type="submit"
-              className="flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!(otpFormik.isValid && otpFormik.dirty) || loading}
-            >
-              {loading ? 'Verifying...' : 'Verify Code'}
-            </button>
-            <button
-              type="button"
-              className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => { setError(''); otpFormik.resetForm(); setStep('email'); }}
-              disabled={loading}
-            >
-              Use a different email
-            </button>
-          </form>
-        )}
-
-        {/* Step 3 — new password */}
-        {step === 'password' && (
-          <form onSubmit={passwordFormik.handleSubmit} className="mt-8 space-y-4">
-            <div>
-              <div className="relative">
-                <label htmlFor="password" className="text-sm font-medium">New Password</label>
-                <input
-                  id="password"
-                  name="password"
-                  type={showPw ? 'text' : 'password'}
-                  value={passwordFormik.values.password}
-                  onChange={passwordFormik.handleChange}
-                  onBlur={passwordFormik.handleBlur}
-                  className={inputClass}
-                  placeholder="Enter your new password"
-                />
-                <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-5/8 text-muted-foreground hover:text-foreground cursor-pointer">
-                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {(passwordFormik.touched.password && passwordFormik.errors.password) && <p className="text-sm text-destructive">{passwordFormik.errors.password}</p>}
-            </div>
-            <div>
-              <label className="text-sm font-medium">Confirm Password</label>
-              <div className="relative">
-                <input
-                  name="confirm"
-                  type="password"
-                  value={passwordFormik.values.confirm}
-                  onChange={passwordFormik.handleChange}
-                  onBlur={passwordFormik.handleBlur}
-                  className={inputClass}
-                  placeholder="Confirm your new password"
-                />
-                {passwordFormik.values.confirm && passwordFormik.values.password === passwordFormik.values.confirm && (
-                  <div className="absolute right-3 top-3/8 text-green-500">
-                    <Check className="h-4 w-4" />
-                  </div>
-                )}
-              </div>
-              {(passwordFormik.touched.confirm && passwordFormik.errors.confirm) && <p className="text-sm text-destructive">{passwordFormik.errors.confirm}</p>}
-            </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <button
-              type="submit"
-              className="flex h-10 w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!(passwordFormik.isValid && passwordFormik.dirty) || loading}
-            >
-              {loading ? 'Updating...' : 'Reset Password'}
-            </button>
-          </form>
-        )}
-
-        {/* Step 4 — done */}
-        {step === 'done' && (
-          <div className="mt-8 rounded-lg border border-border bg-card p-6 text-center">
-            <p className="text-sm">Your password has been reset successfully.</p>
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="mt-4 inline-block text-sm text-primary hover:underline cursor-pointer"
-            >
-              Back to login
-            </button>
+      {/* Step 1 — email */}
+      {step === 'email' && (
+        <form onSubmit={emailFormik.handleSubmit} className="mt-8 space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              data-testid="email-input"
+              value={emailFormik.values.email}
+              onChange={emailFormik.handleChange}
+              onBlur={emailFormik.handleBlur}
+              name="email"
+              type="email"
+              className="h-12 rounded-xl px-4 text-base"
+              placeholder="Enter your email"
+            />
+            {(emailFormik.touched.email && emailFormik.errors.email) && <p className="text-sm text-destructive">{emailFormik.errors.email}</p>}
           </div>
-        )}
-      </div>
-    </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-xl text-base"
+            disabled={!(emailFormik.isValid && emailFormik.dirty) || loading}
+          >
+            {loading ? 'Sending...' : 'Send Reset Code'}
+          </Button>
+          <button
+            type="button"
+            className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => router.push('/')}
+            disabled={loading}
+          >
+            Back to login
+          </button>
+        </form>
+      )}
+
+      {/* Step 2 — OTP */}
+      {step === 'otp' && (
+        <form onSubmit={otpFormik.handleSubmit} className="mt-8 space-y-6">
+          <div>
+            <OtpInput
+              value={otpFormik.values.otp}
+              onChange={(otp) => { setError(''); otpFormik.setFieldValue('otp', otp); }}
+              disabled={loading}
+            />
+          </div>
+          <p className="text-center text-sm text-muted-foreground">
+            Didn&apos;t get a code?{' '}
+            {resendCooldown > 0 ? (
+              <span>Resend in {resendCooldown}s</span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={resending}
+                className="cursor-pointer text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {resending ? 'Sending...' : 'Resend Code'}
+              </button>
+            )}
+          </p>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-xl text-base"
+            disabled={!(otpFormik.isValid && otpFormik.dirty) || loading}
+          >
+            {loading ? 'Verifying...' : 'Verify Code'}
+          </Button>
+          <button
+            type="button"
+            className="block w-full text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => { setError(''); otpFormik.resetForm(); setResendCooldown(0); setStep('email'); }}
+            disabled={loading}
+          >
+            Use a different email
+          </button>
+        </form>
+      )}
+
+      {/* Step 3 — new password */}
+      {step === 'password' && (
+        <form onSubmit={passwordFormik.handleSubmit} className="mt-8 space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="new-password">New Password</Label>
+            <div className="relative">
+              <Input
+                id="new-password"
+                name="password"
+                type={showPw ? 'text' : 'password'}
+                value={passwordFormik.values.password}
+                onChange={passwordFormik.handleChange}
+                onBlur={passwordFormik.handleBlur}
+                className="h-12 rounded-xl px-4 pr-11 text-base"
+                placeholder="At least 8 characters"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                aria-label={showPw ? 'Hide password' : 'Show password'}
+              >
+                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {(passwordFormik.touched.password && passwordFormik.errors.password) && <p className="text-sm text-destructive">{passwordFormik.errors.password}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirm Password</Label>
+            <div className="relative">
+              <Input
+                id="confirm-password"
+                name="confirm"
+                type="password"
+                value={passwordFormik.values.confirm}
+                onChange={passwordFormik.handleChange}
+                onBlur={passwordFormik.handleBlur}
+                className="h-12 rounded-xl px-4 text-base"
+                placeholder="Confirm your new password"
+              />
+              {passwordFormik.values.confirm && passwordFormik.values.password === passwordFormik.values.confirm && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-success">
+                  <Check className="h-4 w-4" />
+                </div>
+              )}
+            </div>
+            {(passwordFormik.touched.confirm && passwordFormik.errors.confirm) && <p className="text-sm text-destructive">{passwordFormik.errors.confirm}</p>}
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button
+            type="submit"
+            className="h-12 w-full rounded-xl text-base"
+            disabled={!(passwordFormik.isValid && passwordFormik.dirty) || loading}
+          >
+            {loading ? 'Updating...' : 'Reset Password'}
+          </Button>
+        </form>
+      )}
+
+      {/* Step 4 — done */}
+      {step === 'done' && (
+        <div className="mt-8 rounded-xl border border-border bg-card p-6 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success">
+            <Check className="h-7 w-7" />
+          </div>
+          <p className="mt-4 text-sm">Your password has been reset successfully.</p>
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            className="mt-4 inline-block text-sm text-primary hover:underline cursor-pointer"
+          >
+            Back to login
+          </button>
+        </div>
+      )}
+    </AuthSplitLayout>
   );
 }

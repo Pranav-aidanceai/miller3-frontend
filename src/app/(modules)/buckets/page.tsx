@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
-import { Download, FolderMinus, Grid3X3, List, Loader2, RefreshCw, Search, Star, X, Zap } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Download, FolderMinus, Loader2, RefreshCw, Search, Star, X, Zap } from 'lucide-react';
 import { Tooltip } from 'react-tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import 'react-tooltip/dist/react-tooltip.css';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
@@ -16,12 +17,14 @@ import { Company } from '@/types/search';
 import { CompanyDrawer } from '../search/CompanyDrawer';
 import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
-import SearchPagination from '../search/SearchPagination';
 import ExportModal from '../search/ExportModal';
 import SortPopover, { type SortOption } from '../search/SortPopover';
 import { useExport } from '../search/useExport';
 import { useBatchEnrich, type EnrichRecordUpdate } from '../search/useBatchEnrich';
 import BucketList, { type Bucket } from './BucketList';
+import BucketFormModal from './BucketFormModal';
+
+const PER_PAGE_OPTIONS = [25, 50, 100] as const;
 
 /** The columns the bucket-companies endpoint accepts for `sort_by`. */
 const sortOptions: SortOption[] = [
@@ -97,7 +100,6 @@ export default function BucketsPage() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [totalResults, setTotalResults] = useState(0);
-    const [totalPages, setTotalPages] = useState(0);
     const [notAccessibleFields, setNotAccessibleFields] = useState<string[]>([]);
     const [perPage, setPerPage] = useState(25);
     const [currentPage, setCurrentPage] = useState(1);
@@ -112,12 +114,16 @@ export default function BucketsPage() {
     const [sortBy, setSortBy] = useState('');
     const [sortOrder, setSortOrder] = useState('');
 
-    const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+    // The card/table toggle UI is paused elsewhere in this file — table is
+    // the only reachable mode for now, so there's no setter.
+    const [viewMode] = useState<'table' | 'card'>('table');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
     const [isRemoving, setIsRemoving] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+    const [addingCompanies, setAddingCompanies] = useState(false);
+    const [perPagePopoverOpen, setPerPagePopoverOpen] = useState(false);
 
     const { isExporting, exportData } = useExport();
     const { isEnriching, enrich } = useBatchEnrich();
@@ -125,7 +131,7 @@ export default function BucketsPage() {
     const fetchCompanies = useCallback(async (bucketId: string, cursor: string | null = null) => {
         setIsLoading(true);
         try {
-            const response = await axios.get('/api/bucket/company', {
+            const response = await apiClient.get('/bucket/company', {
                 params: {
                     bucket_id: bucketId,
                     limit: perPage,
@@ -139,7 +145,6 @@ export default function BucketsPage() {
             const data = response.data ?? {};
             setCompanies((data.results ?? []).map(toCompany));
             setTotalResults(data.total ?? 0);
-            setTotalPages(data.total_pages ?? 0);
             setHasNextPage(data.next_cursor ?? null);
             setNotAccessibleFields(data.not_accessible ?? []);
         } catch (err: unknown) {
@@ -149,7 +154,6 @@ export default function BucketsPage() {
             }
             setCompanies([]);
             setTotalResults(0);
-            setTotalPages(0);
             setHasNextPage(null);
         } finally {
             setIsLoading(false);
@@ -186,6 +190,7 @@ export default function BucketsPage() {
     const changePerPage = (value: number) => {
         setPerPage(value);
         rewindPaging();
+        setPerPagePopoverOpen(false);
     };
 
     const changeSearch = (value: string) => {
@@ -215,7 +220,6 @@ export default function BucketsPage() {
         setBucket(null);
         setCompanies([]);
         setTotalResults(0);
-        setTotalPages(0);
         setHasNextPage(null);
         setSelectedIds(new Set());
         setIsLoading(false);
@@ -232,6 +236,11 @@ export default function BucketsPage() {
             }
         )));
     }, []);
+
+    // The arrows go dead whenever there is nowhere to page to — no bucket, an
+    // empty/short result set, or a request already in flight.
+    const canPrevPage = !!bucket && !isLoading && currentPage > 1;
+    const canNextPage = !!bucket && !isLoading && !!hasNextPage && companies.length > 0;
 
     const allSelected = companies.length > 0 && companies.every(c => selectedIds.has(c.id));
 
@@ -257,7 +266,7 @@ export default function BucketsPage() {
         const count = selectedIds.size;
         setIsRemoving(true);
         try {
-            await axios.delete('/api/bucket/company', {
+            await apiClient.delete('/bucket/company', {
                 data: { bucket_id: bucket.id, company_ids: Array.from(selectedIds) },
             });
             toast.success(
@@ -298,11 +307,9 @@ export default function BucketsPage() {
 
     return (
         <div className="flex h-full">
-            {/* Left: the bucket rail */}
+            {/* Left: the bucket rail — Figma has no separate section header
+                above it, the list (Favourites first) starts right at the top. */}
             <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border">
-                <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
-                    <h2 className="text-sm font-semibold">My Buckets</h2>
-                </div>
                 <BucketList
                     selectedId={bucket?.id ?? null}
                     onSelect={selectBucket}
@@ -311,18 +318,15 @@ export default function BucketsPage() {
                 />
             </aside>
 
-            {/* Right: the companies inside the selected bucket */}
             <div className="flex min-w-0 flex-1 flex-col">
-                <div className="shrink-0 space-y-3 border-b border-border p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="shrink-0 border-b border-border">
+                    <div className="flex flex-wrap items-center justify-between gap-3 py-3 px-6 border-b">
                         <div className="flex min-w-0 items-center gap-2">
                             {bucket?.is_favorite && <Star className="h-4 w-4 shrink-0 fill-warning text-warning" />}
-                            <h1 className="truncate text-lg font-bold">{bucket?.name ?? 'No bucket selected'}</h1>
+                            <h1 className="truncate font-heading text-2xl font-medium text-[#5A5A5ACC]">{bucket?.name ?? 'No bucket selected'}</h1>
                             {bucket && (
-                                <span className="shrink-0 text-sm text-muted-foreground">
-                                    {isLoading
-                                        ? '· loading…'
-                                        : `· ${totalResults.toLocaleString()} ${totalResults === 1 ? 'company' : 'companies'}`}
+                                <span className="shrink-0 rounded-full border border-brand-accent bg-brand-accent/10 px-2.5 py-1 text-xs text-brand-accent font-heading font-normal">
+                                    {isLoading ? '…' : `${totalResults.toLocaleString()} item${totalResults === 1 ? '' : 's'}`}
                                 </span>
                             )}
                         </div>
@@ -330,31 +334,11 @@ export default function BucketsPage() {
                         <div className="flex flex-wrap items-center gap-2">
                             <button
                                 type="button"
-                                data-tooltip-id="bucket-enrich-tip"
-                                onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refresh, applyEnrichUpdate)}
-                                disabled={selectedIds.size <= 1 || isEnriching}
-                                className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {isEnriching
-                                    ? <><Loader2 className="h-4 w-4 animate-spin" />Enriching...</>
-                                    : <><Zap className="h-4 w-4" />Batch Enrich{selectedIds.size > 1 && ` (${selectedIds.size})`}</>}
-                            </button>
-                            <Tooltip
-                                id="bucket-enrich-tip"
-                                place="left"
-                                content={selectedIds.size <= 1
-                                    ? 'Select at least 2 companies for batch enrichment'
-                                    : 'Enrich selected companies'}
-                                className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
-                            />
-
-                            <button
-                                type="button"
                                 data-tooltip-id="bucket-export-tip"
                                 onClick={() => setShowExportModal(true)}
                                 disabled={role === 'FREE' || selectedIds.size === 0}
                                 className={cn(
-                                    'flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer',
+                                    'flex items-center gap-2 rounded-xl border-2 border-primary px-4 py-2 text-sm text-primary font-sans font-normal hover:bg-primary/10 active:scale-[0.98] cursor-pointer',
                                     (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50'
                                 )}
                             >
@@ -370,87 +354,94 @@ export default function BucketsPage() {
                                         : 'Export selected companies'}
                                 className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
                             />
+
+                            <button
+                                type="button"
+                                data-tooltip-id="bucket-enrich-tip"
+                                onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refresh, applyEnrichUpdate)}
+                                disabled={selectedIds.size <= 1 || isEnriching}
+                                className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-sans font-normal text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {isEnriching
+                                    ? <><Loader2 className="h-4 w-4 animate-spin" />Enriching...</>
+                                    : <><Zap className="h-4 w-4" />Batch Enrich{selectedIds.size > 1 && ` (${selectedIds.size})`}</>}
+                            </button>
+                            <Tooltip
+                                id="bucket-enrich-tip"
+                                place="left"
+                                content={selectedIds.size <= 1
+                                    ? 'Select at least 2 companies for batch enrichment'
+                                    : 'Enrich selected companies'}
+                                className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+                            />
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-50 flex-1">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <input
-                                value={searchText}
-                                onChange={e => changeSearch(e.target.value)}
-                                disabled={!bucket}
-                                placeholder="Search companies in this bucket..."
-                                className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-4">
+                        <div className='w-full max-w-1/2 flex items-center gap-2'>
+                            <div className="relative w-full">
+                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    value={searchText}
+                                    onChange={e => changeSearch(e.target.value)}
+                                    disabled={!bucket}
+                                    placeholder="Search Industry / company / location"
+                                    className="h-10 w-full rounded-xl border border-input bg-white pl-9 pr-9 text-sm font-sans font-light outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                                />
+                                {searchText && (
+                                    <button
+                                        type="button"
+                                        onClick={() => changeSearch('')}
+                                        aria-label="Clear search"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+                            <SortPopover
+                                sortBy={sortBy}
+                                sortOrder={sortOrder}
+                                setSortBy={changeSortBy}
+                                setSortOrder={changeSortOrder}
+                                options={sortOptions}
                             />
-                            {searchText && (
-                                <button
-                                    type="button"
-                                    onClick={() => changeSearch('')}
-                                    aria-label="Clear search"
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            )}
                         </div>
 
-                        <SortPopover
-                            sortBy={sortBy}
-                            sortOrder={sortOrder}
-                            setSortBy={changeSortBy}
-                            setSortOrder={changeSortOrder}
-                            options={sortOptions}
-                        />
+                        <div className='flex items-center gap-2'>
+                            {/* <button
+                                type="button"
+                                onClick={() => setAddingCompanies(true)}
+                                disabled={!bucket}
+                                className="flex h-10 items-center gap-2 rounded-xl border-2 border-primary px-3 text-sm font-medium text-primary hover:bg-primary/10 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <FolderPlus className="h-4 w-4" /> Add
+                            </button> */}
 
-                        <button
-                            type="button"
-                            data-tooltip-id="bucket-remove-tip"
-                            onClick={handleRemoveFromBucket}
-                            disabled={!bucket || selectedIds.size === 0 || isRemoving}
-                            className="flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-medium transition-colors cursor-pointer hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-foreground disabled:hover:border-border"
-                        >
-                            {isRemoving
-                                ? <><Loader2 className="h-4 w-4 animate-spin" />Removing...</>
-                                : <><FolderMinus className="h-4 w-4" />Remove{selectedIds.size > 0 && ` (${selectedIds.size})`}</>}
-                        </button>
-                        <Tooltip
-                            id="bucket-remove-tip"
-                            place="bottom"
-                            content={selectedIds.size === 0
-                                ? 'Select companies to remove from this bucket'
-                                : `Remove selected companies from "${bucket?.name ?? 'this bucket'}"`}
-                            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
-                        />
-
-                        <div className="flex items-center gap-1">
                             <button
                                 type="button"
-                                onClick={() => setViewMode('card')}
-                                className={cn(
-                                    'rounded-md p-2 transition-colors cursor-pointer',
-                                    viewMode === 'card' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'
-                                )}
-                                aria-label="Card view"
+                                data-tooltip-id="bucket-remove-tip"
+                                onClick={handleRemoveFromBucket}
+                                disabled={!bucket || selectedIds.size === 0 || isRemoving}
+                                className="flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-sm font-medium font-sans transition-colors cursor-pointer hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-foreground disabled:hover:border-border"
                             >
-                                <Grid3X3 className="h-4 w-4" />
+                                {isRemoving
+                                    ? <><Loader2 className="h-4 w-4 animate-spin" />Removing...</>
+                                    : <><FolderMinus className="h-4 w-4" />Remove{selectedIds.size > 0 && ` (${selectedIds.size})`}</>}
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setViewMode('table')}
-                                className={cn(
-                                    'rounded-md p-2 transition-colors cursor-pointer',
-                                    viewMode === 'table' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'
-                                )}
-                                aria-label="Table view"
-                            >
-                                <List className="h-4 w-4" />
-                            </button>
+                            <Tooltip
+                                id="bucket-remove-tip"
+                                place="bottom"
+                                content={selectedIds.size === 0
+                                    ? 'Select companies to remove from this bucket'
+                                    : `Remove selected companies from "${bucket?.name ?? 'this bucket'}"`}
+                                className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+                            />
                         </div>
                     </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-auto p-4">
+                <div className="min-h-0 flex-1 overflow-auto">
                     {!bucket ? (
                         <div className="flex h-full items-center justify-center text-center text-muted-foreground">
                             <div>
@@ -460,19 +451,44 @@ export default function BucketsPage() {
                         </div>
                     ) : (
                         <>
-                            <div className="mb-3 flex items-center justify-between gap-3">
-                                <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    {isLoading
-                                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching companies...</>
-                                        : <span>Showing {companies.length} of {totalResults.toLocaleString()} companies</span>}
-                                </p>
+                            <div className="flex items-center justify-between gap-3 p-4 border-b border-border">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Popover open={perPagePopoverOpen} onOpenChange={setPerPagePopoverOpen}>
+                                            <PopoverTrigger asChild>
+                                                <button className="flex h-7 items-center gap-1 rounded-md border border-border bg-white px-2 text-xs hover:bg-accent cursor-pointer">
+                                                    {perPage}
+                                                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-40 p-1" align="start">
+                                                {PER_PAGE_OPTIONS.map(value => (
+                                                    <button
+                                                        key={value}
+                                                        onClick={() => changePerPage(value)}
+                                                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                                                    >
+                                                        {value}
+                                                        {perPage === value && <Check className="h-4 w-4 text-primary" />}
+                                                    </button>
+                                                ))}
+                                            </PopoverContent>
+                                        </Popover>
+                                        <span className="text-xs font-normal text-[#B3B3B3] font-sans">Per Page</span>
+                                    </div>
+                                    <p className="flex items-center gap-2 text-xs font-normal font-sans text-[#B3B3B3]">
+                                        {isLoading
+                                            ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching companies...</>
+                                            : <span>Showing {companies.length} of {totalResults.toLocaleString()} companies</span>}
+                                    </p>
+                                </div>
                                 <div className="flex items-center gap-3">
                                     {viewMode === 'card' && companies.length > 0 && (
                                         <button
                                             type="button"
                                             onClick={toggleSelectAll}
                                             disabled={isLoading}
-                                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
+                                            className="flex items-center gap-1.5 text-sm font-sans text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
                                         >
                                             <input
                                                 type="checkbox"
@@ -492,6 +508,27 @@ export default function BucketsPage() {
                                         <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
                                         Refresh
                                     </button>
+
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            type="button"
+                                            disabled={!canPrevPage}
+                                            onClick={handlePrev}
+                                            aria-label="Previous page"
+                                            className="flex h-7 w-7 items-center justify-center rounded-md border border-border cursor-pointer hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={!canNextPage}
+                                            onClick={handleNext}
+                                            aria-label="Next page"
+                                            className="flex h-7 w-7 items-center justify-center rounded-md border border-border cursor-pointer hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -533,17 +570,6 @@ export default function BucketsPage() {
                                             onCardClick={setSelectedCompany}
                                         />
                                     )}
-
-                                    <SearchPagination
-                                        perPage={perPage}
-                                        setPerPage={changePerPage}
-                                        currentPage={currentPage}
-                                        totalPages={totalPages}
-                                        hasNextPage={hasNextPage}
-                                        isLoading={isLoading}
-                                        onPrev={handlePrev}
-                                        onNext={handleNext}
-                                    />
                                 </>
                             )}
                         </>
@@ -570,6 +596,24 @@ export default function BucketsPage() {
                         setSelectedIds(new Set());
                     })}
                     isExporting={isExporting}
+                />
+            )}
+
+            {addingCompanies && bucket && (
+                <BucketFormModal
+                    mode="edit"
+                    bucket={bucket}
+                    autoOpenSearch
+                    onClose={() => setAddingCompanies(false)}
+                    onSaved={(updated) => {
+                        setBucket(updated);
+                        setBucketsRefresh(n => n + 1);
+                        setAddingCompanies(false);
+                        // The modal can add/remove this bucket's companies —
+                        // reload the table so it doesn't go stale behind it.
+                        rewindPaging();
+                        fetchCompanies(updated.id, null);
+                    }}
                 />
             )}
         </div>

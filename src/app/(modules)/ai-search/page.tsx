@@ -2,15 +2,19 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
 import {
+  Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Download,
-  Grid3X3,
-  List,
   Loader2,
+  Search,
   Sparkles,
+  X,
   Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -22,8 +26,10 @@ import { CompanyDrawer } from '../search/CompanyDrawer';
 import ExportModal from '../search/ExportModal';
 import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
-import SearchPagination from '../search/SearchPagination';
+import SortPopover, { type SortOption } from '../search/SortPopover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useBatchEnrich, type EnrichRecordUpdate } from '../search/useBatchEnrich';
+import BucketPickerPopover from '../buckets/BucketPickerPopover';
 import { Company, CompanyData } from '@/types/search';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
@@ -31,6 +37,26 @@ import { useSearchParams } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/store/store';
 import { updateCreditsRemaining } from '@/store/slices/authSlice';
+
+const PER_PAGE_OPTIONS = [25, 50, 100] as const;
+
+const sortOptions: SortOption[] = [
+  { value: 'company_name', label: 'Name' },
+  { value: 'annual_revenue', label: 'Revenue' },
+  { value: 'employee_size', label: 'Employees' },
+  { value: 'state', label: 'State' },
+  { value: 'city', label: 'City' },
+];
+
+/** Employee sizes come back as ranges ("5–9"), so the leading number orders them. */
+const sortValue = (c: Company, key: string): string | number => {
+  if (key === 'annual_revenue') return c.annual_revenue ?? -Infinity;
+  if (key === 'employee_size') {
+    const digits = String(c.employee_size ?? '').match(/\d+/);
+    return digits ? Number(digits[0]) : -Infinity;
+  }
+  return String((c as unknown as Record<string, unknown>)[key] ?? '').toLowerCase();
+};
 
 type Template = {
   id: number;
@@ -137,7 +163,6 @@ export default function AISearchPage() {
   // cursor per page, so going back means replaying the cursor we came from.
   const [perPage, setPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [currentCursor, setCurrentCursor] = useState<string | null>(null);
@@ -147,9 +172,18 @@ export default function AISearchPage() {
   const [paging, setPaging] = useState(false);
   const lastQueryRef = useRef<string | null>(null);
 
-  const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
+  // The card/table toggle UI is paused (see the commented-out button block
+  // below) — table is the only reachable mode for now, so there's no setter.
+  const [viewMode] = useState<'table' | 'card'>('table');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+
+  // Toolbar refinements. They work over the rows already fetched — see the
+  // note on `sortOptions` for why they can't be pushed to the endpoint.
+  const [searchText, setSearchText] = useState('');
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('');
+  const [perPageOpen, setPerPageOpen] = useState(false);
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
@@ -158,7 +192,27 @@ export default function AISearchPage() {
   const { isEnriching, enrich } = useBatchEnrich();
 
   const hasSearched = chat.length > 0;
-  const companies = useMemo(() => results.map(toCompany), [results]);
+  const companies = useMemo(() => {
+    const rows = results.map(toCompany);
+    const needle = searchText.trim().toLowerCase();
+    const matched = needle
+      ? rows.filter(c =>
+        [c.company_name, c.naics_code, c.city, c.state, c.county, c.msa]
+          .some(field => (field ?? '').toString().toLowerCase().includes(needle)),
+      )
+      : rows;
+    if (!sortBy || !sortOrder) return matched;
+    const direction = sortOrder === 'desc' ? -1 : 1;
+    return [...matched].sort((a, b) => {
+      const av = sortValue(a, sortBy);
+      const bv = sortValue(b, sortBy);
+      const delta =
+        typeof av === 'number' && typeof bv === 'number'
+          ? av - bv
+          : String(av).localeCompare(String(bv));
+      return direction * delta;
+    });
+  }, [results, searchText, sortBy, sortOrder]);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -239,7 +293,6 @@ export default function AISearchPage() {
         setCurrentCursor(null);
         setCurrentPage(1);
         setNextCursor(null);
-        setTotalPages(0);
         setTotalResults(0);
       } else {
         setPaging(true);
@@ -287,7 +340,6 @@ export default function AISearchPage() {
       // exporting; only a brand new query clears them.
       if (!silent) setSelectedIds(new Set());
       setNextCursor(data.next_cursor ?? null);
-      setTotalPages(data.total_pages ?? 0);
       setTotalResults(total);
       if (entryId) {
         setChat(prev =>
@@ -347,6 +399,26 @@ export default function AISearchPage() {
     },
   });
 
+  // "Start a new chat" drops the thread and its rows, which takes the page back
+  // to the centered hero — `hasSearched` is just "is there a thread".
+  const startNewChat = () => {
+    setChat([]);
+    setResults([]);
+    setStatusMessage(null);
+    setExpandedSql(new Set());
+    setSelectedIds(new Set());
+    setSearchText('');
+    setSortBy('');
+    setSortOrder('');
+    setCursorStack([]);
+    setCurrentCursor(null);
+    setCurrentPage(1);
+    setNextCursor(null);
+    setTotalResults(0);
+    lastQueryRef.current = null;
+    formik.resetForm();
+  };
+
   // Batch enrichment reports each company as it finishes. Only the availability
   // flags come over the socket, so patch those and leave the values alone.
   const applyEnrichUpdate = useCallback((update: EnrichRecordUpdate) => {
@@ -383,8 +455,8 @@ export default function AISearchPage() {
 
     setIsExporting(true);
     try {
-      const response = await axios.post(
-        '/api/ai-export',
+      const response = await apiClient.post(
+        '/ai-export',
         { company_ids: Array.from(selectedIds), format: exportFormat },
         { responseType: 'blob' },
       );
@@ -483,7 +555,7 @@ export default function AISearchPage() {
           autoResize();
         }}
         placeholder="Describe what you're looking for…"
-        className="w-full resize-none overflow-hidden rounded-2xl border border-input bg-background py-3.5 pl-4 pr-14 text-sm outline-none focus:ring-2 focus:ring-ring"
+        className="w-full resize-none overflow-hidden rounded-2xl border border-input bg-white py-3.5 pl-4 pr-14 text-xs font-sans outline-none focus:ring-2 focus:ring-ring"
         onKeyDown={e => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -496,7 +568,7 @@ export default function AISearchPage() {
         disabled={formik.values.query.trim() === '' || thinking}
         data-tour="ai-search-button"
         aria-label="Search"
-        className="absolute right-2.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 cursor-pointer"
+        className="absolute right-2.5 top-4/9 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 active:scale-95 cursor-pointer"
       >
         {thinking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
       </button>
@@ -506,21 +578,24 @@ export default function AISearchPage() {
   // ---- Pre-search: centered hero with the composer and example prompts ----
   if (!hasSearched) {
     return (
-      <div className="flex h-full flex-col items-center justify-center px-5">
-        <div className="w-full max-w-2xl">
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-              <Sparkles className="h-6 w-6 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold">AI Search</h1>
-            <p className="mt-1 text-muted-foreground">
-              Describe what you&apos;re looking for in plain English
+      <div className="relative flex h-full flex-col justify-center overflow-hidden px-35">
+        {/* Decorative watermark; mix-blend hides the PNG's white plate on the light theme */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat mix-blend-multiply dark:hidden"
+          style={{ backgroundImage: "url('/auth/AI-search-bg.png')" }}
+        />
+        <div className="relative w-full max-w-2xl">
+          <div className="mb-4">
+            <h1 className="text-5xl font-medium font-heading">Looking for the <span className='text-[#00A7A0]'>right vendor?</span></h1>
+            <p className="mt-1 text-[#313131BA] font-light font-sans">
+              Just type what you need and let us bring you the right ones.
             </p>
           </div>
 
           {composer}
 
-          <div data-tour="ai-search-examples" className="mt-5 flex flex-wrap justify-center gap-2">
+          <div data-tour="ai-search-examples" className="mt-5 flex flex-wrap gap-2">
             {loading && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading example queries...
@@ -546,251 +621,347 @@ export default function AISearchPage() {
     );
   }
 
-  // ---- Post-search: chat thread on the left, results table on the right ----
+  const busy = thinking || paging;
+  const canPrevPage = currentPage > 1 && cursorStack.length > 0 && !busy;
+  const canNextPage = !!nextCursor && !busy;
+  const filtering = searchText.trim().length > 0;
+
   return (
-    <div className="flex h-full">
-      {/* Left: conversation + docked composer */}
-      <div className="flex h-full w-full max-w-md shrink-0 flex-col border-r border-border">
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-          {chat.map(entry => (
-            <div key={entry.id} className="space-y-2">
-              {/* User bubble */}
-              <div className="flex justify-end">
-                <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground">
-                  {entry.query}
-                </div>
-              </div>
-
-              {/* Assistant bubble */}
-              <div className="flex justify-start">
-                <div className="max-w-[90%] rounded-2xl rounded-bl-sm border border-border bg-card px-3.5 py-2 text-sm">
-                  {entry.status === 'thinking' && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <div className="flex gap-1">
-                        {[0, 1, 2].map(i => (
-                          <div
-                            key={i}
-                            className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"
-                            style={{ animationDelay: `${i * 0.2}s` }}
-                          />
-                        ))}
-                      </div>
-                      Analyzing your query...
-                    </div>
-                  )}
-
-                  {entry.status === 'done' && (
-                    <div className="space-y-2">
-                      {entry.count === 0 ? (
-                        <p className="text-muted-foreground">
-                          {entry.message || 'No companies matched your query.'}
-                        </p>
-                      ) : (
-                        <p>
-                          Found <span className="font-semibold">{entry.count?.toLocaleString()}</span>{' '}
-                          {entry.count === 1 ? 'company' : 'companies'}.
-                        </p>
-                      )}
-                      {entry.sql && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => toggleSql(entry.id)}
-                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-                          >
-                            {expandedSql.has(entry.id) ? (
-                              <ChevronUp className="h-3.5 w-3.5" />
-                            ) : (
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            )}
-                            Generated SQL
-                          </button>
-                          {expandedSql.has(entry.id) && (
-                            <pre className="max-h-48 overflow-auto rounded-lg bg-muted p-3 text-xs font-mono">
-                              {entry.sql}
-                            </pre>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {entry.status === 'error' && (
-                    <div className="space-y-2 text-destructive">
-                      <p>{entry.error}</p>
-                      {entry.errorCode === 'HTTP_402' && (
-                        <a
-                          href="mailto:admin@miller3.com?subject=Request for more AI search credits"
-                          className="inline-block rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-destructive/90"
-                        >
-                          Contact Admin for more credits
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-          <div ref={chatEndRef} />
-        </div>
-
-        <div className="shrink-0 border-t border-border p-3">{composer}</div>
-      </div>
-
-      {/* Right: results table with toolbar */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Toolbar */}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-          <p className="text-sm text-muted-foreground">
-            {(thinking || paging) && results.length === 0
-              ? 'Searching…'
-              : `Showing ${results.length} of ${totalResults.toLocaleString()} ${totalResults === 1 ? 'company' : 'companies'}`}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {viewMode === 'card' && companies.length > 0 && (
+    <div className="flex h-full flex-col">
+      {/* Toolbar header: refine what's on screen (left), act on the selection (right) */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
+        <div className="flex w-full max-w-1/2 items-center gap-2">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              placeholder="Search Industry / company / location"
+              className="h-10 w-full rounded-xl border border-input bg-white pl-9 pr-9 text-sm font-sans font-light outline-none focus:ring-2 focus:ring-ring"
+            />
+            {searchText && (
               <button
                 type="button"
-                onClick={toggleSelectAll}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                onClick={() => setSearchText('')}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
               >
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  readOnly
-                  className="h-4 w-4 cursor-pointer accent-primary"
-                />
-                {allSelected ? 'Deselect all' : 'Select all'}
+                <X className="h-4 w-4" />
               </button>
             )}
-            <div className="flex items-center gap-1">
+          </div>
+          <SortPopover
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            setSortBy={setSortBy}
+            setSortOrder={setSortOrder}
+            options={sortOptions}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <BucketPickerPopover
+            companyIds={Array.from(selectedIds)}
+            tooltipId="ai-add-to-bucket-tip"
+            className="h-10 rounded-xl border-2 border-primary bg-transparent px-4 py-0 text-sm font-sans font-normal text-primary hover:bg-primary/10"
+            onDone={() => setSelectedIds(new Set())}
+          />
+          <Tooltip
+            id="ai-add-to-bucket-tip"
+            place="bottom"
+            content={selectedIds.size === 0
+              ? 'Select companies to add to a bucket'
+              : 'Add selected companies to a bucket'}
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+          />
+
+          <button
+            type="button"
+            data-tooltip-id="ai-export-tip"
+            onClick={() => setShowExportModal(true)}
+            disabled={role === 'FREE' || selectedIds.size === 0}
+            className={cn(
+              'flex h-10 items-center gap-2 rounded-xl border-2 border-primary px-4 text-sm font-sans font-normal text-primary transition-colors hover:bg-primary/10 active:scale-[0.98] cursor-pointer',
+              (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50 hover:bg-transparent',
+            )}
+          >
+            <Download className="h-4 w-4" /> Export{selectedIds.size > 0 && ` (${selectedIds.size})`}
+          </button>
+          <Tooltip
+            id="ai-export-tip"
+            place="bottom"
+            content={role === 'FREE'
+              ? 'Please upgrade to export search results'
+              : selectedIds.size === 0
+                ? 'Select companies to export'
+                : 'Export selected companies'}
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+          />
+
+          <button
+            type="button"
+            data-tooltip-id="ai-enrich-tip"
+            onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), undefined, applyEnrichUpdate)}
+            disabled={selectedIds.size <= 1 || isEnriching}
+            className="flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-sans font-normal text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isEnriching
+              ? <><Loader2 className="h-4 w-4 animate-spin" />Enriching...</>
+              : <><Zap className="h-4 w-4" />Batch Enrich{selectedIds.size > 1 && ` (${selectedIds.size})`}</>}
+          </button>
+          <Tooltip
+            id="ai-enrich-tip"
+            place="bottom"
+            content={selectedIds.size <= 1
+              ? 'Select at least 2 companies for batch enrichment'
+              : 'Enrich selected companies'}
+            className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
+          />
+        </div>
+      </div>
+
+      <div className="flex min-h-0 flex-1">
+        {/* Left: conversation + docked composer */}
+        <div className="flex h-full w-full max-w-xs shrink-0 flex-col border-r border-border">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 font-heading font-light">
+            {chat.map(entry => (
+              <div key={entry.id} className="space-y-2">
+                {/* User bubble */}
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3.5 py-2 text-sm text-primary-foreground">
+                    {entry.query}
+                  </div>
+                </div>
+
+                {/* Assistant bubble */}
+                <div className="flex justify-start">
+                  <div className="max-w-[90%] rounded-2xl rounded-bl-sm border border-border bg-card px-3.5 py-2 text-sm">
+                    {entry.status === 'thinking' && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map(i => (
+                            <div
+                              key={i}
+                              className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary"
+                              style={{ animationDelay: `${i * 0.2}s` }}
+                            />
+                          ))}
+                        </div>
+                        Analyzing your query...
+                      </div>
+                    )}
+
+                    {entry.status === 'done' && (
+                      <div className="space-y-2">
+                        {entry.count === 0 ? (
+                          <p className="text-muted-foreground">
+                            {entry.message || 'No companies matched your query.'}
+                          </p>
+                        ) : (
+                          <p>
+                            Found <span className="font-semibold">{entry.count?.toLocaleString()}</span>{' '}
+                            {entry.count === 1 ? 'company' : 'companies'}.
+                          </p>
+                        )}
+                        {entry.sql && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => toggleSql(entry.id)}
+                              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                            >
+                              {expandedSql.has(entry.id) ? (
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              )}
+                              Generated SQL
+                            </button>
+                            {expandedSql.has(entry.id) && (
+                              <pre className="max-h-48 overflow-auto rounded-lg bg-muted p-3 text-xs font-mono">
+                                {entry.sql}
+                              </pre>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {entry.status === 'error' && (
+                      <div className="space-y-2 text-destructive">
+                        <p>{entry.error}</p>
+                        {entry.errorCode === 'HTTP_402' && (
+                          <a
+                            href="mailto:admin@miller3.com?subject=Request for more AI search credits"
+                            className="inline-block rounded-md bg-destructive px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-destructive/90"
+                          >
+                            Contact Admin for more credits
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+
+          <div className="shrink-0 space-y-2 border-border p-3">
+            <div className="flex justify-end">
               <button
                 type="button"
-                onClick={() => setViewMode('card')}
-                className={cn(
-                  'rounded-md p-2 transition-colors cursor-pointer',
-                  viewMode === 'card'
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-                aria-label="Card view"
+                onClick={startNewChat}
+                disabled={busy}
+                className="text-xs font-sans text-primary underline underline-offset-2 transition-colors hover:text-primary/80 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
               >
-                <Grid3X3 className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                className={cn(
-                  'rounded-md p-2 transition-colors cursor-pointer',
-                  viewMode === 'table'
-                    ? 'bg-accent text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-                aria-label="Table view"
-              >
-                <List className="h-4 w-4" />
+                Start a new chat
               </button>
             </div>
-
-            <button
-              type="button"
-              data-tooltip-id="ai-enrich-tip"
-              onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), undefined, applyEnrichUpdate)}
-              disabled={selectedIds.size <= 1 || isEnriching}
-              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isEnriching ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Enriching...
-                </>
-              ) : (
-                <>
-                  <Zap className="h-4 w-4" />
-                  Batch Enrich{selectedIds.size > 1 && ` (${selectedIds.size})`}
-                </>
-              )}
-            </button>
-            <Tooltip
-              id="ai-enrich-tip"
-              place="bottom"
-              content={selectedIds.size <= 1
-                ? 'Select at least 2 companies for batch enrichment'
-                : 'Enrich selected companies'}
-              className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
-            />
-
-            <button
-              data-tooltip-id="ai-export-tip"
-              onClick={() => setShowExportModal(true)}
-              disabled={role === 'FREE' || selectedIds.size === 0}
-              className={cn(
-                'flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer',
-                (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50',
-              )}
-            >
-              <Download className="h-4 w-4" /> Export{selectedIds.size > 0 && ` (${selectedIds.size})`}
-            </button>
-            <Tooltip
-              id="ai-export-tip"
-              place="bottom"
-              content={role === 'FREE'
-                ? 'Please upgrade to export search results'
-                : selectedIds.size === 0
-                  ? 'Select companies to export'
-                  : 'Export selected companies'}
-              className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
-            />
+            {composer}
           </div>
         </div>
 
-        {/* Results */}
-        <div className="min-h-0 flex-1 overflow-auto p-4">
-          {results.length === 0 && !thinking && !paging ? (
-            <div className="flex h-full items-center justify-center text-center text-muted-foreground">
-              <div className="max-w-md">
-                <p className="text-lg font-medium">No results found</p>
-                <p className="mt-1 text-sm">{statusMessage || 'Try rephrasing your query.'}</p>
+        {/* Right: results, headed by the page-size / count / pager strip */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Popover open={perPageOpen} onOpenChange={setPerPageOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="flex h-7 items-center gap-1 rounded-md border border-border bg-white px-2 text-xs hover:bg-accent cursor-pointer">
+                      {perPage}
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-40 p-1" align="start">
+                    {PER_PAGE_OPTIONS.map(value => (
+                      <button
+                        key={value}
+                        onClick={() => { setPerPage(value); setPerPageOpen(false); }}
+                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                      >
+                        {value}
+                        {perPage === value && <Check className="h-4 w-4 text-primary" />}
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+                <span className="text-xs font-normal text-[#B3B3B3] font-sans">Per Page</span>
               </div>
+              <p className="flex items-center gap-2 text-xs font-normal font-sans text-[#B3B3B3]">
+                {busy
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching companies...</>
+                  : filtering
+                    ? <span>Showing {companies.length} of {results.length} on this page</span>
+                    : <span>Showing {companies.length} of {totalResults.toLocaleString()} {totalResults === 1 ? 'company' : 'companies'}</span>}
+              </p>
             </div>
-          ) : (
-            <>
-              {viewMode === 'table' ? (
-                <CompanyTable
-                  companies={companies}
-                  isLoading={thinking || paging}
-                  perPage={perPage}
-                  selectedIds={selectedIds}
-                  allSelected={allSelected}
-                  notAccessibleFields={[]}
-                  onToggleSelect={toggleSelect}
-                  onToggleSelectAll={toggleSelectAll}
-                  onRowClick={setSelectedCompany}
-                />
-              ) : (
-                <CompanyCards
-                  companies={companies}
-                  isLoading={thinking || paging}
-                  selectedIds={selectedIds}
-                  notAccessibleFields={[]}
-                  onToggleSelect={toggleSelect}
-                  onCardClick={setSelectedCompany}
-                />
+
+            <div className="flex items-center gap-3">
+              {viewMode === 'card' && companies.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  disabled={busy}
+                  className="flex items-center gap-1.5 text-sm font-sans text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    readOnly
+                    className="h-4 w-4 cursor-pointer accent-primary"
+                  />
+                  {allSelected ? 'Deselect all' : 'Select all'}
+                </button>
               )}
 
-              <SearchPagination
+              {/* <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('card')}
+                  className={cn(
+                    'rounded-md p-1.5 transition-colors cursor-pointer',
+                    viewMode === 'card' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  aria-label="Card view"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={cn(
+                    'rounded-md p-1.5 transition-colors cursor-pointer',
+                    viewMode === 'table' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  aria-label="Table view"
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div> */}
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={!canPrevPage}
+                  onClick={handlePrev}
+                  aria-label="Previous page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border cursor-pointer hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={!canNextPage}
+                  onClick={handleNext}
+                  aria-label="Next page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border cursor-pointer hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto">
+            {results.length === 0 && !busy ? (
+              <div className="flex h-full items-center justify-center text-center text-muted-foreground">
+                <div className="max-w-md">
+                  <p className="text-lg font-medium">No results found</p>
+                  <p className="mt-1 text-sm">{statusMessage || 'Try rephrasing your query.'}</p>
+                </div>
+              </div>
+            ) : companies.length === 0 && !busy ? (
+              <div className="flex h-full items-center justify-center text-center text-muted-foreground">
+                <div className="max-w-md">
+                  <p className="text-lg font-medium">No matches on this page</p>
+                  <p className="mt-1 text-sm">Nothing here matches &ldquo;{searchText.trim()}&rdquo;</p>
+                </div>
+              </div>
+            ) : viewMode === 'table' ? (
+              <CompanyTable
+                companies={companies}
+                isLoading={busy}
                 perPage={perPage}
-                setPerPage={setPerPage}
-                currentPage={currentPage}
-                totalPages={totalPages}
-                hasNextPage={nextCursor}
-                isLoading={thinking || paging}
-                onPrev={handlePrev}
-                onNext={handleNext}
+                selectedIds={selectedIds}
+                allSelected={allSelected}
+                notAccessibleFields={[]}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
+                onRowClick={setSelectedCompany}
               />
-            </>
-          )}
+            ) : (
+              <CompanyCards
+                companies={companies}
+                isLoading={busy}
+                selectedIds={selectedIds}
+                notAccessibleFields={[]}
+                onToggleSelect={toggleSelect}
+                onCardClick={setSelectedCompany}
+              />
+            )}
+          </div>
         </div>
       </div>
 

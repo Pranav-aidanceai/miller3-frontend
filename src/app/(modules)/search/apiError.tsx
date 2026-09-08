@@ -76,7 +76,8 @@ export function isCreditError(code: string | null): boolean {
 }
 
 /**
- * Persistent toast for the out-of-credits case, with a "contact admin" mailto button.
+ * Out-of-credits toast, with a "contact admin" mailto button. Held for 15s —
+ * long enough to read and act on, and the X dismisses it sooner.
  * Mirrors the styling shared by export and batch enrichment.
  */
 export function showCreditLimitToast(opts: {
@@ -110,5 +111,5 @@ export function showCreditLimitToast(opts: {
                 Contact admin for more credits
             </button>
         </div>
-    ), { duration: Infinity });
+    ), { duration: 10000 });
 }
