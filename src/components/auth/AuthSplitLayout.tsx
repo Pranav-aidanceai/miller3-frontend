@@ -18,16 +18,10 @@ interface AuthSplitLayoutProps {
  */
 export function AuthSplitLayout({ children, heroSrc, heroAlt }: AuthSplitLayoutProps) {
     return (
-        <div className="relative flex min-h-screen overflow-hidden bg-background">
-            {/* Decorative background artwork — purely ornamental, so it's
-                marked aria-hidden rather than given alt text. */}
-            <div className="pointer-events-none absolute -left-[418px] top-[180px] size-[860px] rotate-45 opacity-60" aria-hidden="true">
-                <Image src="/auth/blob-1.svg" alt="" fill className="object-contain" priority={false} />
-            </div>
-            <div className="pointer-events-none absolute -right-[290px] -top-[266px] size-[860px] -rotate-45 opacity-60" aria-hidden="true">
-                <Image src="/auth/blob-2.svg" alt="" fill className="object-contain" priority={false} />
-            </div>
-
+        <div 
+            className="relative flex min-h-screen overflow-hidden bg-cover bg-center bg-no-repeat mix-blend-multiply dark:hidden"
+            style={{ backgroundImage: "url('/auth/auth-page-bg.png')" }}
+        >
             <Link
                 href="/"
                 className="absolute left-6 top-6 z-10 flex items-center gap-3 sm:left-10 sm:top-8"
