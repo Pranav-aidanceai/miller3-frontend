@@ -2,7 +2,8 @@ import {
   Search, LayoutDashboard,
   Users, DollarSign, Database,
   Sparkles, History,
-  Eye, PaintBucket, ClipboardList, ClipboardCheck, Building2
+  Eye, PaintBucket, ClipboardList, ClipboardCheck, Building2,
+  Tag, Coins, LogOut
 } from "lucide-react";
 
 // Copy matches the Figma "Select Plan" reference (fileKey
@@ -61,6 +62,16 @@ export const adminNav = [
   { to: '/admin/company-requests', icon: ClipboardCheck, label: 'Company Requests' },
   { to: '/admin/add-company', icon: Building2, label: 'Add Company' }
 ];
+
+
+export const accountMenu = [
+  { key: 'plan', icon: Tag, label: 'My Plan' },
+  { key: 'buy-credits', icon: Coins, label: 'Buy Credits', to: '/buy-credits' },
+  { key: 'request-changes', icon: ClipboardList, label: 'Request Changes', to: '/my-requests' },
+  { key: 'logout', icon: LogOut, label: 'Logout', variant: 'destructive' },
+] as const;
+
+export type AccountMenuKey = typeof accountMenu[number]['key'];
 
 export const roleBadgeColor: Record<string, string> = {
   ADMIN: 'bg-destructive/10 text-destructive',

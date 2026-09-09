@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { Search, X, Grid3X3, List, Loader2, Download, Zap, RefreshCw } from 'lucide-react';
+import { Search, X, Loader2, Download, Zap, Check, ChevronDown, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompanyDrawer } from './CompanyDrawer';
 import Filters from './Filters';
@@ -16,15 +16,18 @@ import { RootState } from '@/store/store';
 import { useSelector } from 'react-redux';
 import { useSearchParams } from 'next/navigation';
 import CompanyTable from './CompanyTable';
-import CompanyCards from './CompanyCards';
-import SearchPagination from './SearchPagination';
 import SortPopover from './SortPopover';
+import ColumnPickerPopover from './ColumnPickerPopover';
+import { useVisibleColumns } from './useVisibleColumns';
 import { useExport } from './useExport';
 import { useBatchEnrich, type EnrichRecordUpdate } from './useBatchEnrich';
 import { emptyFilters, filtersFromQuery, type SearchFilters } from './replayParams';
 import { hasFilterErrors } from './filterValidation';
 import BucketPickerPopover from '../buckets/BucketPickerPopover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
+
+const PER_PAGE_OPTIONS = [25, 50, 100] as const;
 
 function loadSearchState(): Record<string, unknown> | null {
   if (typeof window === 'undefined') return null;
@@ -51,12 +54,10 @@ export default function SearchPage() {
   });
   const [sortBy, setSortBy] = useState((persisted?.sortBy as string) ?? '');
   const [sortOrder, setSortOrder] = useState((persisted?.sortOrder as string) ?? '');
-  const [viewMode, setViewMode] = useState<'table' | 'card'>((persisted?.viewMode as 'table' | 'card') ?? 'card');
   const [perPage, setPerPage] = useState((persisted?.perPage as number) ?? 25);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [totalResults, setTotalResults] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [notAccessibleFields, setNotAccessibleFields] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState((persisted?.currentPage as number) ?? 1);
   // Spread over the defaults so a session persisted by an older build — one
@@ -72,6 +73,9 @@ export default function SearchPage() {
   const [currentCursor, setCurrentCursor] = useState<string | null>((persisted?.currentCursor as string | null) ?? null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [perPageOpen, setPerPageOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
+  const [visibleColumns, setVisibleColumns] = useVisibleColumns();
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
 
@@ -125,7 +129,6 @@ export default function SearchPage() {
       setCompanies(response.data.results);
       setTotalResults(response.data.total);
       setHasNextPage(response.data.next_cursor || null);
-      setTotalPages(response.data.total_pages);
       setNotAccessibleFields(response.data.not_accessible);
     } catch {
       if (!isSessionExpiring()) toast.error('Failed to fetch companies');
@@ -166,13 +169,13 @@ export default function SearchPage() {
   useEffect(() => {
     try {
       sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
-        sortBy, sortOrder, viewMode, perPage,
+        sortBy, sortOrder, perPage,
         appliedFilters, currentPage, cursorStack, currentCursor,
       }));
     } catch {
       // Ignore quota/serialization errors — persistence is best-effort.
     }
-  }, [sortBy, sortOrder, viewMode, perPage, appliedFilters, currentPage, cursorStack, currentCursor]);
+  }, [sortBy, sortOrder, perPage, appliedFilters, currentPage, cursorStack, currentCursor]);
 
   const currentCursorRef = useRef(currentCursor);
   useEffect(() => { currentCursorRef.current = currentCursor; }, [currentCursor]);
@@ -239,44 +242,47 @@ export default function SearchPage() {
     fetchCompanies(prevCursor);
   };
 
+  // Drives the badge on the Filters toggle. `searchText` is left out — it has
+  // its own visible box in the toolbar, so counting it would double-report.
+  const activeFilterCount = useMemo(
+    () => Object.entries(appliedFilters).reduce((count, [key, value]) => {
+      if (key === 'searchText') return count;
+      if (Array.isArray(value)) return count + value.length;
+      return count + (value ? 1 : 0);
+    }, 0),
+    [appliedFilters],
+  );
+
+  const canPrevPage = currentPage > 1 && cursorStack.length > 0 && !isLoading;
+  const canNextPage = !!hasNextPage && !isLoading;
+
   return (
-    <div className="flex gap-3">
-      <Filters
-        filters={appliedFilters}
-        setFilters={setAppliedFilters}
-        draftFilters={draftFilters}
-        setDraftFilters={setDraftFilters}
-        setPage={() => { }}
-        initialFilters={initialFilters}
-        onClear={clearFilters}
-      />
-
-      <div ref={scrollRef} className="flex-1 overflow-auto p-4 md:py-6 px-1" style={{ height: 'calc(100vh - 3.5rem)' }}>
-
-        {/* Top bar */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="relative flex-1 min-w-50">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <div className="flex h-full flex-col">
+      {/* Toolbar header: refine what's on screen (left), act on the selection (right) */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
+        <div className="flex items-center gap-2">
+          <div className="relative w-100 max-w-1/2">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={draftFilters.searchText}
               onChange={e => setDraftFilters({ ...draftFilters, searchText: e.target.value })}
               // Enter is the same commit as the sidebar's Apply button — including
               // its refusal to apply a range the sidebar is flagging as invalid.
               onKeyDown={e => { if (e.key === 'Enter' && !hasFilterErrors(draftFilters)) setAppliedFilters(draftFilters); }}
-              className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-9 text-sm outline-none focus:ring-2 focus:ring-ring"
               placeholder="Search company name..."
+              className="h-10 w-full rounded-xl border border-input bg-white pl-9 pr-9 text-sm font-sans font-light outline-none focus:ring-2 focus:ring-ring"
             />
             {draftFilters.searchText && (
-              <button onClick={() => setDraftFilters({ ...draftFilters, searchText: '' })} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer">
+              <button
+                type="button"
+                onClick={() => setDraftFilters({ ...draftFilters, searchText: '' })}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+              >
                 <X className="h-4 w-4" />
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setViewMode('card')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'card' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Card view"><Grid3X3 className="h-4 w-4" /></button>
-            <button onClick={() => setViewMode('table')} className={cn('rounded-md p-2 transition-colors cursor-pointer', viewMode === 'table' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')} aria-label="Table view"><List className="h-4 w-4" /></button>
-          </div>
-
           <SortPopover
             sortBy={sortBy}
             sortOrder={sortOrder}
@@ -284,9 +290,30 @@ export default function SearchPage() {
             setSortOrder={setSortOrder}
           />
 
+          <button
+            type="button"
+            onClick={() => setShowFilters(open => !open)}
+            aria-pressed={showFilters}
+            className={cn(
+              'flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-sans font-light cursor-pointer transition-colors',
+              showFilters ? 'border-input bg-muted' : 'border-input bg-white hover:bg-accent',
+            )}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
           <BucketPickerPopover
             companyIds={Array.from(selectedIds)}
             tooltipId="add-to-bucket-tip"
+            className="h-10 rounded-xl border-2 border-primary bg-transparent px-4 py-0 text-sm font-sans font-normal text-primary hover:bg-primary/10"
             onDone={() => setSelectedIds(new Set())}
           />
           <Tooltip
@@ -299,11 +326,13 @@ export default function SearchPage() {
           />
 
           <button
+            type="button"
             data-tooltip-id="export-tip"
             onClick={() => setShowExportModal(true)}
             disabled={role === 'FREE' || selectedIds.size === 0}
-            className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
-              (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50'
+            className={cn(
+              'flex h-10 items-center gap-2 rounded-xl border-2 border-primary px-4 text-sm font-sans font-normal text-primary transition-colors hover:bg-primary/10 active:scale-[0.98] cursor-pointer',
+              (role === 'FREE' || selectedIds.size === 0) && 'cursor-not-allowed opacity-50 hover:bg-transparent',
             )}
           >
             <Download className="h-4 w-4" /> Export{selectedIds.size > 0 && ` (${selectedIds.size})`}
@@ -324,9 +353,7 @@ export default function SearchPage() {
             data-tooltip-id="enrich-tip"
             onClick={() => enrich(selectedIds, () => setSelectedIds(new Set()), refreshSearch, applyEnrichUpdate)}
             disabled={role === 'FREE' || selectedIds.size <= 1 || isEnriching}
-            className={cn("flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 active:scale-[0.98] cursor-pointer",
-              'disabled:cursor-not-allowed disabled:opacity-50'
-            )}
+            className="flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-sans font-normal text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isEnriching
               ? <><Loader2 className="h-4 w-4 animate-spin" />Enriching...</>
@@ -342,80 +369,98 @@ export default function SearchPage() {
                 : 'Enrich selected companies'}
             className="text-xs! px-2! py-1! rounded-md! bg-foreground! text-background!"
           />
-
         </div>
+      </div>
 
-        <div className='flex items-center justify-between'>
-          <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-            {isLoading
-              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching companies...</>
-              : <span>Showing {companies.length} of {totalResults.toLocaleString()} companies</span>
-            }
-          </div>
-          <div className="flex items-center gap-3">
-            {viewMode === 'card' && companies.length > 0 && (
-              <button
-                type="button"
-                onClick={toggleSelectAll}
-                disabled={isLoading}
-                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  readOnly
-                  className="h-4 w-4 cursor-pointer accent-primary"
-                />
-                {allSelected ? 'Deselect all' : 'Select all'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => fetchCompanies(currentCursor)}
-              disabled={isLoading}
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {viewMode === 'table' && (
-          <CompanyTable
-            companies={companies}
-            isLoading={isLoading}
-            perPage={perPage}
-            selectedIds={selectedIds}
-            allSelected={allSelected}
-            notAccessibleFields={notAccessibleFields}
-            onToggleSelect={toggleSelect}
-            onToggleSelectAll={toggleSelectAll}
-            onRowClick={setSelectedCompany}
+      <div className="flex min-h-0 flex-1">
+        {/* Left: the filter sidebar, toggled from the toolbar */}
+        {showFilters && (
+          <Filters
+            filters={appliedFilters}
+            setFilters={setAppliedFilters}
+            draftFilters={draftFilters}
+            setDraftFilters={setDraftFilters}
+            setPage={() => { }}
+            initialFilters={initialFilters}
+            onClear={clearFilters}
           />
         )}
 
-        {viewMode === 'card' && (
-          <CompanyCards
-            companies={companies}
-            isLoading={isLoading}
-            selectedIds={selectedIds}
-            notAccessibleFields={notAccessibleFields}
-            onToggleSelect={toggleSelect}
-            onCardClick={setSelectedCompany}
-          />
-        )}
+        {/* Right: results, headed by the page-size / count / pager strip */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Popover open={perPageOpen} onOpenChange={setPerPageOpen}>
+                  <PopoverTrigger asChild>
+                    <button className="flex h-7 items-center gap-1 rounded-md border border-border bg-white px-2 text-xs hover:bg-accent cursor-pointer">
+                      {perPage}
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-40 p-1" align="start">
+                    {PER_PAGE_OPTIONS.map(value => (
+                      <button
+                        key={value}
+                        onClick={() => { setPerPage(value); setPerPageOpen(false); }}
+                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                      >
+                        {value}
+                        {perPage === value && <Check className="h-4 w-4 text-primary" />}
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+                <span className="text-xs font-normal text-[#B3B3B3] font-sans">Per Page</span>
+              </div>
+              <p className="flex items-center gap-2 text-xs font-normal font-sans text-[#B3B3B3]">
+                {isLoading
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Fetching companies...</>
+                  : <span>Showing {companies.length} of {totalResults.toLocaleString()} {totalResults === 1 ? 'company' : 'companies'}</span>}
+              </p>
+            </div>
 
-        <SearchPagination
-          perPage={perPage}
-          setPerPage={setPerPage}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          hasNextPage={hasNextPage}
-          isLoading={isLoading}
-          onPrev={handlePrev}
-          onNext={handleNext}
-        />
+            <div className="flex items-center gap-3">
+              <ColumnPickerPopover selected={visibleColumns} onChange={setVisibleColumns} />
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={!canPrevPage}
+                  onClick={handlePrev}
+                  aria-label="Previous page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border cursor-pointer hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={!canNextPage}
+                  onClick={handleNext}
+                  aria-label="Next page"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border cursor-pointer hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+            <CompanyTable
+              companies={companies}
+              isLoading={isLoading}
+              perPage={perPage}
+              selectedIds={selectedIds}
+              allSelected={allSelected}
+              notAccessibleFields={notAccessibleFields}
+              visibleColumns={visibleColumns}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              onRowClick={setSelectedCompany}
+            />
+          </div>
+        </div>
       </div>
 
       {selectedCompany && <CompanyDrawer id={selectedCompany.id} onClose={() => setSelectedCompany(null)} onEnriched={refreshSearch} />}

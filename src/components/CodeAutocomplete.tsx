@@ -213,7 +213,7 @@ export const CodeAutocomplete = ({
 
     return (
         <div className={isForm ? undefined : 'mt-2'}>
-            <label className={cn('text-xs font-medium text-muted-foreground', isForm && 'mb-1 block')}>
+            <label className={cn(isForm ? 'mb-1 block text-xs font-medium text-muted-foreground' : 'text-sm text-foreground/80')}>
                 {label}
                 {labelSuffix}
             </label>
@@ -225,7 +225,7 @@ export const CodeAutocomplete = ({
                             'flex w-full items-center gap-1.5 border bg-background',
                             isForm
                                 ? 'h-10 rounded-lg px-3 focus-within:ring-2'
-                                : 'mt-1 h-9 rounded-md border-input px-2 focus-within:ring-1 focus-within:ring-ring',
+                                : 'mt-2 h-10 rounded-xl border-input px-3 focus-within:ring-1 focus-within:ring-ring',
                             isForm && (invalid
                                 ? 'border-destructive focus-within:ring-destructive/30'
                                 : 'border-input focus-within:ring-ring'),

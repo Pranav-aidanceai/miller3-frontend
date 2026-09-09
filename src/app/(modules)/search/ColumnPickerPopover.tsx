@@ -21,8 +21,8 @@ export default function ColumnPickerPopover({ selected, onChange }: ColumnPicker
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <button className="flex items-center gap-1.5 h-10 rounded-md border border-input bg-background px-3 text-sm cursor-pointer transition-colors hover:bg-accent">
-                    <Columns3 className="h-4 w-4" />
+                <button className="flex h-7 items-center gap-1.5 rounded-md border border-border bg-white px-2 text-xs cursor-pointer transition-colors hover:bg-accent">
+                    <Columns3 className="h-3.5 w-3.5" />
                     Columns
                 </button>
             </PopoverTrigger>
