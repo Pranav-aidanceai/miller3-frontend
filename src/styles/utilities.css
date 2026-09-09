@@ -61,6 +61,22 @@
     }
   }
 
+  /* Bucket membership chips on the company drawer's teal footer. The fill is
+     mixed against the surface rather than set as an alpha, so the blue stays
+     blue instead of picking up the teal behind it. */
+  .bucket-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 10px;
+    line-height: 1rem;
+    background: color-mix(in oklab, var(--brand-accent) 20%, var(--card));
+    border: 1px solid var(--brand-accent);
+    color: var(--brand-accent);
+  }
+
   /* Status line shown while the model writes a company description: the text
      itself carries the motion, so no spinner is needed beside it. */
   .ai-sweep-text {

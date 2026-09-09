@@ -9,6 +9,7 @@ import * as Yup from 'yup';
 import { loginAction } from '@/app/auth/authServices';
 import { useAppDispatch } from '@/store/hooks';
 import { logout, setCredentials } from '@/store/slices/authSlice';
+import { clearLowCreditsBannerDismissal } from '@/lib/session';
 import { ApiError } from '@/types/common';
 import TermsModal from './auth/register/TermsOfUse';
 import ApprovalPending from './auth/ApprovalPending';
@@ -77,6 +78,9 @@ export default function LoginForm() {
         return;
       }
       dispatch(setCredentials(data));
+      // Every login gets the low-credit banner back, even if the previous
+      // session on this tab closed it.
+      clearLowCreditsBannerDismissal();
       if (data?.user_details?.tou_accepted === false) {
         setShowTouModal(true);
         return;

@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
 import { Company } from '@/types/search';
 import { ContactIcons, TableSkeleton } from './helper';
-// import ColumnPickerPopover from './ColumnPickerPopover';
-import { DEFAULT_VISIBLE_COLUMNS, OPTIONAL_COLUMNS, TABLE_COLUMNS_STORAGE_KEY } from './tableColumns';
+import { OPTIONAL_COLUMNS } from './tableColumns';
+import { useVisibleColumns } from './useVisibleColumns';
 
 interface CompanyTableProps {
     companies: Company[];
@@ -14,23 +13,11 @@ interface CompanyTableProps {
     onToggleSelect: (id: string) => void;
     onToggleSelectAll: () => void;
     onRowClick: (company: Company) => void;
-}
-
-function loadVisibleColumns(): string[] {
-    if (typeof window === 'undefined') return DEFAULT_VISIBLE_COLUMNS;
-    try {
-        const raw = localStorage.getItem(TABLE_COLUMNS_STORAGE_KEY);
-        if (!raw) return DEFAULT_VISIBLE_COLUMNS;
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return DEFAULT_VISIBLE_COLUMNS;
-        // Drop anything that no longer exists as a column, so a stale cache
-        // from an older build can't render a blank header.
-        const validKeys = new Set(OPTIONAL_COLUMNS.map(c => c.key));
-        const filtered = parsed.filter((key): key is string => typeof key === 'string' && validKeys.has(key));
-        return filtered.length > 0 ? filtered : DEFAULT_VISIBLE_COLUMNS;
-    } catch {
-        return DEFAULT_VISIBLE_COLUMNS;
-    }
+    /**
+     * Which optional columns to show. Pass it when the page renders its own
+     * column picker; leave it off and the table follows the saved choice.
+     */
+    visibleColumns?: string[];
 }
 
 export default function CompanyTable({
@@ -43,36 +30,16 @@ export default function CompanyTable({
     onToggleSelect,
     onToggleSelectAll,
     onRowClick,
+    visibleColumns,
 }: CompanyTableProps) {
-    // Column choice is per-browser, not per-search — it applies the same way
-    // across Search, AI Search, and Buckets tables.
-    const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
-    // Deliberately not a lazy useState initializer: the server always renders
-    // DEFAULT_VISIBLE_COLUMNS (no localStorage there), so seeding state with
-    // the real saved value here — before the client's first paint settles —
-    // would render a different set of columns than the server did and trip a
-    // hydration mismatch. Swapping in the saved value post-mount is a plain
-    // update instead.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    useEffect(() => { setVisibleColumns(loadVisibleColumns()); }, []);
+    const [savedColumns] = useVisibleColumns();
+    const activeColumns = visibleColumns ?? savedColumns;
 
-    // const handleColumnsChange = (keys: string[]) => {
-    //     setVisibleColumns(keys);
-    //     try {
-    //         localStorage.setItem(TABLE_COLUMNS_STORAGE_KEY, JSON.stringify(keys));
-    //     } catch {
-    //         // Ignore quota/serialization errors — persistence is best-effort.
-    //     }
-    // };
-
-    const columns = OPTIONAL_COLUMNS.filter(c => visibleColumns.includes(c.key));
+    const columns = OPTIONAL_COLUMNS.filter(c => activeColumns.includes(c.key));
     const colSpan = columns.length + 3; // checkbox + Company + Contact
 
     return (
         <div className="overflow-hidden">
-            {/* <div className="flex items-center justify-end border-b border-border bg-muted/50 px-2 py-1.5">
-                <ColumnPickerPopover selected={visibleColumns} onChange={handleColumnsChange} />
-            </div> */}
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead className='border-b border-t'>

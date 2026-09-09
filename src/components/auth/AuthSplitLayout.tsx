@@ -3,23 +3,15 @@ import Link from 'next/link';
 
 interface AuthSplitLayoutProps {
     children: React.ReactNode;
-    /** Right-hand hero photo. Omit to fall back to a plain decorative panel. */
     heroSrc?: string;
     heroAlt?: string;
 }
 
-/**
- * Shared two-column shell for every pre-auth screen (login, register,
- * forgot/reset password): logo top-left, decorative blob artwork behind a
- * left-aligned content column, a hero photo panel on the right (hidden
- * below `lg`). Matches the Figma "Sign up and Log in" reference
- * (fileKey pskj0D4uvWBsvAB5Csxyt4, node 418:658) — the design provides one
- * shared template for both auth directions, toggled by copy only.
- */
+
 export function AuthSplitLayout({ children, heroSrc, heroAlt }: AuthSplitLayoutProps) {
     return (
         <div 
-            className="relative flex min-h-screen overflow-hidden bg-cover bg-center bg-no-repeat mix-blend-multiply dark:hidden"
+            className="relative flex min-h-screen overflow-hidden bg-cover bg-center bg-no-repeat mix-blend-multiply"
             style={{ backgroundImage: "url('/auth/auth-page-bg.png')" }}
         >
             <Link

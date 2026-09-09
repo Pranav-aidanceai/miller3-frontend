@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { statesList } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { FilterAutocomplete } from './FilterAutocomplete';
-import { FilterInput, Toggle } from './helper';
+import { FilterInput } from './helper';
 import { SearchFilters } from './replayParams';
 import { validateFilters } from './filterValidation';
 
@@ -23,18 +25,101 @@ interface FiltersProps {
     onClear?: () => void;
 }
 
+const DEMOGRAPHICS: { value: string; label: string }[] = [
+    { value: 'Minority-Owned', label: 'Minority Owned' },
+    { value: 'Women-Owned', label: 'Women Owned' },
+    { value: 'Veteran-Owned', label: 'Veteran Owned' },
+];
+
+/**
+ * The draft fields each section owns. Sections start collapsed, so a collapsed
+ * one carries a dot when something inside it is set — otherwise an applied
+ * filter would be invisible until the user went looking for it.
+ */
+const SECTION_FIELDS = {
+    industry: ['naicsFilter', 'sicFilter'],
+    location: ['cityFilter', 'countyFilter', 'stateFilter', 'msaFilter'],
+    employees: ['minEmp', 'maxEmp'],
+    revenue: ['minRev', 'maxRev'],
+    founded: ['minYear', 'maxYear'],
+    ownership: ['demoFilter', 'certificationFilter'],
+    quality: ['hasPhone', 'hasEmail', 'hasWebsite'],
+} satisfies Record<string, (keyof SearchFilters)[]>;
+
+type SectionId = keyof typeof SECTION_FIELDS;
+
+const isSet = (value: SearchFilters[keyof SearchFilters]) =>
+    Array.isArray(value) ? value.length > 0 : !!value;
+
+function CheckRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+                type="checkbox"
+                checked={checked}
+                onChange={e => onChange(e.target.checked)}
+                className="h-4 w-4 shrink-0 cursor-pointer rounded-[5px] border-input accent-primary"
+            />
+            {label}
+        </label>
+    );
+}
+
+function Section({
+    title,
+    open,
+    active,
+    onToggle,
+    dataTour,
+    children,
+}: {
+    title: string;
+    open: boolean;
+    active: boolean;
+    onToggle: () => void;
+    dataTour?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div data-tour={dataTour} className="border-b border-border">
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={open}
+                className="flex w-full cursor-pointer items-center justify-between gap-2 px-6 py-3 text-left text-sm"
+            >
+                <span className={cn('flex items-center gap-1.5 text-sm font-heading', open ? 'font-semibold' : 'font-normal')}>
+                    {title}
+                    {active && !open && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                </span>
+                <ChevronDown
+                    className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}
+                />
+            </button>
+            {open && <div className="space-y-4 px-6 pb-4">{children}</div>}
+        </div>
+    );
+}
+
 const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, initialFilters, onClear }: FiltersProps) => {
+
+    // Sections start closed, matching the panel's default state in the design.
+    const [openSections, setOpenSections] = useState<Set<SectionId>>(new Set());
 
     const hasChanges = JSON.stringify(draftFilters) !== JSON.stringify(filters);
     // A bad range would be silently dropped by the backend, so Apply waits.
     const errors = validateFilters(draftFilters);
     const isValid = Object.keys(errors).length === 0;
 
-    const activeFilterCount = Object.values(filters).reduce((count, value) => {
-        if (Array.isArray(value)) return count + value.length;
-        if (typeof value === 'boolean') return count + (value ? 1 : 0);
-        return count + (value ? 1 : 0);
-    }, 0);
+    const toggleSection = (id: SectionId) =>
+        setOpenSections(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+
+    const sectionActive = (id: SectionId) => SECTION_FIELDS[id].some(key => isSet(draftFilters[key]));
 
     const applyFilters = () => {
         if (!isValid) return;
@@ -49,82 +134,127 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
         onClear?.();
     };
 
-    return (
-        <aside data-tour="filters-section" className="w-80 shrink-0 border-r border-border bg-card overflow-auto hidden lg:block" style={{ height: 'calc(100vh - 3.5rem)' }}>
-            <div className="sticky top-0 bg-card flex items-center justify-between border-b p-4 border-border">
-                <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-sm">Filters</h3>
-                    {activeFilterCount > 0 && <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{activeFilterCount}</span>}
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={clearDraftFilters} className="text-xs text-primary cursor-pointer hover:underline">Clear</button>
-                    <button onClick={applyFilters} disabled={!hasChanges || !isValid} className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Apply</button>
-                </div>
-            </div>
-            <div className="p-4 space-y-5">
-                {/* Location */}
-                <div data-tour="location-filter">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Location</p>
-                    <FilterInput letters label="City" value={draftFilters.cityFilter} onChange={(v) => setDraftFilters({ ...draftFilters, cityFilter: v })} placeholder="e.g. Austin" />
-                    <FilterInput letters label="County" value={draftFilters.countyFilter} onChange={(v) => setDraftFilters({ ...draftFilters, countyFilter: v })} placeholder="e.g. Travis" />
-                    <div className="mt-2">
-                        <label className="text-xs font-medium text-muted-foreground">State</label>
-                        <div className="mt-1 flex flex-wrap gap-1 max-h-24 overflow-auto">
-                            {statesList.map(s => (
-                                <button key={s} onClick={() => { setDraftFilters({ ...draftFilters, stateFilter: draftFilters.stateFilter.includes(s) ? draftFilters.stateFilter.filter(x => x !== s) : [...draftFilters.stateFilter, s] }); setPage(1); }}
-                                    className={cn('rounded-pill px-2 py-0.5 text-xs font-medium transition-colors border cursor-pointer', draftFilters.stateFilter.includes(s) ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:border-primary/40')}>
-                                    {s}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <FilterAutocomplete label="Metropolitan Statistical Area (MSA)" field="msa" value={draftFilters.msaFilter} onChange={(v) => setDraftFilters({ ...draftFilters, msaFilter: v })} placeholder="e.g. Amsterdam, NY" />
-                </div>
-                {/* Industry */}
-                <div data-tour="industry-filter">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Industry</p>
-                    <FilterAutocomplete label="NAICS Code" field="naics" value={draftFilters.naicsFilter} onChange={(v) => setDraftFilters({ ...draftFilters, naicsFilter: v })} placeholder="Code or industry" />
-                    <FilterAutocomplete label="SIC Code" field="sic" value={draftFilters.sicFilter} onChange={(v) => setDraftFilters({ ...draftFilters, sicFilter: v })} placeholder="Code or industry" />
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                        <FilterInput numeric maxLength={4} error={errors.minYear} label="Min Year Founded" value={draftFilters.minYear} onChange={(v) => setDraftFilters({ ...draftFilters, minYear: v })} placeholder="1700" />
-                        <FilterInput numeric maxLength={4} error={errors.maxYear} label="Max Year Founded" value={draftFilters.maxYear} onChange={(v) => setDraftFilters({ ...draftFilters, maxYear: v })} placeholder={new Date().getFullYear().toString()} />
-                    </div>
-                </div>
-                {/* Size */}
-                <div data-tour="size-filter">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Company Size</p>
-                    <div className="grid grid-cols-2 gap-2">
-                        <FilterInput numeric label="Min Employees" value={draftFilters.minEmp} onChange={(v) => setDraftFilters({ ...draftFilters, minEmp: v })} placeholder="0" />
-                        <FilterInput numeric error={errors.maxEmp} label="Max Employees" value={draftFilters.maxEmp} onChange={(v) => setDraftFilters({ ...draftFilters, maxEmp: v })} placeholder="10000" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                        <FilterInput numeric label="Min Revenue" value={draftFilters.minRev} onChange={(v) => setDraftFilters({ ...draftFilters, minRev: v })} placeholder="0" />
-                        <FilterInput numeric error={errors.maxRev} label="Max Revenue" value={draftFilters.maxRev} onChange={(v) => setDraftFilters({ ...draftFilters, maxRev: v })} placeholder="100000000" />
-                    </div>
-                </div>
-                {/* Demographics */}
-                <div data-tour="demographics-filter">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Demographics</p>
-                    {['Minority-Owned', 'Women-Owned', 'Veteran-Owned'].map(d => (
-                        <label key={d} className="flex items-center gap-2 py-1 text-sm cursor-pointer">
-                            <input type="checkbox" checked={draftFilters.demoFilter.includes(d)}
-                                onChange={e => { setDraftFilters({ ...draftFilters, demoFilter: e.target.checked ? [...draftFilters.demoFilter, d] : draftFilters.demoFilter.filter(x => x !== d) }); setPage(1); }}
-                                className="rounded border-border" />
-                            {d}
-                        </label>
-                    ))}
-                    <FilterAutocomplete label="Certification" field="certification" value={draftFilters.certificationFilter} onChange={(v) => setDraftFilters({ ...draftFilters, certificationFilter: v })} placeholder="e.g. SBE, MBE, HUBZone" />
-                </div>
-                {/* Data Quality */}
-                <div data-tour="data-quality-filter">
-                    <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Data Quality</p>
-                    <Toggle label="Has phone" checked={draftFilters.hasPhone} onChange={v => { setDraftFilters({ ...draftFilters, hasPhone: v }); setPage(1); }} />
-                    <Toggle label="Has email" checked={draftFilters.hasEmail} onChange={v => { setDraftFilters({ ...draftFilters, hasEmail: v }); setPage(1); }} />
-                    <Toggle label="Has website" checked={draftFilters.hasWebsite} onChange={v => { setDraftFilters({ ...draftFilters, hasWebsite: v }); setPage(1); }} />
-                </div>
-            </div>
-        </aside>
-    )
-}
+    const patch = (changes: Partial<SearchFilters>) => setDraftFilters({ ...draftFilters, ...changes });
 
-export default Filters
+    const toggleDemo = (value: string, checked: boolean) => {
+        patch({
+            demoFilter: checked
+                ? [...draftFilters.demoFilter, value]
+                : draftFilters.demoFilter.filter(x => x !== value),
+        });
+        setPage(1);
+    };
+
+    const section = (id: SectionId) => ({
+        open: openSections.has(id),
+        active: sectionActive(id),
+        onToggle: () => toggleSection(id),
+    });
+
+    return (
+        <aside data-tour="filters-section" className="hidden h-full w-65 shrink-0 overflow-auto border-r border-border lg:block">
+            <div className="sticky top-0 z-10 flex h-15 items-center justify-between border-b border-border px-4">
+                <h3 className="text-sm font-semibold text-[#5A5A5A] font-heading">Filters</h3>
+                <div className="flex items-center gap-2.5">
+                    <button
+                        type="button"
+                        onClick={clearDraftFilters}
+                        className="cursor-pointer text-sm font-heading font-normal text-primary underline underline-offset-2 transition-colors hover:text-primary/80"
+                    >
+                        Clear
+                    </button>
+                    <button
+                        type="button"
+                        onClick={applyFilters}
+                        disabled={!hasChanges || !isValid}
+                        className="cursor-pointer rounded-lg bg-primary px-2 py-1 text-sm font-heading font-normal text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        Apply
+                    </button>
+                </div>
+            </div>
+
+            <Section title="Industry Codes" dataTour="industry-filter" {...section('industry')}>
+                <FilterAutocomplete label="NAICS Code / Industry" field="naics" value={draftFilters.naicsFilter} onChange={v => patch({ naicsFilter: v })} placeholder="Enter NAICS Code" />
+                <FilterAutocomplete label="SIC Code" field="sic" value={draftFilters.sicFilter} onChange={v => patch({ sicFilter: v })} placeholder="Enter SIC Code" />
+            </Section>
+
+            <Section title="Location" dataTour="location-filter" {...section('location')}>
+                <FilterInput letters label="City" value={draftFilters.cityFilter} onChange={v => patch({ cityFilter: v })} placeholder="Search City" />
+                <FilterInput letters label="County" value={draftFilters.countyFilter} onChange={v => patch({ countyFilter: v })} placeholder="Search County" />
+                <div>
+                    <label className="text-sm text-foreground/80">State</label>
+                    {/* A wrapping pill list rather than the design's single select:
+                        `stateFilter` is a multi-select, which a one-value dropdown
+                        could not express. */}
+                    <div className="mt-2 flex max-h-28 flex-wrap gap-1 overflow-auto">
+                        {statesList.map(s => (
+                            <button
+                                key={s}
+                                type="button"
+                                onClick={() => {
+                                    patch({
+                                        stateFilter: draftFilters.stateFilter.includes(s)
+                                            ? draftFilters.stateFilter.filter(x => x !== s)
+                                            : [...draftFilters.stateFilter, s],
+                                    });
+                                    setPage(1);
+                                }}
+                                className={cn(
+                                    'cursor-pointer rounded-full border px-2 py-0.5 text-xs font-medium transition-colors',
+                                    draftFilters.stateFilter.includes(s)
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'border-border hover:border-primary/40'
+                                )}
+                            >
+                                {s}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+                <FilterAutocomplete label="Metropolitan Statistical Area" field="msa" value={draftFilters.msaFilter} onChange={v => patch({ msaFilter: v })} placeholder="Search MSA" />
+            </Section>
+
+            <Section title="Employee Size" dataTour="size-filter" {...section('employees')}>
+                <div className="grid grid-cols-2 gap-3">
+                    <FilterInput numeric label="Min" value={draftFilters.minEmp} onChange={v => patch({ minEmp: v })} placeholder="Enter min" />
+                    <FilterInput numeric error={errors.maxEmp} label="Max" value={draftFilters.maxEmp} onChange={v => patch({ maxEmp: v })} placeholder="Enter Max" />
+                </div>
+            </Section>
+
+            <Section title="Revenue" {...section('revenue')}>
+                <div className="grid grid-cols-2 gap-3">
+                    <FilterInput numeric label="Min" value={draftFilters.minRev} onChange={v => patch({ minRev: v })} placeholder="Enter min" />
+                    <FilterInput numeric error={errors.maxRev} label="Max" value={draftFilters.maxRev} onChange={v => patch({ maxRev: v })} placeholder="Enter Max" />
+                </div>
+            </Section>
+
+            <Section title="Founding Year" {...section('founded')}>
+                <div className="grid grid-cols-2 gap-3">
+                    <FilterInput numeric maxLength={4} error={errors.minYear} label="Min" value={draftFilters.minYear} onChange={v => patch({ minYear: v })} placeholder="Enter min" />
+                    <FilterInput numeric maxLength={4} error={errors.maxYear} label="Max" value={draftFilters.maxYear} onChange={v => patch({ maxYear: v })} placeholder="Enter Max" />
+                </div>
+            </Section>
+
+            <Section title="Ownership" dataTour="demographics-filter" {...section('ownership')}>
+                {DEMOGRAPHICS.map(d => (
+                    <CheckRow
+                        key={d.value}
+                        label={d.label}
+                        checked={draftFilters.demoFilter.includes(d.value)}
+                        onChange={checked => toggleDemo(d.value, checked)}
+                    />
+                ))}
+                <FilterAutocomplete label="Certification" field="certification" value={draftFilters.certificationFilter} onChange={v => patch({ certificationFilter: v })} placeholder="eg : SBE, HUBZone" />
+            </Section>
+
+            <Section title="Data Quality" dataTour="data-quality-filter" {...section('quality')}>
+                <CheckRow label="Has Phone" checked={draftFilters.hasPhone} onChange={v => { patch({ hasPhone: v }); setPage(1); }} />
+                <CheckRow label="Has email" checked={draftFilters.hasEmail} onChange={v => { patch({ hasEmail: v }); setPage(1); }} />
+                <CheckRow label="Has website" checked={draftFilters.hasWebsite} onChange={v => { patch({ hasWebsite: v }); setPage(1); }} />
+            </Section>
+        </aside>
+    );
+};
+
+export default Filters;

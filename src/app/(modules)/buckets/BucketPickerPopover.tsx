@@ -130,7 +130,7 @@ export default function BucketPickerPopover({
                     data-tooltip-id={tooltipId}
                     disabled={disabled}
                     className={cn(
-                        'flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors active:scale-[0.98] cursor-pointer',
+                        'flex items-center gap-2 rounded-md px-4 py-2 text-sm font-light font-heading transition-colors active:scale-[0.98] cursor-pointer',
                         removing
                             ? 'border border-border hover:bg-accent'
                             : 'bg-primary text-primary-foreground hover:bg-primary/90',
@@ -140,14 +140,14 @@ export default function BucketPickerPopover({
                 >
                     {removing
                         ? <><FolderMinus className="h-4 w-4" />Remove from Bucket</>
-                        : <><FolderPlus className="h-4 w-4" />Add to Bucket{showCount && count > 0 && ` (${count})`}</>}
+                        : <><FolderPlus className="h-4 w-4" />Add to Preferred List{showCount && count > 0 && ` (${count})`}</>}
                 </button>
             </PopoverTrigger>
 
             <PopoverContent align="end" className="w-72 gap-0 p-0">
                 <div className="border-b border-border px-3 py-2.5">
-                    <p className="text-sm font-semibold">{removing ? 'Remove from bucket' : 'Add to bucket'}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className="text-sm font-heading font-semibold">{removing ? 'Remove from bucket' : 'Add to bucket'}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground font-heading">
                         {showCount ? `${count} ${noun} selected · pick one bucket` : 'Pick one bucket'}
                     </p>
                 </div>
