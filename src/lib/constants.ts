@@ -59,7 +59,7 @@ export const adminNav = [
   { to: '/admin/cost-centre', icon: DollarSign, label: 'Cost Center' },
   { to: '/admin/data-health', icon: Database, label: 'Data Health' },
   { to: '/admin/search-oversight', icon: Eye, label: 'Search Oversight' },
-  { to: '/admin/company-requests', icon: ClipboardCheck, label: 'Company Requests' },
+  // { to: '/admin/company-requests', icon: ClipboardCheck, label: 'Company Requests' },
   { to: '/admin/add-company', icon: Building2, label: 'Add Company' }
 ];
 
