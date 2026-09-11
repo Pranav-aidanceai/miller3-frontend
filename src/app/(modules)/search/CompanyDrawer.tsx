@@ -14,8 +14,9 @@ import SimilarPage from './Similar';
 import { ApiErrorResponse } from '@/types/common';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { updateCreditsRemaining } from '@/store/slices/authSlice';
+import type { RootState } from '@/store/store';
 import BucketPickerPopover from '../buckets/BucketPickerPopover';
 import type { Bucket } from '../buckets/BucketList';
 import EditCompanyModal from './EditCompanyModal';
@@ -268,6 +269,8 @@ type Tab = (typeof TABS)[number];
 export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose: () => void; onEnriched?: (enriched?: CompanyData) => void }) {
 
     const dispatch = useDispatch();
+    const role = useSelector((state: RootState) => state.auth.role);
+    const isAdmin = role === 'ADMIN';
     const [tab, setTab] = useState<Tab>('overview');
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -573,7 +576,8 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                             <p className="mt-1 text-sm text-primary-foreground/80">
                                 {[companyData?.city, companyData?.state].filter(Boolean).join(', ')}
                             </p>
-                            {companyData?.last_enriched_label && (
+                            {/* Enrichment recency is operational detail — admins only. */}
+                            {isAdmin && companyData?.last_enriched_label && (
                                 companyData?.last_enriched_at ? (() => {
                                     const { text, isStale } = formatEnrichedAt(companyData.last_enriched_at);
                                     return (
@@ -598,7 +602,8 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                             </button>
 
                             <div className="flex items-center gap-2">
-                                {companyData && (
+                                {/* Editing company records is an admin-only action. */}
+                                {isAdmin && companyData && (
                                     <button
                                         type="button"
                                         onClick={() => setEditing(true)}
@@ -776,7 +781,7 @@ export function CompanyDrawer({ id, onClose, onEnriched }: { id: string; onClose
                 </div>
             </div>
 
-            {editing && companyData && (
+            {isAdmin && editing && companyData && (
                 <EditCompanyModal
                     company={companyData}
                     onClose={() => setEditing(false)}

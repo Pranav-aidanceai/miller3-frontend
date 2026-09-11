@@ -1,7 +1,7 @@
 'use client'
 
-import Image from 'next/image';
 import { Loader2 } from 'lucide-react';
+import { ChoiceScreenLayout } from '@/components/auth/ChoiceScreenLayout';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { tiers } from '@/lib/constants';
@@ -26,12 +26,34 @@ interface OnboardingPageProps {
      * succeeded — shown in the Plan Payment popup. Null keeps it closed. */
     successPlanLabel: string | null;
     onClosePaymentPopup: () => void;
+    /** Heading above the cards. Registration keeps the default; the in-app
+     * plan screen swaps in "Upgrade"/"Change" wording. */
+    title?: string;
+    /** The plan the signed-in user is already on ('FREE' | 'STANDARD' |
+     * 'PREMIUM'). Its card shows a "Current Plan" badge instead of a button,
+     * and the rest read "Upgrade to"/"Change to" against it. Omitted during
+     * registration, where the user is on no plan yet. */
+    currentRole?: string | null;
+    /** Where "Back" goes: the previous registration step during sign-up, the
+     * previous route on the in-app plan screen. Omitted hides the link. */
+    onBack?: () => void;
 }
 
-export default function OnboardingPage({ onTierSelect, onSubmit, loading, successPlanLabel, onClosePaymentPopup }: OnboardingPageProps) {
-    // Tracks which card's own button was clicked, so only that one shows a
-    // spinner while `loading` is true — the other two just get disabled.
+export default function OnboardingPage({
+    onTierSelect,
+    onSubmit,
+    loading,
+    successPlanLabel,
+    onClosePaymentPopup,
+    title = 'Choose Your Plan',
+    currentRole = null,
+    onBack,
+}: OnboardingPageProps) {
+
     const [submittingTier, setSubmittingTier] = useState<string | null>(null);
+    const currentIndex = currentRole
+        ? tiers.findIndex(t => t.role.toUpperCase() === currentRole.toUpperCase())
+        : -1;
 
     const handleSelectPlan = async (role: string) => {
         setSubmittingTier(role);
@@ -40,20 +62,16 @@ export default function OnboardingPage({ onTierSelect, onSubmit, loading, succes
     };
 
     return (
-        <div 
-            className="flex min-h-screen flex-col items-center justify-center p-6 bg-cover bg-center bg-no-repeat mix-blend-multiply dark:hidden"
-            style={{ backgroundImage: "url('/auth/plan-page-bg.png')" }}
-        >
-            <div className="relative w-full overflow-hidden py-12">
-                <div className="absolute left-0 top-0 z-10 flex items-center gap-3">
-                    <Image src="/brand/logomark.svg" alt="" width={28} height={24} />
-                    <span className="text-lg font-heading font-semibold text-foreground">VendorLens</span>
-                </div>
-                <div className="animate-fade-in relative z-10 w-full text-center">
-                    <h2 className="font-heading text-4xl font-bold text-primary">Choose Your Plan</h2>
-                    <div className="mt-10 flex flex-col items-center justify-center gap-6 lg:flex-row lg:items-stretch lg:justify-center">
-                        {tiers.map(tier => {
+        <>
+            <ChoiceScreenLayout title={title} onBack={onBack}>
+                        {tiers.map((tier, index) => {
                             const isSubmittingThis = loading && submittingTier === tier.role;
+                            const isCurrent = currentIndex >= 0 && index === currentIndex;
+                            const ctaLabel = currentIndex < 0
+                                ? `Start ${tier.label}`
+                                : index > currentIndex
+                                    ? `Upgrade to ${tier.label}`
+                                    : `Change to ${tier.label}`;
                             return (
                                 <div
                                     key={tier.role}
@@ -61,9 +79,18 @@ export default function OnboardingPage({ onTierSelect, onSubmit, loading, succes
                                         'flex w-full max-w-[320px] flex-col items-center gap-10 rounded-[1.5rem] border p-6 text-left',
                                         tier.highlighted
                                             ? 'border-primary bg-primary text-primary-foreground'
-                                            : 'border-primary bg-card text-card-foreground'
+                                            : 'border-primary bg-card text-card-foreground',
+                                        isCurrent && 'ring-2 ring-primary ring-offset-4 ring-offset-background'
                                     )}
                                 >
+                                    {isCurrent && (
+                                        <span className={cn(
+                                            '-mb-6 self-start rounded-full px-3 py-1 text-xs font-medium',
+                                            tier.highlighted ? 'bg-background text-primary' : 'bg-primary text-primary-foreground'
+                                        )}>
+                                            Current Plan
+                                        </span>
+                                    )}
                                     <div className="flex w-full flex-col items-center gap-4">
                                         <div className="flex w-full flex-col items-center gap-1 text-center">
                                             <p className="text-lg font-heading font-semibold">{tier.label}</p>
@@ -81,28 +108,34 @@ export default function OnboardingPage({ onTierSelect, onSubmit, loading, succes
                                             ))}
                                         </ul>
                                     </div>
-                                    <button
-                                        onClick={() => handleSelectPlan(tier.role)}
-                                        disabled={loading}
-                                        className={cn(
-                                            'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-medium shadow-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70',
-                                            tier.highlighted
-                                                ? 'bg-background text-primary hover:bg-background/90'
-                                                : 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                        )}
-                                    >
-                                        {isSubmittingThis ? <Loader2 className="h-5 w-5 animate-spin" /> : `Start ${tier.label}`}
-                                    </button>
+                                    {/* The plan already held needs no call to action — the
+                                        badge above says where the user stands. */}
+                                    {!isCurrent && (
+                                        <button
+                                            onClick={() => handleSelectPlan(tier.role)}
+                                            disabled={loading}
+                                            className={cn(
+                                                'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-medium shadow-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70',
+                                                tier.highlighted
+                                                    ? 'bg-background text-primary hover:bg-background/90'
+                                                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                            )}
+                                        >
+                                            {isSubmittingThis ? <Loader2 className="h-5 w-5 animate-spin" /> : ctaLabel}
+                                        </button>
+                                    )}
                                 </div>
                             );
                         })}
-                    </div>
-                </div>
-            </div>
+            </ChoiceScreenLayout>
 
-            {/* Plan Payment popup — matches the Figma "Select Plan" reference's
-                confirmation overlay (fileKey pskj0D4uvWBsvAB5Csxyt4, node
-                430:1822), shown once registration succeeds for the chosen tier. */}
+            <PlanPaymentDialog successPlanLabel={successPlanLabel} onClosePaymentPopup={onClosePaymentPopup} />
+        </>
+    );
+}
+
+function PlanPaymentDialog({ successPlanLabel, onClosePaymentPopup }: Pick<OnboardingPageProps, 'successPlanLabel' | 'onClosePaymentPopup'>) {
+    return (
             <Dialog open={!!successPlanLabel} onOpenChange={(open) => { if (!open) onClosePaymentPopup(); }}>
                 <DialogContent className="gap-6 rounded-2xl p-6 sm:max-w-md">
                     <DialogHeader>
@@ -125,6 +158,5 @@ export default function OnboardingPage({ onTierSelect, onSubmit, loading, succes
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
     );
 }

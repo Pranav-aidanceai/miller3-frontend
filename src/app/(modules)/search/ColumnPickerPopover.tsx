@@ -26,12 +26,19 @@ export default function ColumnPickerPopover({ selected, onChange }: ColumnPicker
                     Columns
                 </button>
             </PopoverTrigger>
-            <PopoverContent className="w-64 p-0" align="end">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            {/* Radix reports how much room is left between the trigger and the
+                viewport edge; capping to it keeps the footer on screen on short
+                viewports and lets the list — not the popover — do the scrolling. */}
+            <PopoverContent
+                className="w-64 max-h-(--radix-popover-content-available-height) overflow-hidden p-0"
+                align="end"
+                collisionPadding={12}
+            >
+                <div className="flex shrink-0 items-center justify-between px-4 py-3 border-b border-border">
                     <span className="text-sm font-semibold">Columns</span>
                     <span className="text-xs text-muted-foreground">{selected.length}/{MAX_OPTIONAL_COLUMNS} extra</span>
                 </div>
-                <div className="px-2 py-2">
+                <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
                     <label className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-muted-foreground">
                         Company
                         <input type="checkbox" checked disabled className="h-4 w-4 accent-primary" />
@@ -63,7 +70,7 @@ export default function ColumnPickerPopover({ selected, onChange }: ColumnPicker
                         <input type="checkbox" checked disabled className="h-4 w-4 accent-primary" />
                     </label>
                 </div>
-                <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+                <div className="flex shrink-0 items-center justify-between px-4 py-3 border-t border-border">
                     <span className="text-xs text-muted-foreground">Max {MAX_OPTIONAL_COLUMNS} extra columns</span>
                     <button
                         onClick={() => onChange(DEFAULT_VISIBLE_COLUMNS)}

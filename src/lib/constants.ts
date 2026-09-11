@@ -49,7 +49,7 @@ export const mainNav = [
   // literally reads "Bucket List" — supersedes the earlier "Preferred List" name.
   { to: '/buckets', icon: PaintBucket, label: 'Preferred List' },
   { to: '/query-history', icon: History, label: 'Search History' },
-  { to: '/my-requests', icon: ClipboardList, label: 'My Requests' },
+  // { to: '/my-requests', icon: ClipboardList, label: 'My Requests' },
 ];
 
 export const adminNav = [
@@ -64,10 +64,20 @@ export const adminNav = [
 ];
 
 
+// Credit top-up packs, biggest first, per the Figma "Buy your Credit Pack"
+// screen (fileKey nPLWw73lkfNSi2MZX2bIsU, node 2:18114). Prices aren't shown
+// there — the pack is identified by its tier and credit count alone.
+export const creditPacks = [
+  { tier: 'Tier 1', credits: 1500, highlighted: true },
+  { tier: 'Tier 2', credits: 1000, highlighted: false },
+  { tier: 'Tier 3', credits: 500, highlighted: false },
+  { tier: 'Tier 4', credits: 100, highlighted: false },
+] as const;
+
 export const accountMenu = [
-  { key: 'plan', icon: Tag, label: 'My Plan' },
+  { key: 'plan', icon: Tag, label: 'My Plan', to: '/plan' },
   { key: 'buy-credits', icon: Coins, label: 'Buy Credits', to: '/buy-credits' },
-  { key: 'request-changes', icon: ClipboardList, label: 'Request Changes', to: '/my-requests' },
+  // { key: 'request-changes', icon: ClipboardList, label: 'Request Changes', to: '/my-requests' },
   { key: 'logout', icon: LogOut, label: 'Logout', variant: 'destructive' },
 ] as const;
 

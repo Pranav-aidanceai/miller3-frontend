@@ -18,6 +18,11 @@ import {
     SidebarTrigger,
 } from '@/components/ui/sidebar';
 
+// Shared by both nav groups so the main and admin items stay in step:
+// roomier rows than the shadcn default, with a slightly larger label and icon.
+const NAV_MENU_CLASS = 'gap-1.5';
+const NAV_BUTTON_CLASS = 'h-9 text-[15px] [&_svg]:size-[18px]';
+
 export function AppSidebar() {
     const pathName = usePathname();
     const role = useAppSelector((state) => state.auth.role);
@@ -45,7 +50,7 @@ export function AppSidebar() {
                     the admin section below gets a label ("Admin Actions"). */}
                 <SidebarGroup>
                     <SidebarGroupContent>
-                        <SidebarMenu>
+                        <SidebarMenu className={NAV_MENU_CLASS}>
                             {/* Admins raise no update requests of their own — they edit
                                 records directly and review everyone else's under Admin. */}
                             {mainNav
@@ -56,6 +61,7 @@ export function AppSidebar() {
                                             asChild
                                             isActive={isActive(item.to)}
                                             tooltip={item.label}
+                                            className={NAV_BUTTON_CLASS}
                                         >
                                             <Link href={item.to}>
                                                 <item.icon />
@@ -72,13 +78,14 @@ export function AppSidebar() {
                     <SidebarGroup>
                         <SidebarGroupLabel>Admin Actions</SidebarGroupLabel>
                         <SidebarGroupContent>
-                            <SidebarMenu>
+                            <SidebarMenu className={NAV_MENU_CLASS}>
                                 {adminNav.map((item) => (
                                     <SidebarMenuItem key={item.to}>
                                         <SidebarMenuButton
                                             asChild
                                             isActive={isActive(item.to)}
                                             tooltip={item.label}
+                                            className={NAV_BUTTON_CLASS}
                                         >
                                             <Link href={item.to}>
                                                 <item.icon />

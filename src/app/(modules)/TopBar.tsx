@@ -1,6 +1,6 @@
 'use client';
 
-import { Command, Sparkles, Zap, Download, X } from 'lucide-react';
+import { Command, Sparkles, Zap, Download, X, Infinity } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useSyncExternalStore } from 'react';
 import axios from 'axios';
@@ -13,19 +13,15 @@ import {
     dismissLowCreditsBanner,
     isLowCreditsBannerDismissed,
 } from '@/lib/session';
-import { accountMenu, roleBadgeColor, type AccountMenuKey } from '@/lib/constants';
-import { cn } from '@/lib/utils';
+import { accountMenu, type AccountMenuKey } from '@/lib/constants';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -36,7 +32,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MyPlanDialog } from './MyPlanDialog';
 
 // Export is billed per block of companies rather than per company; the block
 // size is fixed by the backend's pricing, not configurable per environment.
@@ -88,7 +83,7 @@ function CreditBar({ remaining, limit }: { remaining: number; limit: number }) {
     return (
         <div className={`group relative flex h-9 cursor-default select-none items-center gap-2 rounded-full border-2 ${borderColor} bg-background px-4 transition-colors`}>
             <span className="text-sm font-medium tabular-nums text-foreground">
-                {unlimited ? '∞' : `${remaining}/${limit}`}
+                {unlimited ? <Infinity size={16} /> : `${remaining}/${limit}`}
             </span>
             <span className="text-sm text-muted-foreground">Credits</span>
 
@@ -170,8 +165,8 @@ export function TopBar() {
     const router = useRouter();
     const credits_left = useAppSelector(state => state.auth.credits_left);
     const user = useAppSelector(state => state.auth.user);
+    const role = useAppSelector(state => state.auth.role);
 
-    const [showPlanDialog, setShowPlanDialog] = useState(false);
     const [showLogoutDialog, setShowLogoutDialog] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -196,9 +191,14 @@ export function TopBar() {
         setDismissedNow(true);
     };
 
+    // Admin accounts are neither billed against a plan nor metered on credits,
+    // so the two billing entries have nothing to show them.
+    const menuItems = role === 'ADMIN'
+        ? accountMenu.filter(item => item.key !== 'plan' && item.key !== 'buy-credits')
+        : accountMenu;
+
     // Handlers for the `accountMenu` entries that have no route of their own.
     const openDialog: Partial<Record<AccountMenuKey, () => void>> = {
-        plan: () => setShowPlanDialog(true),
         logout: () => setShowLogoutDialog(true),
     };
 
@@ -285,7 +285,7 @@ export function TopBar() {
                                         {user.role}
                                     </Badge>
                                 </DropdownMenuLabel> */}
-                                {accountMenu.map(({ key, icon: Icon, label, ...item }) => (
+                                {menuItems.map(({ key, icon: Icon, label, ...item }) => (
                                     <DropdownMenuItem
                                         key={key}
                                         variant={'variant' in item ? item.variant : 'default'}
@@ -313,8 +313,6 @@ export function TopBar() {
                     onDismiss={dismissCreditsBanner}
                 />
             )}
-
-            <MyPlanDialog open={showPlanDialog} onOpenChange={setShowPlanDialog} />
 
             <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
                 <AlertDialogContent>
