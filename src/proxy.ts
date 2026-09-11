@@ -7,7 +7,7 @@ const WHITE_LISTED_ROUTES = [
   "/auth/reset-password",
 ];
 
-const PROTECTED_ROUTES = ["/search", "/admin", "/ai-search", "/query-history"];
+const PROTECTED_ROUTES = ["/search", "/admin", "/ai-search", "/query-history", "/plan", "/buy-credits"];
 
 const isWhiteListed = (pathname: string) =>
   WHITE_LISTED_ROUTES.some((route) =>

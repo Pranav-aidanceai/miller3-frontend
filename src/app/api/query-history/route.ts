@@ -8,9 +8,8 @@ export async function GET(request: Request) {
         const response = await AXIOS.get('/api/v1/query-history', {
             params: {
                 query_type: searchParams.get('query_type') ?? undefined,
-                page: searchParams.get('page') ?? undefined,
+                cursor: searchParams.get('cursor') ?? undefined,
                 limit: searchParams.get('limit') ?? undefined,
-                scope: searchParams.get('scope') ?? undefined,
             },
         });
         return NextResponse.json({ data: response.data }, { status: 200 });

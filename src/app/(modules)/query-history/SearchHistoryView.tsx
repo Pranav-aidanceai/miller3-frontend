@@ -2,13 +2,22 @@
 
 import apiClient from '@/lib/api/client';
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getErrorMessage } from "@/lib/apiError";
 import { cn } from "@/lib/utils";
-import { useSelector } from "react-redux";
-import { RootState } from "@/store/store";
 import { StructuredFilters, structuredFiltersToQuery, describeStructuredFilters } from "../search/replayParams";
+
+interface QueryHistoryResponse {
+  items: QueryHistoryItem[];
+  total: number;
+  total_pages: number;
+  limit: number;
+  offset: number;
+  next_cursor: string | null;
+  prev_cursor: string | null;
+}
 
 interface QueryHistoryItem {
   query_type: 'ai' | 'structured';
@@ -26,18 +35,25 @@ const TYPE_FILTERS = [
 ];
 type TypeFilter = typeof TYPE_FILTERS[number]['value'];
 
+const PER_PAGE_OPTIONS = [25, 50, 100] as const;
+
 export default function SearchHistoryView() {
 
   const router = useRouter();
-  const role = useSelector((state: RootState) => state.auth.role);
-  const isAdmin = role === 'ADMIN';
   const [userQueries, setUserQueries] = useState<QueryHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(25);
-  const [totalPages, setTotalPages] = useState(0);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [perPageOpen, setPerPageOpen] = useState(false);
+
+  // /query-history is cursor-paginated: each response carries the cursors for
+  // the pages either side of it, so `page` is only a display counter.
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [prevCursor, setPrevCursor] = useState<string | null>(null);
 
   const replay = (q: QueryHistoryItem) => {
     if (q.query_type === 'structured') {
@@ -61,15 +77,17 @@ export default function SearchHistoryView() {
       try {
         const response = await apiClient.get('/query-history', {
           params: {
-            page,
             limit: perPage,
+            cursor: cursor ?? undefined,
             query_type: typeFilter === 'all' ? undefined : typeFilter,
           },
         });
         if (!active) return;
-        const data = response?.data?.data;
+        const data: QueryHistoryResponse | undefined = response?.data?.data;
         setUserQueries(data?.items ?? []);
         setTotalPages(data?.total_pages ?? 0);
+        setNextCursor(data?.next_cursor ?? null);
+        setPrevCursor(data?.prev_cursor ?? null);
       } catch (err: unknown) {
         if (!active) return;
         setError(getErrorMessage(err, 'Failed to load search history'));
@@ -78,11 +96,37 @@ export default function SearchHistoryView() {
       }
     })();
     return () => { active = false; };
-  }, [page, perPage, typeFilter]);
+  }, [cursor, perPage, typeFilter]);
+
+  // The list scrolls on its own, so a new page would otherwise open wherever
+  // the previous one was left — usually somewhere down the list.
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listScrollRef.current?.scrollTo({ top: 0 });
+  }, [cursor, perPage, typeFilter]);
+
+  // Any change to the query invalidates the cursor chain — restart from the
+  // first page rather than replaying a cursor cut for the previous filter.
+  const resetToFirstPage = () => {
+    setCursor(null);
+    setPage(1);
+  };
 
   const selectType = (value: TypeFilter) => {
     setTypeFilter(value);
-    setPage(1);
+    resetToFirstPage();
+  };
+
+  const handleNext = () => {
+    if (!nextCursor) return;
+    setCursor(nextCursor);
+    setPage(p => p + 1);
+  };
+
+  const handlePrev = () => {
+    if (page === 1) return;
+    setCursor(prevCursor);
+    setPage(p => Math.max(1, p - 1));
   };
 
   return (
@@ -108,7 +152,63 @@ export default function SearchHistoryView() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      {/* Pager above the list, matching Search Oversight: page-size popover on
+          the left, arrow steppers on the right. */}
+      {!error && (
+        <div className="shrink-0 flex items-center justify-between border-b border-border py-3 px-6">
+          <div className="flex items-center gap-2">
+            <Popover open={perPageOpen} onOpenChange={setPerPageOpen}>
+              <PopoverTrigger asChild>
+                <button className="flex h-7 items-center gap-1 rounded-md border border-border bg-white px-2 text-xs hover:bg-accent cursor-pointer">
+                  {perPage}
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-1" align="start">
+                {PER_PAGE_OPTIONS.map(value => (
+                  <button
+                    key={value}
+                    onClick={() => { setPerPage(value); resetToFirstPage(); setPerPageOpen(false); }}
+                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                  >
+                    {value}
+                    {perPage === value && <Check className="h-4 w-4 text-primary" />}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+            <span className="text-xs font-normal text-[#B3B3B3]">Per Page</span>
+            {totalPages > 0 && (
+              <span className="text-xs font-normal text-[#B3B3B3]">
+                Page {page} of {totalPages}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={page === 1 || loading}
+              onClick={handlePrev}
+              aria-label="Previous page"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-border hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              disabled={!nextCursor || loading}
+              onClick={handleNext}
+              aria-label="Next page"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-border hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent cursor-pointer"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div ref={listScrollRef} className="flex-1 overflow-auto">
         {loading && (
           <div data-tour="query-history-list">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -141,7 +241,7 @@ export default function SearchHistoryView() {
             {userQueries.map((q, i) => {
               const title = q.query_type === 'ai'
                 ? (q.raw_input ?? 'AI search')
-                : describeStructuredFilters(q.filters_applied);
+                : describeStructuredFilters(q.filters_applied, q.raw_input);
               const dateTime = (() => {
                 const d = new Date(q.created_at);
                 const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -179,66 +279,6 @@ export default function SearchHistoryView() {
           </div>
         )}
       </div>
-
-      {/* Static pagination footer — admins only */}
-      {isAdmin && !error && totalPages > 1 && (
-        <div className="shrink-0 flex items-center justify-between border-t border-border py-3 px-6">
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <select
-                value={perPage}
-                onChange={e => { setPerPage(Number(e.target.value)); setPage(1); }}
-                className="h-9 rounded-md border border-input bg-background px-2 pr-8 text-sm appearance-none cursor-pointer"
-              >
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            </div>
-            <span className="text-xs text-muted-foreground">per page</span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              disabled={page === 1 || loading}
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              className="rounded-md border border-border px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-accent cursor-pointer"
-            >
-              Prev
-            </button>
-
-            {[page - 1, page, page + 1]
-              .filter(p => p >= 1 && p <= totalPages)
-              .map(p => {
-                const isActive = p === page;
-                return (
-                  <button
-                    key={p}
-                    disabled={loading}
-                    onClick={() => setPage(p)}
-                    className={cn(
-                      'min-w-8 rounded-md border px-2 py-1.5 text-sm transition-colors cursor-pointer',
-                      isActive
-                        ? 'border-primary bg-primary text-primary-foreground font-semibold pointer-events-none'
-                        : 'border-border hover:bg-accent disabled:opacity-50'
-                    )}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-
-            <button
-              disabled={page >= totalPages || loading}
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              className="rounded-md border border-border px-3 py-1.5 text-sm disabled:opacity-50 hover:bg-accent cursor-pointer"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

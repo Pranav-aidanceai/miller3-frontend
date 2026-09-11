@@ -30,7 +30,9 @@ export function ModuleShell({
   }
 
   return (
-    <SidebarProvider className="h-screen">
+    // The sidebar width lives on the provider (the collapse-gap spacer reads
+    // the same variable), so it is overridden here rather than in AppSidebar.
+    <SidebarProvider className="h-screen" style={{ '--sidebar-width': '14rem' } as React.CSSProperties}>
       <AppSidebar />
       <SidebarInset className="flex max-h-screen flex-col overflow-hidden">
         <TopBar />

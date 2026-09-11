@@ -115,8 +115,8 @@ export function structuredFiltersToQuery(filters: StructuredFilters): string {
  * most likely to have searched by; falls back to a plain description when
  * nothing recognizable was applied.
  */
-export function describeStructuredFilters(filters: StructuredFilters | null | undefined): string {
-    if (!filters) return 'All companies';
+export function describeStructuredFilters(filters: StructuredFilters | null | undefined, raw_input: string | null): string {
+    if (!filters) return raw_input ?? 'Search';
 
     const first = (values?: string[] | null) => (values && values.length > 0 ? values[0] : null);
 
@@ -138,7 +138,7 @@ export function describeStructuredFilters(filters: StructuredFilters | null | un
     if (filters.minority_owned || filters.women_owned || filters.veteran_owned) return 'Ownership filter';
     if (filters.has_email || filters.has_website || filters.has_mobile_number) return 'Contact info filter';
 
-    return 'All companies';
+    return raw_input ?? 'Search';
 }
 
 /**

@@ -26,7 +26,9 @@ import { CompanyDrawer } from '../search/CompanyDrawer';
 import ExportModal from '../search/ExportModal';
 import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
-import SortPopover, { type SortOption } from '../search/SortPopover';
+import ColumnPickerPopover from '../search/ColumnPickerPopover';
+import { useVisibleColumns } from '../search/useVisibleColumns';
+// import SortPopover, { type SortOption } from '../search/SortPopover';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useBatchEnrich, type EnrichRecordUpdate } from '../search/useBatchEnrich';
 import BucketPickerPopover from '../buckets/BucketPickerPopover';
@@ -40,15 +42,15 @@ import { updateCreditsRemaining } from '@/store/slices/authSlice';
 
 const PER_PAGE_OPTIONS = [25, 50, 100] as const;
 
-const sortOptions: SortOption[] = [
-  { value: 'company_name', label: 'Name' },
-  { value: 'annual_revenue', label: 'Revenue' },
-  { value: 'employee_size', label: 'Employees' },
-  { value: 'state', label: 'State' },
-  { value: 'city', label: 'City' },
-];
+// const sortOptions: SortOption[] = [
+//   { value: 'company_name', label: 'Name' },
+//   { value: 'annual_revenue', label: 'Revenue' },
+//   { value: 'employee_size', label: 'Employees' },
+//   { value: 'state', label: 'State' },
+//   { value: 'city', label: 'City' },
+// ];
 
-/** Employee sizes come back as ranges ("5–9"), so the leading number orders them. */
+
 const sortValue = (c: Company, key: string): string | number => {
   if (key === 'annual_revenue') return c.annual_revenue ?? -Infinity;
   if (key === 'employee_size') {
@@ -184,6 +186,7 @@ export default function AISearchPage() {
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('');
   const [perPageOpen, setPerPageOpen] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useVisibleColumns();
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
@@ -650,13 +653,13 @@ export default function AISearchPage() {
               </button>
             )}
           </div>
-          <SortPopover
+          {/* <SortPopover
             sortBy={sortBy}
             sortOrder={sortOrder}
             setSortBy={setSortBy}
             setSortOrder={setSortOrder}
             options={sortOptions}
-          />
+          /> */}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -901,6 +904,10 @@ export default function AISearchPage() {
                 </button>
               </div> */}
 
+              {viewMode === 'table' && (
+                <ColumnPickerPopover selected={visibleColumns} onChange={setVisibleColumns} />
+              )}
+
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -947,6 +954,7 @@ export default function AISearchPage() {
                 selectedIds={selectedIds}
                 allSelected={allSelected}
                 notAccessibleFields={[]}
+                visibleColumns={visibleColumns}
                 onToggleSelect={toggleSelect}
                 onToggleSelectAll={toggleSelectAll}
                 onRowClick={setSelectedCompany}

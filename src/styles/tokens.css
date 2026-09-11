@@ -91,7 +91,8 @@
   --sidebar-foreground: oklch(0.37 0.012 247.858);
   --sidebar-primary: oklch(0.448 0.081 218.734);
   --sidebar-primary-foreground: oklch(1 0 89.876);
-  --sidebar-accent: oklch(0.968 0.003 247.858);
+  /* #F1F1F1 — the sidebar's active/hover row fill. */
+  --sidebar-accent: oklch(0.958 0 89.876);
   --sidebar-accent-foreground: oklch(0.235 0 89.876);
   --sidebar-border: oklch(0.92 0.004 247.858);
   --sidebar-ring: oklch(0.448 0.081 218.734);

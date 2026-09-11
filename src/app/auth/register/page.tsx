@@ -111,6 +111,9 @@ export default function RegisterPage() {
             {onboarding ?
                 <OnboardingPage
                     onTierSelect={(role) => formik.setFieldValue('role', role)}
+                    // The wizard's last step before the tier cards is the
+                    // password form, which is still mounted behind this screen.
+                    onBack={() => setOnboarding(false)}
                     onSubmit={formik.handleSubmit}
                     loading={loading}
                     successPlanLabel={successPlanLabel}
