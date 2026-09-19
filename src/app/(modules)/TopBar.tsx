@@ -13,12 +13,13 @@ import {
     dismissLowCreditsBanner,
     isLowCreditsBannerDismissed,
 } from '@/lib/session';
-import { accountMenu, type AccountMenuKey } from '@/lib/constants';
+import { accountMenu, roleBadgeColor, type AccountMenuKey } from '@/lib/constants';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -32,6 +33,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 // Export is billed per block of companies rather than per company; the block
 // size is fixed by the backend's pricing, not configurable per environment.
@@ -140,7 +143,7 @@ function LowCreditsBanner({
     return (
         <div className="relative flex shrink-0 items-center justify-center gap-4 bg-primary m-3 rounded-xl px-12 py-2.5 text-primary-foreground text-heading">
             <p className="text-sm font-light">
-                Hi, {name} <span className="font-semibold tabular-nums">{remaining}/{limit}</span>{' '}
+                Hi {name}, <span className="font-semibold tabular-nums">{remaining}/{limit}</span>{' '}
                 credits left. Don&apos;t have enough credits?
             </p>
             <button
@@ -173,7 +176,7 @@ export function TopBar() {
     // True only after client-side hydration, without a cascading effect render
     // (same pattern as ModuleShell). Gates the sessionStorage read below, which
     // has no server-side answer.
-    const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+    const mounted = useSyncExternalStore(() => () => { }, () => true, () => false);
     // Re-renders on dismiss; sessionStorage is what survives a route change.
     const [dismissedNow, setDismissedNow] = useState(false);
 
@@ -270,21 +273,23 @@ export function TopBar() {
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="bottom" align="end" className="w-40 mt-1 p-0">
-                                {/* <DropdownMenuLabel className="font-normal">
-                                    <p className="truncate text-sm font-medium">{user.name}</p>
+                                <DropdownMenuLabel className="font-normal border-b">
+                                    <div className='flex gap-1 items-start'>
+                                        <p className="truncate text-sm font-medium">{user.name}</p>
+                                        <Badge
+                                            variant="outline"
+                                            className={cn(
+                                                'w-fit border-0 px-1.5 py-0 text-[10px] font-normal uppercase',
+                                                roleBadgeColor[user.role]
+                                            )}
+                                        >
+                                            {user.role}
+                                        </Badge>
+                                    </div>
                                     <p className="truncate text-xs font-normal text-muted-foreground">
                                         {user.email}
                                     </p>
-                                    <Badge
-                                        variant="outline"
-                                        className={cn(
-                                            'mt-1.5 w-fit border-0 px-1.5 py-0 text-[10px] font-semibold uppercase',
-                                            roleBadgeColor[user.role]
-                                        )}
-                                    >
-                                        {user.role}
-                                    </Badge>
-                                </DropdownMenuLabel> */}
+                                </DropdownMenuLabel>
                                 {menuItems.map(({ key, icon: Icon, label, ...item }) => (
                                     <DropdownMenuItem
                                         key={key}

@@ -6,6 +6,7 @@ import { statesList } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { FilterAutocomplete } from './FilterAutocomplete';
 import { FilterInput } from './helper';
+import { Switch } from '@/components/ui/switch';
 import { SearchFilters } from './replayParams';
 import { validateFilters } from './filterValidation';
 
@@ -71,6 +72,7 @@ function Section({
     active,
     onToggle,
     dataTour,
+    headerExtra,
     children,
 }: {
     title: string;
@@ -78,25 +80,43 @@ function Section({
     active: boolean;
     onToggle: () => void;
     dataTour?: string;
+    /** A control that sits beside the arrow, rendered only while open. */
+    headerExtra?: React.ReactNode;
     children: React.ReactNode;
 }) {
     return (
         <div data-tour={dataTour} className="border-b border-border">
-            <button
-                type="button"
-                onClick={onToggle}
-                aria-expanded={open}
-                className="flex w-full cursor-pointer items-center justify-between gap-2 px-6 py-3 text-left text-sm"
-            >
-                <span className={cn('flex items-center gap-1.5 text-sm font-heading', open ? 'font-semibold' : 'font-normal')}>
+            {/* The header is a row rather than one big button so `headerExtra`
+                can hold its own interactive control — a button inside a button
+                is invalid markup. The arrow stays clickable; the title button
+                is the single focusable expander. */}
+            <div className="flex w-full items-center gap-2 px-4 py-3 text-sm">
+                <button
+                    type="button"
+                    onClick={onToggle}
+                    aria-expanded={open}
+                    className={cn(
+                        'flex flex-1 cursor-pointer items-center gap-1.5 text-left text-sm font-heading',
+                        open ? 'font-semibold' : 'font-normal'
+                    )}
+                >
                     {title}
                     {active && !open && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                </span>
-                <ChevronDown
-                    className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}
-                />
-            </button>
-            {open && <div className="space-y-4 px-6 pb-4">{children}</div>}
+                </button>
+                {open && headerExtra}
+                <button
+                    type="button"
+                    onClick={onToggle}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="flex shrink-0 cursor-pointer items-center"
+                >
+                    <ChevronDown
+                        className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')}
+                    />
+                </button>
+            </div>
+            {open && <div className="space-y-4 px-4 pb-4">{children}</div>}
         </div>
     );
 }
@@ -136,6 +156,10 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
 
     const patch = (changes: Partial<SearchFilters>) => setDraftFilters({ ...draftFilters, ...changes });
 
+    // AND and OR only differ once there are two flags to combine, so the match
+    // toggle stays inert below that.
+    const canMatchOwnership = draftFilters.demoFilter.length >= 2;
+
     const toggleDemo = (value: string, checked: boolean) => {
         patch({
             demoFilter: checked
@@ -153,7 +177,7 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
 
     return (
         <aside data-tour="filters-section" className="hidden h-full w-65 shrink-0 overflow-auto border-r border-border lg:block">
-            <div className="sticky top-0 z-10 flex h-15 items-center justify-between border-b border-border px-4">
+            <div className="sticky top-0 z-10 flex h-15 items-center justify-between border-b border-border bg-white px-4">
                 <h3 className="text-sm font-semibold text-[#5A5A5A] font-heading">Filters</h3>
                 <div className="flex items-center gap-2.5">
                     <button
@@ -175,8 +199,8 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
             </div>
 
             <Section title="Industry Codes" dataTour="industry-filter" {...section('industry')}>
-                <FilterAutocomplete label="NAICS Code / Industry" field="naics" value={draftFilters.naicsFilter} onChange={v => patch({ naicsFilter: v })} placeholder="Enter NAICS Code" />
-                <FilterAutocomplete label="SIC Code" field="sic" value={draftFilters.sicFilter} onChange={v => patch({ sicFilter: v })} placeholder="Enter SIC Code" />
+                <FilterAutocomplete label="NAICS Code / Industry" field="naics" value={draftFilters.naicsFilter} onChange={v => patch({ naicsFilter: v })} placeholder="Enter NAICS Code / Industry Name" />
+                <FilterAutocomplete label="SIC Code" field="sic" value={draftFilters.sicFilter} onChange={v => patch({ sicFilter: v })} placeholder="Enter SIC Code / Industry Name" />
             </Section>
 
             <Section title="Location" dataTour="location-filter" {...section('location')}>
@@ -236,7 +260,34 @@ const Filters = ({ setPage, filters, setFilters, draftFilters, setDraftFilters, 
                 </div>
             </Section>
 
-            <Section title="Ownership" dataTour="demographics-filter" {...section('ownership')}>
+            {/* The ownership flags are sent as separate booleans, so the
+                backend needs `ownership_match` to know whether a company must
+                satisfy all of the checked ones (AND, the default) or any of
+                them (OR). */}
+            <Section
+                title="Ownership"
+                dataTour="demographics-filter"
+                headerExtra={
+                    <span
+                        className={cn(
+                            'flex shrink-0 items-center gap-1.5 text-[11px] font-medium',
+                            !canMatchOwnership && 'opacity-50'
+                        )}
+                        title={canMatchOwnership ? undefined : 'Check at least two ownership types to combine them'}
+                    >
+                        <span className={canMatchOwnership && draftFilters.ownershipMatch === 'OR' ? 'text-primary' : 'text-muted-foreground'}>OR</span>
+                        <Switch
+                            size="sm"
+                            disabled={!canMatchOwnership}
+                            checked={draftFilters.ownershipMatch === 'AND'}
+                            onCheckedChange={checked => { patch({ ownershipMatch: checked ? 'AND' : 'OR' }); setPage(1); }}
+                            aria-label="Match every checked ownership filter (AND) or any of them (OR)"
+                        />
+                        <span className={canMatchOwnership && draftFilters.ownershipMatch === 'AND' ? 'text-primary' : 'text-muted-foreground'}>AND</span>
+                    </span>
+                }
+                {...section('ownership')}
+            >
                 {DEMOGRAPHICS.map(d => (
                     <CheckRow
                         key={d.value}

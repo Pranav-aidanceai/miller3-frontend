@@ -15,6 +15,8 @@ export interface SearchFilters {
     minRev: string;
     maxRev: string;
     demoFilter: string[];
+    /** How the checked ownership flags combine — `AND` (default) or `OR`. */
+    ownershipMatch: 'AND' | 'OR';
     hasPhone: boolean;
     hasEmail: boolean;
     hasWebsite: boolean;
@@ -36,6 +38,7 @@ export const emptyFilters: SearchFilters = {
     minRev: '',
     maxRev: '',
     demoFilter: [],
+    ownershipMatch: 'AND',
     hasPhone: false,
     hasEmail: false,
     hasWebsite: false,
@@ -61,6 +64,7 @@ export interface StructuredFilters {
     minority_owned?: boolean | null;
     women_owned?: boolean | null;
     veteran_owned?: boolean | null;
+    ownership_match?: 'AND' | 'OR' | null;
     year_founded?: Range | null;
     annual_revenue?: Range | null;
     employee_size_range?: Range | null;
@@ -99,6 +103,9 @@ export function structuredFiltersToQuery(filters: StructuredFilters): string {
     (Object.keys(DEMO_LABELS) as (keyof typeof DEMO_LABELS)[]).forEach(key => {
         if (filters[key]) params.append('demo', DEMO_LABELS[key]);
     });
+
+    // Only worth carrying when it differs from the backend's default.
+    if (filters.ownership_match === 'OR') params.set('ownership_match', 'OR');
 
     if (filters.has_mobile_number) params.set('has_phone', '1');
     if (filters.has_email) params.set('has_email', '1');
@@ -165,6 +172,7 @@ export function filtersFromQuery(search: string): SearchFilters | null {
         minRev: digits('min_rev'),
         maxRev: digits('max_rev'),
         demoFilter: params.getAll('demo').filter(d => (Object.values(DEMO_LABELS) as string[]).includes(d)),
+        ownershipMatch: params.get('ownership_match') === 'OR' ? 'OR' : 'AND',
         hasPhone: params.get('has_phone') === '1',
         hasEmail: params.get('has_email') === '1',
         hasWebsite: params.get('has_website') === '1',

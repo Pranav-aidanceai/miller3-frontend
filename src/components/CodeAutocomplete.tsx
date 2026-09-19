@@ -269,7 +269,7 @@ export const CodeAutocomplete = ({
                             aria-activedescendant={activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined}
                             aria-label={label}
                             className={cn(
-                                'h-full min-w-10 flex-1 bg-transparent text-sm outline-none placeholder:font-sans disabled:cursor-not-allowed',
+                                'h-full min-w-10 flex-1 bg-transparent text-sm outline-none placeholder:font-sans disabled:cursor-not-allowed placeholder:text-xs',
                                 isMono && 'font-mono'
                             )}
                         />

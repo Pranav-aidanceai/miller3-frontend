@@ -28,6 +28,11 @@ export interface CompanySearchPayload {
   year_founded_max: number | null;
   ownership_type: string[] | null;
   enrichment_status: string | null;
+  /**
+   * How the checked ownership flags (minority/women/veteran owned) combine:
+   * `AND` requires every one of them, `OR` any. Defaults to `AND`.
+   */
+  ownership_match?: 'AND' | 'OR';
 }
 
 export interface ExportPayload {

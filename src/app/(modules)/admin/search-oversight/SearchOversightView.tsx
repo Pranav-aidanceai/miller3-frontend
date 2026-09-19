@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import apiClient from '@/lib/api/client';
 import { cn } from '@/lib/utils';
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown, CalendarDays } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { getErrorMessage } from '@/lib/apiError';
 import { BsSliders } from 'react-icons/bs';
 
@@ -47,6 +48,29 @@ const SORT_LABELS: Record<Sort, string> = {
     'fewest-results': 'Fewest results',
 };
 
+// The from/to filters stay `YYYY-MM-DD` strings (the request layer widens them
+// to ISO timestamps), so parse and format them against local time — going
+// through `new Date(value)` would treat them as UTC and land the calendar a day
+// off for anyone west of GMT.
+const parseDay = (value: string): Date | undefined => {
+    if (!value) return undefined;
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
+const formatDay = (date: Date) =>
+    [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+    ].join('-');
+
+const startOfToday = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+};
+
 // Same trigger treatment as the User Management filters (Figma fileKey
 // pskj0D4uvWBsvAB5Csxyt4): rounded outline, sliders glyph, brand fill once the
 // filter is active.
@@ -54,6 +78,14 @@ const filterTrigger = (active: boolean) =>
     cn(
         'flex items-center gap-1.5 h-9 rounded-xl border px-3.5 text-sm cursor-pointer transition-colors',
         active ? 'border-primary bg-primary/10 text-primary' : 'border-[#CFCFCF] bg-white hover:bg-accent'
+    );
+
+// The From/To fields keep the look of the native date inputs they replaced —
+// they're buttons now only because each one opens a calendar popover.
+const dateInput = (filled: boolean) =>
+    cn(
+        'flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-input bg-white px-3 text-sm cursor-pointer outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
+        filled ? 'text-foreground' : 'text-muted-foreground'
     );
 
 export default function SearchOversightView() {
@@ -75,6 +107,8 @@ export default function SearchOversightView() {
 
     const [typePopoverOpen, setTypePopoverOpen] = useState(false);
     const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+    const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
+    const [toPopoverOpen, setToPopoverOpen] = useState(false);
     const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
     const [limitPopoverOpen, setLimitPopoverOpen] = useState(false);
 
@@ -155,7 +189,7 @@ export default function SearchOversightView() {
     };
 
     const fmtShortDate = (value: string) =>
-        new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        (parseDay(value) ?? new Date(value)).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
     const dateLabel = from && to
         ? `${fmtShortDate(from)} - ${fmtShortDate(to)}`
@@ -179,7 +213,28 @@ export default function SearchOversightView() {
         }
     }, [searches, sort]);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = startOfToday();
+    const earliestMonth = new Date(today.getFullYear() - 5, 0, 1);
+    const fromDay = parseDay(from);
+    const toDay = parseDay(to);
+
+    // Each calendar greys out what the other endpoint forbids, so an invalid
+    // range can't be picked in the first place: `from` never lands after `to`
+    // (or after today), `to` never before `from`.
+    const fromDisabled = { after: toDay && toDay < today ? toDay : today };
+    const toDisabled = [...(fromDay ? [{ before: fromDay }] : []), { after: today }];
+
+    const pickFrom = (date: Date | undefined) => {
+        setFrom(date ? formatDay(date) : '');
+        resetToFirstPage();
+        setFromPopoverOpen(false);
+    };
+
+    const pickTo = (date: Date | undefined) => {
+        setTo(date ? formatDay(date) : '');
+        resetToFirstPage();
+        setToPopoverOpen(false);
+    };
 
     return (
         <div className="h-full max-h-screen overflow-auto">
@@ -226,9 +281,13 @@ export default function SearchOversightView() {
                             </PopoverContent>
                         </Popover>
 
-                        {/* Date range — the Figma shows a single "DD-MM-YY" trigger,
-                            so the from/to pair lives inside the popover. */}
-                        <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+                        <Popover
+                            open={datePopoverOpen}
+                            onOpenChange={(open) => {
+                                setDatePopoverOpen(open);
+                                if (!open) { setFromPopoverOpen(false); setToPopoverOpen(false); }
+                            }}
+                        >
                             <PopoverTrigger asChild>
                                 <button className={filterTrigger(!!(from || to))}>
                                     <BsSliders className="h-3.5 w-3.5" />
@@ -238,22 +297,49 @@ export default function SearchOversightView() {
                             <PopoverContent className="w-60 p-3" align="end">
                                 <div className="flex flex-col gap-2">
                                     <label className="text-xs text-muted-foreground">From</label>
-                                    <input
-                                        type="date"
-                                        value={from}
-                                        max={to || today}
-                                        onChange={(e) => { setFrom(e.target.value); resetToFirstPage(); }}
-                                        className="h-9 rounded-xl border border-input bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
-                                    />
+                                    <Popover open={fromPopoverOpen} onOpenChange={setFromPopoverOpen}>
+                                        <PopoverTrigger asChild>
+                                            <button className={dateInput(!!from)}>
+                                                {from ? fmtShortDate(from) : 'Select from date'}
+                                                <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start" side="bottom">
+                                            <Calendar
+                                                mode="single"
+                                                captionLayout="dropdown"
+                                                selected={fromDay}
+                                                defaultMonth={fromDay ?? toDay ?? today}
+                                                startMonth={earliestMonth}
+                                                endMonth={today}
+                                                disabled={fromDisabled}
+                                                onSelect={pickFrom}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+
                                     <label className="mt-1 text-xs text-muted-foreground">To</label>
-                                    <input
-                                        type="date"
-                                        value={to}
-                                        min={from || undefined}
-                                        max={today}
-                                        onChange={(e) => { setTo(e.target.value); resetToFirstPage(); }}
-                                        className="h-9 rounded-xl border border-input bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ring-offset-background"
-                                    />
+                                    <Popover open={toPopoverOpen} onOpenChange={setToPopoverOpen}>
+                                        <PopoverTrigger asChild>
+                                            <button className={dateInput(!!to)}>
+                                                {to ? fmtShortDate(to) : 'Select to date'}
+                                                <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start" side="bottom">
+                                            <Calendar
+                                                mode="single"
+                                                captionLayout="dropdown"
+                                                selected={toDay}
+                                                defaultMonth={toDay ?? fromDay ?? today}
+                                                startMonth={earliestMonth}
+                                                endMonth={today}
+                                                disabled={toDisabled}
+                                                onSelect={pickTo}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+
                                     {(from || to) && (
                                         <button
                                             onClick={() => { setFrom(''); setTo(''); resetToFirstPage(); setDatePopoverOpen(false); }}
