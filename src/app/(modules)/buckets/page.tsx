@@ -17,6 +17,8 @@ import { Company } from '@/types/search';
 import { CompanyDrawer } from '../search/CompanyDrawer';
 import CompanyTable from '../search/CompanyTable';
 import CompanyCards from '../search/CompanyCards';
+import ColumnPickerPopover from '../search/ColumnPickerPopover';
+import { useVisibleColumns } from '../search/useVisibleColumns';
 import ExportModal from '../search/ExportModal';
 import SortPopover, { type SortOption } from '../search/SortPopover';
 import { useExport } from '../search/useExport';
@@ -117,6 +119,7 @@ export default function BucketsPage() {
     // The card/table toggle UI is paused elsewhere in this file — table is
     // the only reachable mode for now, so there's no setter.
     const [viewMode] = useState<'table' | 'card'>('table');
+    const [visibleColumns, setVisibleColumns] = useVisibleColumns();
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
     const [isRemoving, setIsRemoving] = useState(false);
@@ -451,7 +454,7 @@ export default function BucketsPage() {
                         </div>
                     ) : (
                         <>
-                            <div className="flex items-center justify-between gap-3 p-4 border-b border-border">
+                            <div className="sticky left-0 flex items-center justify-between gap-3 p-4 border-b border-border">
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2">
                                         <Popover open={perPagePopoverOpen} onOpenChange={setPerPagePopoverOpen}>
@@ -509,6 +512,10 @@ export default function BucketsPage() {
                                         Refresh
                                     </button>
 
+                                    {viewMode === 'table' && (
+                                        <ColumnPickerPopover selected={visibleColumns} onChange={setVisibleColumns} />
+                                    )}
+
                                     <div className="flex items-center gap-1">
                                         <button
                                             type="button"
@@ -556,6 +563,7 @@ export default function BucketsPage() {
                                             selectedIds={selectedIds}
                                             allSelected={allSelected}
                                             notAccessibleFields={notAccessibleFields}
+                                            visibleColumns={visibleColumns}
                                             onToggleSelect={toggleSelect}
                                             onToggleSelectAll={toggleSelectAll}
                                             onRowClick={setSelectedCompany}

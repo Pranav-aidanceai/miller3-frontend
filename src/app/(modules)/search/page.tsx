@@ -39,6 +39,12 @@ function loadSearchState(): Record<string, unknown> | null {
   }
 }
 
+// Filter keys the Filters badge doesn't count: `searchText` has its own visible
+// box in the toolbar, so counting it would double-report, and `ownershipMatch`
+// only says how the ownership flags combine — it always holds a value, so
+// counting it would show a permanent 1.
+const UNCOUNTED_FILTERS = ['searchText', 'ownershipMatch'];
+
 export default function SearchPage() {
 
   const initialFilters = emptyFilters;
@@ -86,7 +92,7 @@ export default function SearchPage() {
     const {
       searchText, stateFilter, cityFilter, countyFilter, naicsFilter, sicFilter,
       msaFilter, certificationFilter, minEmp, maxEmp, minRev, maxRev, minYear, maxYear,
-      demoFilter, hasEmail, hasPhone, hasWebsite
+      demoFilter, ownershipMatch, hasEmail, hasPhone, hasWebsite
     } = appliedFilters;
 
     const payload: CompanySearchPayload = {
@@ -108,6 +114,7 @@ export default function SearchPage() {
       minority_owned: demoFilter.includes('Minority-Owned') || null,
       women_owned: demoFilter.includes('Women-Owned') || null,
       veteran_owned: demoFilter.includes('Veteran-Owned') || null,
+      ownership_match: ownershipMatch,
       enrichment_status: null,
       sort_by: sortBy,
       sort_order: (sortOrder || 'asc') as 'asc' | 'desc',
@@ -242,11 +249,10 @@ export default function SearchPage() {
     fetchCompanies(prevCursor);
   };
 
-  // Drives the badge on the Filters toggle. `searchText` is left out — it has
-  // its own visible box in the toolbar, so counting it would double-report.
+  // Drives the badge on the Filters toggle.
   const activeFilterCount = useMemo(
     () => Object.entries(appliedFilters).reduce((count, [key, value]) => {
-      if (key === 'searchText') return count;
+      if (UNCOUNTED_FILTERS.includes(key)) return count;
       if (Array.isArray(value)) return count + value.length;
       return count + (value ? 1 : 0);
     }, 0),
