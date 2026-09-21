@@ -46,7 +46,6 @@ interface AuthState {
   roleDetails: RoleDetails | null
   credits_left: CreditsLeft
   isAuthenticated: boolean
-  sidebarCollapsed?: boolean
   has_seen_onboarding: boolean
 }
 
@@ -58,7 +57,6 @@ const initialState: AuthState = {
   roleDetails: null,
   credits_left: emptyCredits,
   isAuthenticated: false,
-  sidebarCollapsed: false,
   has_seen_onboarding: false,
 }
 
@@ -78,19 +76,14 @@ const authSlice = createSlice({
       state.credits_left = action.payload.credits_left
       state.has_seen_onboarding = action.payload.user_details.has_seen_onboarding
       state.isAuthenticated = true
-      state.sidebarCollapsed = false
     },
     logout: (state) => {
       state.role = null
       state.user = null
       state.credits_left = emptyCredits
       state.isAuthenticated = false
-      state.sidebarCollapsed = false
       // state.has_seen_onboarding = false
       storage.removeItem('persist:auth')
-    },
-    toggleSidebar: (state) => {
-      state.sidebarCollapsed = !state.sidebarCollapsed
     },
     setOnboardingSeen: (state) => {
       state.has_seen_onboarding = true
@@ -107,5 +100,5 @@ const authSlice = createSlice({
   }
 })
 
-export const { setCredentials, logout, toggleSidebar, setOnboardingSeen, updateCreditsRemaining } = authSlice.actions
+export const { setCredentials, logout, setOnboardingSeen, updateCreditsRemaining } = authSlice.actions
 export default authSlice.reducer

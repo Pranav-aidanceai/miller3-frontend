@@ -15,6 +15,8 @@ export interface SearchFilters {
     minRev: string;
     maxRev: string;
     demoFilter: string[];
+    /** How the checked ownership flags combine — `AND` (default) or `OR`. */
+    ownershipMatch: 'AND' | 'OR';
     hasPhone: boolean;
     hasEmail: boolean;
     hasWebsite: boolean;
@@ -36,6 +38,7 @@ export const emptyFilters: SearchFilters = {
     minRev: '',
     maxRev: '',
     demoFilter: [],
+    ownershipMatch: 'AND',
     hasPhone: false,
     hasEmail: false,
     hasWebsite: false,
@@ -61,6 +64,7 @@ export interface StructuredFilters {
     minority_owned?: boolean | null;
     women_owned?: boolean | null;
     veteran_owned?: boolean | null;
+    ownership_match?: 'AND' | 'OR' | null;
     year_founded?: Range | null;
     annual_revenue?: Range | null;
     employee_size_range?: Range | null;
@@ -100,11 +104,48 @@ export function structuredFiltersToQuery(filters: StructuredFilters): string {
         if (filters[key]) params.append('demo', DEMO_LABELS[key]);
     });
 
+    // Only worth carrying when it differs from the backend's default.
+    if (filters.ownership_match === 'OR') params.set('ownership_match', 'OR');
+
     if (filters.has_mobile_number) params.set('has_phone', '1');
     if (filters.has_email) params.set('has_email', '1');
     if (filters.has_website) params.set('has_website', '1');
 
     return params.toString();
+}
+
+/**
+ * A short "Label : value" summary of a structured history entry — e.g.
+ * "NAICS : 6223456" — for display where there's no `raw_input` to show
+ * (structured searches don't have one; only AI searches do). Picks the
+ * single most identifying filter that was applied, in the order a user is
+ * most likely to have searched by; falls back to a plain description when
+ * nothing recognizable was applied.
+ */
+export function describeStructuredFilters(filters: StructuredFilters | null | undefined, raw_input: string | null): string {
+    if (!filters) return raw_input ?? 'Search';
+
+    const first = (values?: string[] | null) => (values && values.length > 0 ? values[0] : null);
+
+    const candidates: [string, string | null][] = [
+        ['NAICS', first(filters.naics_code)],
+        ['SIC', first(filters.sic_code)],
+        ['City', first(filters.city)],
+        ['County', first(filters.county)],
+        ['State', first(filters.state)],
+        ['MSA', first(filters.msa)],
+        ['Certification', first(filters.certification_status)],
+    ];
+    const match = candidates.find(([, value]) => !!value);
+    if (match) return `${match[0]} : ${match[1]}`;
+
+    if (filters.employee_size_range?.min != null || filters.employee_size_range?.max != null) return 'Employee size filter';
+    if (filters.annual_revenue?.min != null || filters.annual_revenue?.max != null) return 'Revenue filter';
+    if (filters.year_founded?.min != null || filters.year_founded?.max != null) return 'Year founded filter';
+    if (filters.minority_owned || filters.women_owned || filters.veteran_owned) return 'Ownership filter';
+    if (filters.has_email || filters.has_website || filters.has_mobile_number) return 'Contact info filter';
+
+    return raw_input ?? 'Search';
 }
 
 /**
@@ -131,6 +172,7 @@ export function filtersFromQuery(search: string): SearchFilters | null {
         minRev: digits('min_rev'),
         maxRev: digits('max_rev'),
         demoFilter: params.getAll('demo').filter(d => (Object.values(DEMO_LABELS) as string[]).includes(d)),
+        ownershipMatch: params.get('ownership_match') === 'OR' ? 'OR' : 'AND',
         hasPhone: params.get('has_phone') === '1',
         hasEmail: params.get('has_email') === '1',
         hasWebsite: params.get('has_website') === '1',

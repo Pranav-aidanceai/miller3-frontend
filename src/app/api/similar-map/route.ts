@@ -1,4 +1,4 @@
-import AXIOS from '@/lib/axios';
+import AXIOS from '@/lib/api/server';
 import { AxiosError } from 'axios';
 import { NextResponse } from 'next/server';
 const API_URL = process.env.API_BASE_URL;

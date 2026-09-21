@@ -1,4 +1,5 @@
 import axios from "axios";
+import apiClient from "@/lib/api/client";
 
 function parseAiError(body: unknown, fallback: string): { detail: string; code: string | null } {
     if (body && typeof body === 'object') {
@@ -39,7 +40,7 @@ export async function submitQueryAction(
     opts?: { cursor?: string | null; limit?: number; operation?: boolean }
 ) {
     try {
-        const response = await axios.post(`/api/search/ai`, {
+        const response = await apiClient.post(`/search/ai`, {
             query,
             cursor: opts?.cursor ?? null,
             limit: opts?.limit ?? null,
@@ -60,7 +61,7 @@ export async function submitQueryAction(
 
 export async function getTemplateAction() {
     try {
-        const response = await axios.get(`/api/search/ai/templates`);
+        const response = await apiClient.get(`/search/ai/templates`);
         return { data: response.data, error: null }
     } catch (error: unknown) {
         const body = axios.isAxiosError(error) ? error.response?.data : null;

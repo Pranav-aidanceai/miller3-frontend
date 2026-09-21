@@ -5,6 +5,7 @@ import { AppSidebar } from './AppSidebar';
 import { TopBar } from './TopBar';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { WelcomeScreen } from '../WelcomeScreen';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 export function ModuleShell({
   children,
@@ -29,14 +30,16 @@ export function ModuleShell({
   }
 
   return (
-    <div className="flex h-screen w-full bg-background">
+    // The sidebar width lives on the provider (the collapse-gap spacer reads
+    // the same variable), so it is overridden here rather than in AppSidebar.
+    <SidebarProvider className="h-screen" style={{ '--sidebar-width': '14rem' } as React.CSSProperties}>
       <AppSidebar />
-      <main className="flex-1 flex flex-col max-h-screen overflow-hidden">
+      <SidebarInset className="flex max-h-screen flex-col overflow-hidden">
         <TopBar />
-        <div className="flex-1 overflow-hidden w-full">
+        <div className="flex-1 overflow-hidden w-full bg-white">
           {children}
         </div>
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

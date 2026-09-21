@@ -36,8 +36,8 @@ export default function SortPopover({ sortBy, sortOrder, setSortBy, setSortOrder
         }}>
             <PopoverTrigger asChild>
                 <button className={cn(
-                    'flex items-center gap-1.5 h-10 rounded-md border px-3 text-sm cursor-pointer transition-colors',
-                    sortBy ? 'border-primary bg-primary/10 text-primary' : 'border-input bg-background hover:bg-accent'
+                    'flex items-center gap-1.5 h-10 rounded-xl border px-3 text-sm font-sans font-light cursor-pointer transition-colors',
+                    sortBy ? 'border-primary bg-primary/10 text-primary' : 'border-input bg-white hover:bg-accent'
                 )}>
                     <ArrowUpDown className="h-4 w-4" />
                     Sort

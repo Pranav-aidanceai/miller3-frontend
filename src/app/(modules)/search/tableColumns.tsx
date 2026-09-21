@@ -150,9 +150,5 @@ export const OPTIONAL_COLUMNS: CompanyColumn[] = [
 /** Matches the columns the table showed before column selection existed. */
 export const DEFAULT_VISIBLE_COLUMNS = ['naics_code', 'employee_size', 'annual_revenue'];
 
-/** Name + Contact are static, so this leaves room for 4 more — 6 total. */
-export const MAX_TOTAL_COLUMNS = 6;
-export const MAX_OPTIONAL_COLUMNS = MAX_TOTAL_COLUMNS - 2;
-
 /** Where the per-browser column choice is cached so it survives a reload. */
 export const TABLE_COLUMNS_STORAGE_KEY = 'miller3:table-columns';

@@ -12,7 +12,7 @@ import { Tooltip } from "react-tooltip";
  */
 export const FilterInput = ({ label, value, onChange, placeholder, mono, numeric, letters, maxLength, error }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; mono?: boolean; numeric?: boolean; letters?: boolean; maxLength?: number; error?: string }) => (
     <div>
-        <label className="text-xs font-medium text-muted-foreground">{label}</label>
+        <label className="text-sm text-foreground/80">{label}</label>
         <input
             value={value}
             onChange={e => { onChange(numeric ? digitsOnly(e.target.value) : letters ? lettersOnly(e.target.value) : e.target.value) }}
@@ -21,7 +21,7 @@ export const FilterInput = ({ label, value, onChange, placeholder, mono, numeric
             maxLength={maxLength}
             aria-invalid={!!error}
             className={cn(
-                'mt-1 flex h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:ring-1',
+                'mt-2 flex h-10 w-full rounded-xl border bg-background px-3 text-sm font-light outline-none focus:ring-1',
                 error ? 'border-destructive focus:ring-destructive' : 'border-input focus:ring-ring',
                 mono && 'font-mono',
             )} />

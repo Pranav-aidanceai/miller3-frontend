@@ -1,5 +1,5 @@
 import { AxiosError } from 'axios';
-import AXIOS from '@/lib/axios';
+import AXIOS from '@/lib/api/server';
 import { NextResponse } from 'next/server';
 
 // The upstream reports remaining credits on failures too (a rejected query can

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import AXIOS from '@/lib/axios';
+import AXIOS from '@/lib/api/server';
 
 const expiredCookie = {
     httpOnly: true,

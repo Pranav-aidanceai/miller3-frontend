@@ -53,3 +53,32 @@ export function clearSearchState() {
         sessionStorage.removeItem(SEARCH_STATE_KEY);
     } catch { /* storage unavailable — nothing cached to clear */ }
 }
+
+/** Where the TopBar records that the low-credit banner has been closed. */
+const LOW_CREDITS_DISMISSED_KEY = 'miller3:low-credits-dismissed';
+
+export function isLowCreditsBannerDismissed() {
+    if (typeof window === 'undefined') return false;
+    try {
+        return sessionStorage.getItem(LOW_CREDITS_DISMISSED_KEY) === '1';
+    } catch { return false; }
+}
+
+/** Closing the banner silences it for the rest of this sign-in only. */
+export function dismissLowCreditsBanner() {
+    if (typeof window === 'undefined') return;
+    try {
+        sessionStorage.setItem(LOW_CREDITS_DISMISSED_KEY, '1');
+    } catch { /* storage unavailable — banner just returns on next render */ }
+}
+
+/**
+ * Called on sign-in, so a low balance is surfaced again on every login rather
+ * than staying dismissed from a previous session on this tab.
+ */
+export function clearLowCreditsBannerDismissal() {
+    if (typeof window === 'undefined') return;
+    try {
+        sessionStorage.removeItem(LOW_CREDITS_DISMISSED_KEY);
+    } catch { /* storage unavailable — nothing recorded to clear */ }
+}

@@ -1,6 +1,5 @@
 'use client';
 
-import { BarChart3, LineChart, PieChart, Users, ListOrdered, AlertTriangle, Coins } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AnalyticsChart, { type ChartApiResponse } from './AnalyticsChart';
 import AnalyticsTable, { type TableColumn } from './AnalyticsTable';
@@ -225,64 +224,54 @@ export default function AnalyticsSection() {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <AnalyticsChart
-          endpoint="/api/admin/search-analytics/overview"
-          icon={BarChart3}
-          iconColor="text-blue-500"
-          iconBg="bg-blue-500/10"
+          endpoint="/admin/search-analytics/overview"
           title="Search Analytics Overview"
           subtitle="Headline KPIs across 24h / 7d / 30d"
         />
 
         <AnalyticsChart
-          endpoint="/api/admin/search-analytics/trends"
+          endpoint="/admin/search-analytics/trends"
           filters={TRENDS_FILTERS}
-          icon={LineChart}
-          iconColor="text-violet-500"
-          iconBg="bg-violet-500/10"
           title="Search Volume Trends"
-          subtitle="Query volume over time"
+          subtitle="Query Volume Over Time"
         />
 
         <AnalyticsChart
-          endpoint="/api/admin/search-analytics/user-distribution"
+          endpoint="/admin/search-analytics/user-distribution"
           filters={USER_DISTRIBUTION_FILTERS}
           select={(raw) => (raw as UserDistributionResponse).highcharts.by_role}
-          icon={PieChart}
-          iconColor="text-emerald-500"
-          iconBg="bg-emerald-500/10"
-          title="Users by Role"
-          subtitle="Registered users grouped by role"
+          // Matches the Figma reference exactly: Free/Standard/Premium/Admin
+          // get fixed brand colors rather than the generic categorical
+          // palette, since this breakdown's categories are a known, stable
+          // set (unlike e.g. an arbitrary list of top queries).
+          seriesColors={['var(--primary)', 'var(--brand-secondary)', 'var(--brand-accent)', 'var(--warning)']}
+          title="Users by Roles"
+          subtitle="Registered users grouped by roles"
         />
 
         <AnalyticsChart
-          endpoint="/api/admin/search-analytics/user-distribution"
+          endpoint="/admin/search-analytics/user-distribution"
           filters={USER_DISTRIBUTION_FILTERS}
           select={(raw) => (raw as UserDistributionResponse).highcharts.by_status}
-          icon={Users}
-          iconColor="text-amber-500"
-          iconBg="bg-amber-500/10"
+          // Semantic status colors (active/rejected/inactive/pending), not
+          // the generic categorical palette.
+          seriesColors={['var(--success)', 'var(--destructive)', 'var(--muted-foreground)', 'var(--warning)']}
           title="Users by Status"
-          subtitle="Registered users grouped by account status"
+          subtitle="Registered user grouped by status"
         />
 
         <AnalyticsChart
-          endpoint="/api/admin/analytics/credit-burn-rate"
+          endpoint="/admin/analytics/credit-burn-rate"
           filters={CREDIT_BURN_FILTERS}
           select={(raw) => (raw as { highcharts: ChartApiResponse }).highcharts}
           wide
-          icon={Coins}
-          iconColor="text-rose-500"
-          iconBg="bg-rose-500/10"
           title="Credit Burn Rate"
           subtitle="Monthly credit consumption by type"
         />
 
         <AnalyticsTable<TopQueryRow>
-          endpoint="/api/admin/search-analytics/top-queries"
+          endpoint="/admin/search-analytics/top-queries"
           filters={TOP_QUERIES_FILTERS}
-          icon={ListOrdered}
-          iconColor="text-cyan-500"
-          iconBg="bg-cyan-500/10"
           title="Top Queries"
           subtitle="Most frequently repeated search terms"
           columns={TOP_QUERIES_COLUMNS}
@@ -290,12 +279,9 @@ export default function AnalyticsSection() {
         />
 
         <AnalyticsTable<FailedQueryRow>
-          endpoint="/api/admin/search-analytics/failed-queries"
+          endpoint="/admin/search-analytics/failed-queries"
           filters={FAILED_QUERIES_FILTERS}
           paginated
-          icon={AlertTriangle}
-          iconColor="text-red-500"
-          iconBg="bg-red-500/10"
           title="Failed Queries"
           subtitle="Zero-result queries, most recent first"
           columns={FAILED_QUERIES_COLUMNS}
