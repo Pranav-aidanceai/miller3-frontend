@@ -15,15 +15,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-/**
- * The account menu's "Buy Credits" destination — the plan chooser's screen with
- * credit packs in place of tiers, per the Figma "Buy your Credit Pack"
- * (fileKey nPLWw73lkfNSi2MZX2bIsU, node 2:18114).
- *
- * Top-ups aren't self-serve yet — there is no purchase endpoint — so a pack
- * confirms the choice and points at the administrator, matching how /plan
- * handles a plan change.
- */
 export default function BuyCreditsPage() {
     const router = useRouter();
     const [requestedPack, setRequestedPack] = useState<number | null>(null);
@@ -35,7 +26,7 @@ export default function BuyCreditsPage() {
                     <div
                         key={pack.tier}
                         className={cn(
-                            'flex w-full max-w-[300px] flex-col items-center justify-between gap-10 rounded-[1.5rem] border p-6',
+                            'flex w-full max-w-[300px] flex-col items-center justify-between gap-10 rounded-[1.5rem] border p-6 2xl:max-w-[330px] 2xl:p-7',
                             pack.highlighted
                                 ? 'border-primary bg-primary text-primary-foreground'
                                 : 'border-primary bg-card text-card-foreground'
@@ -43,22 +34,20 @@ export default function BuyCreditsPage() {
                     >
                         <div className="flex w-full flex-col items-center gap-4">
                             <p className={cn(
-                                'text-lg font-heading font-semibold',
-                                // The filled card needs its label lifted off the
-                                // teal, so it reads as a pill rather than plain text.
+                                'text-lg font-heading font-semibold 2xl:text-xl',
                                 pack.highlighted && 'rounded-full bg-background px-4 py-0.5 text-primary'
                             )}>
                                 {pack.tier}
                             </p>
                             <p className="flex flex-col items-center gap-1 font-heading leading-none">
-                                <span className={cn('text-3xl font-bold', pack.highlighted ? 'text-primary-foreground' : 'text-primary')}>
+                                <span className={cn('text-3xl font-bold 2xl:text-4xl', pack.highlighted ? 'text-primary-foreground' : 'text-primary')}>
                                     {pack.credits.toLocaleString()}
                                 </span>
                                 <span className={cn('text-lg font-normal', pack.highlighted ? 'text-primary-foreground' : 'text-foreground')}>
                                     credits
                                 </span>
                             </p>
-                            <p className={cn('text-center text-xs', pack.highlighted ? 'text-primary-foreground/85' : 'text-muted-foreground')}>
+                            <p className={cn('text-center text-xs 2xl:text-sm', pack.highlighted ? 'text-primary-foreground/85' : 'text-muted-foreground')}>
                                 An extra {pack.credits.toLocaleString()} Credit will be added to your
                                 profile, The Extra added credits will be in use after your existing
                                 plan credits
@@ -69,7 +58,7 @@ export default function BuyCreditsPage() {
                             type="button"
                             onClick={() => setRequestedPack(pack.credits)}
                             className={cn(
-                                'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-medium shadow-sm transition-all cursor-pointer',
+                                'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-medium shadow-sm transition-all cursor-pointer 2xl:h-13',
                                 pack.highlighted
                                     ? 'bg-background text-primary hover:bg-background/90'
                                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
