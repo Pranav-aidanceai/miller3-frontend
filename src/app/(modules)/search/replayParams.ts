@@ -51,6 +51,8 @@ interface Range {
 }
 
 export interface StructuredFilters {
+    /** The company-name box's text — the `q` param on the search page. */
+    search_text?: string | null;
     city?: string[] | null;
     state?: string[] | null;
     county?: string[] | null;
@@ -85,6 +87,12 @@ const DEMO_LABELS = {
 export function structuredFiltersToQuery(filters: StructuredFilters): string {
     const params = new URLSearchParams();
 
+    // `search_text` is the plain company-name box, and on its own it's enough
+    // to replay an entry — leaving it out made text-only searches look
+    // unreplayable.
+    const searchText = filters.search_text?.trim();
+    if (searchText) params.set('q', searchText);
+
     (filters.state ?? []).forEach(s => params.append('state', s));
     if (filters.city?.[0]) params.set('city', filters.city[0]);
     if (filters.county?.[0]) params.set('county', filters.county[0]);
@@ -116,25 +124,34 @@ export function structuredFiltersToQuery(filters: StructuredFilters): string {
 
 /**
  * A short "Label : value" summary of a structured history entry — e.g.
- * "NAICS : 6223456" — for display where there's no `raw_input` to show
- * (structured searches don't have one; only AI searches do). Picks the
- * single most identifying filter that was applied, in the order a user is
- * most likely to have searched by; falls back to a plain description when
- * nothing recognizable was applied.
+ * "NAICS : 6223456", or "State : UT, NY, IN, CT" when several were picked —
+ * for display where there's no `raw_input` to show (structured searches don't
+ * have one; only AI searches do). Picks the single most identifying filter
+ * that was applied, in the order a user is most likely to have searched by;
+ * falls back to a plain description when nothing recognizable was applied.
  */
 export function describeStructuredFilters(filters: StructuredFilters | null | undefined, raw_input: string | null): string {
     if (!filters) return raw_input ?? 'Search';
 
-    const first = (values?: string[] | null) => (values && values.length > 0 ? values[0] : null);
+    // Every value, not just the first — a four-state search that reads
+    // "State : UT" looks like it lost three of them. Very long lists are
+    // capped so the row's title stays one or two lines.
+    const MAX_SHOWN = 5;
+    const list = (values?: string[] | null) => {
+        const items = (values ?? []).filter(Boolean);
+        if (items.length === 0) return null;
+        if (items.length <= MAX_SHOWN) return items.join(', ');
+        return `${items.slice(0, MAX_SHOWN).join(', ')} +${items.length - MAX_SHOWN} more`;
+    };
 
     const candidates: [string, string | null][] = [
-        ['NAICS', first(filters.naics_code)],
-        ['SIC', first(filters.sic_code)],
-        ['City', first(filters.city)],
-        ['County', first(filters.county)],
-        ['State', first(filters.state)],
-        ['MSA', first(filters.msa)],
-        ['Certification', first(filters.certification_status)],
+        ['NAICS', list(filters.naics_code)],
+        ['SIC', list(filters.sic_code)],
+        ['City', list(filters.city)],
+        ['County', list(filters.county)],
+        ['State', list(filters.state)],
+        ['MSA', list(filters.msa)],
+        ['Certification', list(filters.certification_status)],
     ];
     const match = candidates.find(([, value]) => !!value);
     if (match) return `${match[0]} : ${match[1]}`;
@@ -145,7 +162,7 @@ export function describeStructuredFilters(filters: StructuredFilters | null | un
     if (filters.minority_owned || filters.women_owned || filters.veteran_owned) return 'Ownership filter';
     if (filters.has_email || filters.has_website || filters.has_mobile_number) return 'Contact info filter';
 
-    return raw_input ?? 'Search';
+    return raw_input ?? filters.search_text?.trim() ?? 'Search';
 }
 
 /**
