@@ -123,19 +123,19 @@ export function structuredFiltersToQuery(filters: StructuredFilters): string {
 }
 
 /**
- * A short "Label : value" summary of a structured history entry — e.g.
- * "NAICS : 6223456", or "State : UT, NY, IN, CT" when several were picked —
- * for display where there's no `raw_input` to show (structured searches don't
- * have one; only AI searches do). Picks the single most identifying filter
- * that was applied, in the order a user is most likely to have searched by;
- * falls back to a plain description when nothing recognizable was applied.
+ * A human-readable summary of a structured history entry — every filter that
+ * was applied, e.g. "NAICS : 423450 · State : GA, IL, IN, KY, NJ +8 more ·
+ * Founded : 2000 – 2002 · Ownership : Minority-Owned · Has : Phone, Email,
+ * Website". Structured searches carry no `raw_input` worth showing (only AI
+ * searches do), so this is what titles the row. Falls back to a plain
+ * description when nothing recognizable was applied.
  */
 export function describeStructuredFilters(filters: StructuredFilters | null | undefined, raw_input: string | null): string {
     if (!filters) return raw_input ?? 'Search';
 
-    // Every value, not just the first — a four-state search that reads
-    // "State : UT" looks like it lost three of them. Very long lists are
-    // capped so the row's title stays one or two lines.
+    // Every value of a list filter, not just the first — a four-state search
+    // that reads "State : UT" looks like it lost three of them. Long lists are
+    // capped so one filter can't crowd the others out of the title.
     const MAX_SHOWN = 5;
     const list = (values?: string[] | null) => {
         const items = (values ?? []).filter(Boolean);
@@ -144,7 +144,31 @@ export function describeStructuredFilters(filters: StructuredFilters | null | un
         return `${items.slice(0, MAX_SHOWN).join(', ')} +${items.length - MAX_SHOWN} more`;
     };
 
-    const candidates: [string, string | null][] = [
+    // Either bound may stand on its own, so a range reads as "10 – 50", "10+"
+    // or "up to 50".
+    const range = (bounds: Range | null | undefined, format: (n: number) => string) => {
+        if (bounds?.min != null && bounds.max != null) return `${format(bounds.min)} – ${format(bounds.max)}`;
+        if (bounds?.min != null) return `${format(bounds.min)}+`;
+        if (bounds?.max != null) return `up to ${format(bounds.max)}`;
+        return null;
+    };
+    const year = (n: number) => String(n); // a year takes no thousands separator
+    // Pinned to en-US so grouping doesn't shift with the viewer's locale.
+    const grouped = (n: number) => n.toLocaleString('en-US');
+
+    const owned = (Object.keys(DEMO_LABELS) as (keyof typeof DEMO_LABELS)[])
+        .filter(key => filters[key])
+        .map(key => DEMO_LABELS[key]);
+    const contact = [
+        filters.has_mobile_number ? 'Phone' : null,
+        filters.has_email ? 'Email' : null,
+        filters.has_website ? 'Website' : null,
+    ].filter((label): label is string => !!label);
+
+    // Ordered as a user is most likely to have searched — what they typed, then
+    // industry, then place, then the numeric and flag filters.
+    const parts: [string, string | null][] = [
+        ['Search', filters.search_text?.trim() || null],
         ['NAICS', list(filters.naics_code)],
         ['SIC', list(filters.sic_code)],
         ['City', list(filters.city)],
@@ -152,17 +176,22 @@ export function describeStructuredFilters(filters: StructuredFilters | null | un
         ['State', list(filters.state)],
         ['MSA', list(filters.msa)],
         ['Certification', list(filters.certification_status)],
+        ['Employees', range(filters.employee_size_range, grouped)],
+        ['Revenue', range(filters.annual_revenue, grouped)],
+        ['Founded', range(filters.year_founded, year)],
+        // `ownership_match` is how the checked flags combined, so it belongs in
+        // the summary — "Minority-Owned or Women-Owned" is a different search
+        // from "Minority-Owned, Women-Owned".
+        ['Ownership', owned.length > 0 ? owned.join(filters.ownership_match === 'OR' ? ' or ' : ', ') : null],
+        ['Has', contact.length > 0 ? contact.join(', ') : null],
     ];
-    const match = candidates.find(([, value]) => !!value);
-    if (match) return `${match[0]} : ${match[1]}`;
 
-    if (filters.employee_size_range?.min != null || filters.employee_size_range?.max != null) return 'Employee size filter';
-    if (filters.annual_revenue?.min != null || filters.annual_revenue?.max != null) return 'Revenue filter';
-    if (filters.year_founded?.min != null || filters.year_founded?.max != null) return 'Year founded filter';
-    if (filters.minority_owned || filters.women_owned || filters.veteran_owned) return 'Ownership filter';
-    if (filters.has_email || filters.has_website || filters.has_mobile_number) return 'Contact info filter';
+    const summary = parts
+        .filter(([, value]) => !!value)
+        .map(([label, value]) => `${label} : ${value}`)
+        .join(' · ');
 
-    return raw_input ?? filters.search_text?.trim() ?? 'Search';
+    return summary || raw_input || 'Search';
 }
 
 /**

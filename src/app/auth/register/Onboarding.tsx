@@ -76,7 +76,7 @@ export default function OnboardingPage({
                                 <div
                                     key={tier.role}
                                     className={cn(
-                                        'flex w-full max-w-[320px] flex-col items-center gap-10 rounded-[1.5rem] border p-6 text-left',
+                                        'flex w-full max-w-[320px] flex-col items-center gap-10 rounded-[1.5rem] border p-6 text-left 2xl:max-w-[360px] 2xl:p-7 min-[1920px]:max-w-[400px] min-[1920px]:p-8',
                                         tier.highlighted
                                             ? 'border-primary bg-primary text-primary-foreground'
                                             : 'border-primary bg-card text-card-foreground',
@@ -85,7 +85,7 @@ export default function OnboardingPage({
                                 >
                                     {isCurrent && (
                                         <span className={cn(
-                                            '-mb-6 self-start rounded-full px-3 py-1 text-xs font-medium',
+                                            '-mb-6 self-start rounded-full px-3 py-1 text-xs font-medium 2xl:text-sm min-[1920px]:text-base',
                                             tier.highlighted ? 'bg-background text-primary' : 'bg-primary text-primary-foreground'
                                         )}>
                                             Current Plan
@@ -93,15 +93,15 @@ export default function OnboardingPage({
                                     )}
                                     <div className="flex w-full flex-col items-center gap-4">
                                         <div className="flex w-full flex-col items-center gap-1 text-center">
-                                            <p className="text-lg font-heading font-semibold">{tier.label}</p>
-                                            <p className={cn('text-2xl font-heading font-bold', tier.highlighted ? 'text-primary-foreground' : 'text-primary')}>{tier.price}</p>
+                                            <p className="text-lg font-heading font-semibold 2xl:text-xl min-[1920px]:text-2xl">{tier.label}</p>
+                                            <p className={cn('text-2xl font-heading font-bold 2xl:text-3xl min-[1920px]:text-4xl', tier.highlighted ? 'text-primary-foreground' : 'text-primary')}>{tier.price}</p>
                                         </div>
-                                        <p className={cn('text-center text-xs', tier.highlighted ? 'text-primary-foreground/85' : 'text-muted-foreground')}>
+                                        <p className={cn('text-center text-xs 2xl:text-sm min-[1920px]:text-base', tier.highlighted ? 'text-primary-foreground/85' : 'text-muted-foreground')}>
                                             {tier.description}
                                         </p>
                                         <ul className="flex w-full flex-col items-start gap-2.5">
                                             {[tier.desc1, tier.desc2, tier.desc3].map((desc) => (
-                                                <li key={desc} className="flex items-center gap-2.5 text-sm">
+                                                <li key={desc} className="flex items-center gap-2.5 text-sm 2xl:text-base min-[1920px]:text-lg">
                                                     <span className={cn('size-1.5 shrink-0 rounded-full', tier.highlighted ? 'bg-primary-foreground' : 'bg-primary')} />
                                                     {desc}
                                                 </li>
@@ -115,7 +115,7 @@ export default function OnboardingPage({
                                             onClick={() => handleSelectPlan(tier.role)}
                                             disabled={loading}
                                             className={cn(
-                                                'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-medium shadow-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70',
+                                                'flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-medium shadow-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 2xl:h-13 2xl:text-lg min-[1920px]:h-14 min-[1920px]:text-xl',
                                                 tier.highlighted
                                                     ? 'bg-background text-primary hover:bg-background/90'
                                                     : 'bg-primary text-primary-foreground hover:bg-primary/90'

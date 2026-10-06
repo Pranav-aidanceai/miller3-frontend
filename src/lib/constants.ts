@@ -2,7 +2,7 @@ import {
   Search, LayoutDashboard,
   Users, DollarSign, Database,
   Sparkles, History,
-  Eye, PaintBucket, ClipboardList, ClipboardCheck, Building2,
+  Eye, PaintBucket, Building2,
   Tag, Coins, LogOut
 } from "lucide-react";
 

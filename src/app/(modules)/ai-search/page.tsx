@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronUp,
   Download,
   Loader2,
   Search,
@@ -141,7 +140,7 @@ type ChatEntry = {
   query: string;
   status: 'thinking' | 'done' | 'error';
   count?: number;
-  sql?: string | null;
+  // sql?: string | null;
   message?: string | null;
   error?: string;
   errorCode?: string | null;
@@ -157,7 +156,7 @@ export default function AISearchPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [thinking, setThinking] = useState(false);
   const [chat, setChat] = useState<ChatEntry[]>([]);
-  const [expandedSql, setExpandedSql] = useState<Set<string>>(new Set());
+  // const [expandedSql, setExpandedSql] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<AIResult[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -268,13 +267,13 @@ export default function AISearchPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat]);
 
-  const toggleSql = (id: string) =>
-    setExpandedSql(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // const toggleSql = (id: string) =>
+  //   setExpandedSql(prev => {
+  //     const next = new Set(prev);
+  //     if (next.has(id)) next.delete(id);
+  //     else next.add(id);
+  //     return next;
+  //   });
 
   const runQuery = useCallback(
     async (rawQuery: string, opts?: { silent?: boolean; cursor?: string | null; limit?: number }) => {
@@ -348,7 +347,7 @@ export default function AISearchPage() {
         setChat(prev =>
           prev.map(c =>
             c.id === entryId
-              ? { ...c, status: 'done', count: total, sql: data.generated_sql, message }
+              ? { ...c, status: 'done', count: total, /* sql: data.generated_sql, */ message }
               : c,
           ),
         );
@@ -408,7 +407,7 @@ export default function AISearchPage() {
     setChat([]);
     setResults([]);
     setStatusMessage(null);
-    setExpandedSql(new Set());
+    // setExpandedSql(new Set());
     setSelectedIds(new Set());
     setSearchText('');
     setSortBy('');
@@ -766,7 +765,7 @@ export default function AISearchPage() {
                             {entry.count === 1 ? 'company' : 'companies'}.
                           </p>
                         )}
-                        {entry.sql && (
+                        {/* {entry.sql && (
                           <>
                             <button
                               type="button"
@@ -786,7 +785,7 @@ export default function AISearchPage() {
                               </pre>
                             )}
                           </>
-                        )}
+                        )} */}
                       </div>
                     )}
 
