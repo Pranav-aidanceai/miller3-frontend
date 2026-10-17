@@ -11,17 +11,10 @@ export async function POST(request: Request) {
             payload
         );
 
-        // The backend returns a relative ws_url (e.g. /api/v1/batch-enrichment/{id}/ws).
-        // API_BASE_URL is server-only, so resolve it to an absolute ws(s):// URL here
-        // (http -> ws, https -> wss) that the browser can open directly.
-        const data = response.data ?? {};
-        const relativeWs: string | undefined = data.ws_url;
-        if (relativeWs && /^\//.test(relativeWs)) {
-            const wsBase = (process.env.API_BASE_URL ?? '')
-                .replace(/\/+$/, '')
-                .replace(/^http/i, 'ws');
-            data.ws_url = `${wsBase}${relativeWs}`;
-        }
+        // The backend's ws_url here carries no credentials and is refused once
+        // the backend enforces socket auth. The client connects through a
+        // single-use ticket from ./[batchId]/ws-ticket instead, so drop it.
+        const { ws_url: _untickedWsUrl, ...data } = response.data ?? {};
 
         return NextResponse.json(
             { data },

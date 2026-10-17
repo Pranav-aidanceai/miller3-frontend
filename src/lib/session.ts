@@ -1,10 +1,13 @@
-// Central hub for the forced sign-out teardown. Two things end a session from
-// the server's side:
+// Central hub for the forced sign-out teardown. Three things end a session
+// from the server's side:
 //
 //   - `deactivated`  — HTTP 403, the admin disabled the account.
 //   - `role-changed` — HTTP 401 + `error_code: "ROLE_CHANGED"`, the admin moved
 //     the user to another tier, so the access token's claims are stale and only
 //     a fresh login can pick up the new permissions.
+//   - `session-expired` — HTTP 401 + `error_code: "SESSION_EXPIRED"`, the
+//     backend refused to refresh the session (signed out elsewhere, password
+//     changed, refresh token expired or reused). See src/lib/api/server.ts.
 //
 // Every axios call funnels through SessionGuard's interceptor into
 // `triggerSessionExpired()` so the modal shows regardless of which call failed.
@@ -12,7 +15,7 @@
 // `isSessionExpiring()` lets per-call error handlers skip their own "failed to…"
 // toasts while the teardown is in progress.
 
-export type SessionEndReason = 'deactivated' | 'role-changed';
+export type SessionEndReason = 'deactivated' | 'role-changed' | 'session-expired';
 
 let sessionExpiring = false;
 let handler: ((reason: SessionEndReason) => void) | null = null;

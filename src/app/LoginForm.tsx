@@ -16,6 +16,8 @@ import ApprovalPending from './auth/ApprovalPending';
 import AccountRejected from './auth/AccountRejected';
 import AccountDeactivated from './auth/AccountDeactivated';
 import apiClient from '@/lib/api/client';
+import { useRetryCooldown } from '@/hooks/useRetryCooldown';
+import { DEFAULT_RETRY_AFTER_SECONDS } from '@/lib/rateLimit';
 import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,7 @@ export default function LoginForm() {
   const [showDeactivated, setShowDeactivated] = useState<boolean>(false);
   const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const cooldown = useRetryCooldown();
 
   const formik = useFormik({
     initialValues: {
@@ -48,8 +51,18 @@ export default function LoginForm() {
       setError('');
       setServerErrors({});
       setLoading(true);
-      const { data, errors } = await loginAction(values.email, values.password);
+      const { data, errors, status, retryAfter } = await loginAction(values.email, values.password);
       setLoading(false);
+      // Too many attempts (per IP, or this account is locked for 15 min):
+      // show the backend's message as-is — it carries field "email", but it
+      // isn't a problem with the email — and block submit until Retry-After.
+      if (status === 429) {
+        cooldown.start(
+          retryAfter ?? DEFAULT_RETRY_AFTER_SECONDS,
+          errors?.[0]?.message ?? 'Too many attempts. Please try again later.'
+        );
+        return;
+      }
       if (errors || !data) {
         const fieldErrors: Record<string, string> = {};
         errors?.forEach((err: ApiError) => {
@@ -159,11 +172,11 @@ export default function LoginForm() {
           <Button
             type="submit"
             className="h-12 w-full rounded-xl text-base"
-            disabled={!(formik.isValid && formik.dirty) || loading}
+            disabled={!(formik.isValid && formik.dirty) || loading || cooldown.active}
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? 'Signing In...' : cooldown.active ? `Try again in ${cooldown.label}` : 'Sign In'}
           </Button>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {(cooldown.message || error) && <p className="text-sm text-destructive" role="alert">{cooldown.message || error}</p>}
         </form>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">

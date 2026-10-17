@@ -307,3 +307,43 @@ describe('ForgotPasswordPage', () => {
     })
   })
 })
+
+describe('ForgotPasswordPage — too many attempts (429)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('shows the throttle message on the email step and blocks Send Reset Code', async () => {
+    mockResetPasswordAction.mockResolvedValue({
+      data: null,
+      errors: [{ code: 'TOO_MANY_ATTEMPTS', message: 'Too many attempts. Please try again in 12 minutes.', field: 'email' }],
+      status: 429,
+      retryAfter: 720,
+    })
+    render(<ForgotPasswordPage />)
+    await userEvent.type(screen.getByTestId('email-input'), 'lock-test-123@example.com')
+    await userEvent.click(screen.getByRole('button', { name: /send reset code/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts. Please try again in 12 minutes.')
+    expect(screen.getByRole('button', { name: /try again in 1[12]:\d\d/i })).toBeDisabled()
+    expect(screen.getByTestId('email-input')).toBeInTheDocument()
+  })
+
+  it('shows the throttle message on the OTP step and blocks Verify Code', async () => {
+    mockResetPasswordAction.mockResolvedValue({ data: true, errors: null })
+    mockApiClientPost.mockRejectedValueOnce(Object.assign(new Error('Request failed'), {
+      isAxiosError: true,
+      response: {
+        status: 429,
+        headers: { 'retry-after': '900' },
+        data: { errors: [{ code: 'TOO_MANY_ATTEMPTS', message: 'Too many attempts. Please try again in 15 minutes.' }] },
+      },
+    }))
+    await getToOtpStep()
+    await userEvent.type(screen.getByTestId('otp-box-0'), VALID_OTP)
+    await userEvent.click(screen.getByRole('button', { name: /verify code/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts. Please try again in 15 minutes.')
+    expect(screen.getByRole('button', { name: /try again in 1[45]:\d\d/i })).toBeDisabled()
+  })
+})

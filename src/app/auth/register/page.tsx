@@ -13,6 +13,8 @@ import { ApiError } from '@/types/common';
 import { tiers } from '@/lib/constants';
 import TermsModal from './TermsOfUse';
 import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
+import { useRetryCooldown } from '@/hooks/useRetryCooldown';
+import { DEFAULT_RETRY_AFTER_SECONDS } from '@/lib/rateLimit';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +32,7 @@ export default function RegisterPage() {
     const [registerStep, setRegisterStep] = useState<RegisterStep>(0);
     const [showTerms, setShowTerms] = useState(false)
     const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
+    const cooldown = useRetryCooldown();
 
     const formik = useFormik({
         initialValues: {
@@ -58,8 +61,20 @@ export default function RegisterPage() {
                 setError('');
                 setServerErrors({});
                 setLoading(true);
-                const { data, errors } = await registerAction(values.name, values.email, values.password, values.confirm, values.role, values.touAccepted);
+                const { data, errors, status, retryAfter } = await registerAction(values.name, values.email, values.password, values.confirm, values.role, values.touAccepted);
                 setLoading(false);
+                // Too many attempts: nothing is wrong with what was entered, so
+                // keep every value and return to the password step (where the
+                // message shows), with Sign Up blocked until Retry-After.
+                if (status === 429) {
+                    setOnboarding(false);
+                    setRegisterStep(1);
+                    cooldown.start(
+                        retryAfter ?? DEFAULT_RETRY_AFTER_SECONDS,
+                        errors?.[0]?.message ?? 'Too many attempts. Please try again later.'
+                    );
+                    return;
+                }
                 if (errors || !data) {
                     setOnboarding(false);
                     const fieldErrors: Record<string, string> = {};
@@ -241,9 +256,9 @@ export default function RegisterPage() {
                                     <input type="checkbox" checked={formik.values.touAccepted} onChange={() => setShowTerms(true)} name="touAccepted" className="rounded border-border cursor-pointer" />
                                     I accept the <button type="button" onClick={() => setShowTerms(true)} className="cursor-pointer text-primary hover:underline">Terms of Use</button>
                                 </label>
-                                {error && <p className={cn("text-sm text-destructive", error ? 'visible' : 'invisible')}>{error}</p>}
-                                <Button type="submit" disabled={!(formik.isValid && formik.dirty)} className="h-12 w-full rounded-xl text-base">
-                                    Sign Up
+                                {(cooldown.message || error) && <p className={cn("text-sm text-destructive")} role="alert">{cooldown.message || error}</p>}
+                                <Button type="submit" disabled={!(formik.isValid && formik.dirty) || cooldown.active} className="h-12 w-full rounded-xl text-base">
+                                    {cooldown.active ? `Try again in ${cooldown.label}` : 'Sign Up'}
                                 </Button>
                                 <button
                                     type="button"

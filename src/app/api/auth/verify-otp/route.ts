@@ -1,5 +1,7 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { NextResponse } from 'next/server';
+import { authErrorResponse } from '@/lib/api/authError';
+import { forwardedForHeader } from '@/lib/api/clientIp';
 const API_URL = process.env.API_BASE_URL;
 
 // Deliberately NOT routed through the shared src/lib/api/server.ts instance:
@@ -17,7 +19,9 @@ export async function POST(req: Request) {
             otp: data.otp
         }
 
-        const response = await axios.post(`${API_URL}/api/v1/auth/reset-password/verify-otp`, payload);
+        const response = await axios.post(`${API_URL}/api/v1/auth/reset-password/verify-otp`, payload, {
+            headers: await forwardedForHeader(),
+        });
 
         return NextResponse.json({
             data: response.data
@@ -26,25 +30,9 @@ export async function POST(req: Request) {
         })
 
     } catch (error: unknown) {
-        console.error("error", error)
-        if (error instanceof AxiosError) {
-            let errorData = error?.response?.data;
-            if (typeof errorData === 'object') {
-                errorData = JSON.stringify(errorData);
-            }
-            return NextResponse.json(
-                { error: errorData || 'An error occurred' },
-                {
-                    status: error.response?.status || 500
-                });
-        } else if (error instanceof Error) {
-            return NextResponse.json({ error: error.message }, {
-                status: 500
-            });
-        } else {
-            return NextResponse.json({ error: error }, {
-                status: 500
-            });
-        }
+        console.error('error', error);
+        // Passes the backend's status, errors and Retry-After through (429
+        // rate limits, 413 body too large, …) — see src/lib/api/authError.ts.
+        return authErrorResponse(error, 'Invalid or expired code');
     }
 }

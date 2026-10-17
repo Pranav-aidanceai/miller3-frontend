@@ -160,3 +160,48 @@ describe('LoginForm', () => {
         })
     })
 })
+describe('LoginForm — too many attempts (429)', () => {
+    beforeEach(() => {
+        jest.clearAllMocks()
+    })
+
+    const submit = async () => {
+        render(<LoginForm />)
+        await userEvent.type(screen.getByLabelText(/email/i), 'lock-test-123@example.com')
+        await userEvent.type(screen.getByLabelText('Password'), 'wrongpassword')
+        fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
+    }
+
+    it('shows the backend message once (not as an email error) and blocks submit with a countdown', async () => {
+        mockLoginAction.mockResolvedValue({
+            data: null,
+            errors: [{ code: 'TOO_MANY_ATTEMPTS', message: 'Too many attempts. Please try again in 15 minutes.', field: 'email' }],
+            status: 429,
+            retryAfter: 900,
+        })
+
+        await submit()
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts. Please try again in 15 minutes.')
+        expect(screen.getAllByText(/too many attempts/i)).toHaveLength(1)
+        const button = screen.getByRole('button', { name: /try again in 1[45]:\d\d/i })
+        expect(button).toBeDisabled()
+    })
+
+    it('unlocks submit and clears the message once Retry-After has passed', async () => {
+        mockLoginAction.mockResolvedValue({
+            data: null,
+            errors: [{ code: 'TOO_MANY_REQUESTS', message: 'Too many attempts. Please try again in a minute.' }],
+            status: 429,
+            retryAfter: 1,
+        })
+
+        await submit()
+        expect(await screen.findByRole('button', { name: /try again in 1s/i })).toBeDisabled()
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /sign in/i })).not.toBeDisabled()
+        }, { timeout: 2500 })
+        expect(screen.queryByText(/too many attempts/i)).not.toBeInTheDocument()
+    })
+})
