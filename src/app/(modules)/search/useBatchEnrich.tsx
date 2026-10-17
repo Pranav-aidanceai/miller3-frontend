@@ -10,7 +10,6 @@ export type { EnrichRecordUpdate };
 
 interface BatchEnrichResult {
     batch_id: string;
-    ws_url: string;
     total_records: number;
     status: string;
     queue: string;
@@ -38,7 +37,7 @@ export function useBatchEnrich() {
             const response = await apiClient.post('/batch-enrichment', { records });
 
             const data: BatchEnrichResult | undefined = response.data?.data;
-            if (!data?.ws_url) {
+            if (!data?.batch_id) {
                 toast.error('Enrichment started but no progress channel was returned.');
                 return;
             }
@@ -47,7 +46,7 @@ export function useBatchEnrich() {
                 (id) => (
                     <BatchEnrichToast
                         toastId={id}
-                        wsUrl={data.ws_url}
+                        batchId={data.batch_id}
                         total={data.total_records ?? records.length}
                         onComplete={onComplete}
                         onRecord={onRecord}

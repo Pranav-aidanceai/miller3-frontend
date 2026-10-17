@@ -55,14 +55,24 @@ apiClient.interceptors.response.use(
 
     if (!isSessionEndpoint && loggedIn && !isSessionExpiring()) {
       if (status === 403) {
-        triggerSessionExpired("deactivated");
-      } else if (status === 401) {
-        // Only a role change forces a re-login here; an ordinary expired
-        // token is retried server-side by the refresh interceptor in
-        // src/lib/api/server.ts.
+        // The proxy's cross-site guard (src/lib/csrf.ts) also answers 403.
+        // Our own pages should never hit it; if one somehow does, surface
+        // the error rather than signing the user out as "deactivated".
         const body = await readErrorBody(error.response?.data);
-        if (getApiError(body, "").code === "ROLE_CHANGED") {
+        if (getApiError(body, "").code !== "CROSS_SITE_REQUEST") {
+          triggerSessionExpired("deactivated");
+        }
+      } else if (status === 401) {
+        // An ordinary expired access token is refreshed server-side by the
+        // interceptor in src/lib/api/server.ts and never reaches here. Only
+        // a role change, or a session the backend refused to refresh,
+        // forces a re-login.
+        const body = await readErrorBody(error.response?.data);
+        const code = getApiError(body, "").code;
+        if (code === "ROLE_CHANGED") {
           triggerSessionExpired("role-changed");
+        } else if (code === "SESSION_EXPIRED") {
+          triggerSessionExpired("session-expired");
         }
       }
     }

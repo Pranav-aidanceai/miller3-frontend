@@ -13,19 +13,31 @@
 
 import apiClient from '@/lib/api/client';
 import axios from 'axios';
+import { parseRetryAfter } from '@/lib/rateLimit';
+
+/**
+ * The failure half of every action's result. `status` and `retryAfter` let
+ * the screens tell a 429 "too many attempts" (show errors[0].message, disable
+ * submit for `retryAfter` seconds) apart from an ordinary rejection.
+ */
+function failure(error: unknown, fallbackMessage: string) {
+    if (axios.isAxiosError(error)) {
+        return {
+            data: null,
+            errors: error.response?.data?.errors ?? [{ message: fallbackMessage }],
+            status: error.response?.status,
+            retryAfter: parseRetryAfter(error.response?.headers?.['retry-after']),
+        };
+    }
+    return { data: null, errors: [{ message: 'Something went wrong' }], status: undefined, retryAfter: null };
+}
 
 export async function loginAction(email: string, password: string) {
     try {
         const response = await apiClient.post('/auth/login', { email, password });
-        return { data: response.data?.data, error: null };
+        return { data: response.data?.data, errors: null, status: response.status, retryAfter: null };
     } catch (error) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Login failed' }],
-            };
-        }
-        return { data: null, errors: [{ message: 'Something went wrong' }] };
+        return failure(error, 'Login failed');
     }
 }
 
@@ -39,44 +51,26 @@ export async function registerAction(name: string, email: string, password: stri
             role,
             tou,
         });
-        return { data: response.data?.data, error: null };
+        return { data: response.data?.data, errors: null, status: response.status, retryAfter: null };
     } catch (error) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Registration failed' }],
-            };
-        }
-        return { data: null, errors: [{ message: 'Something went wrong' }] };
+        return failure(error, 'Registration failed');
     }
 }
 
 export async function resetPasswordAction(email: string) {
     try {
         const response = await apiClient.post('/auth/reset-password', { email });
-        return { data: response.data?.data, error: null };
+        return { data: response.data?.data, errors: null, status: response.status, retryAfter: null };
     } catch (error) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Password reset failed' }],
-            };
-        }
-        return { data: null, errors: [{ message: 'Something went wrong' }] };
+        return failure(error, 'Password reset failed');
     }
 }
 
 export async function onboardingAction() {
     try {
         const response = await apiClient.patch('/auth/onboarding', {});
-        return { data: response.data?.data, error: null };
+        return { data: response.data?.data, errors: null, status: response.status, retryAfter: null };
     } catch (error) {
-        if (axios.isAxiosError(error)) {
-            return {
-                data: null,
-                errors: error.response?.data?.errors ?? [{ message: 'Onboarding failed' }],
-            };
-        }
-        return { data: null, errors: [{ message: 'Something went wrong' }] };
+        return failure(error, 'Onboarding failed');
     }
 }

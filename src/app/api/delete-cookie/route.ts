@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
+import { EXPIRED_COOKIE } from '@/lib/api/authCookies';
 
-const expiredCookie = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path: '/',
-    maxAge: 0,
-};
+const expiredCookie = EXPIRED_COOKIE;
 
 export async function POST() {
     try {

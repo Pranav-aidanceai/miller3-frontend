@@ -29,6 +29,12 @@ const REASON_COPY: Record<SessionNoticeReason, CopyEntry> = {
         title: 'Your account tier has changed',
         body: 'Your account tier has been changed. Redirecting you to the login page. For more information, please contact your admin.',
     },
+    'session-expired': {
+        icon: Clock,
+        tone: 'primary',
+        title: 'Your session has ended',
+        body: 'Please sign in again. Redirecting you to the login page.',
+    },
     rejected: {
         icon: Ban,
         tone: 'destructive',

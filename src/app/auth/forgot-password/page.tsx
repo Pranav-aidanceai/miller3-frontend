@@ -9,6 +9,8 @@ import { ApiError } from '@/types/common';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/apiError';
+import { DEFAULT_RETRY_AFTER_SECONDS, rateLimitFrom } from '@/lib/rateLimit';
+import { formatCooldown, useRetryCooldown } from '@/hooks/useRetryCooldown';
 import { Eye, EyeOff, Check } from 'lucide-react';
 import { AuthSplitLayout } from '@/components/auth/AuthSplitLayout';
 import { Button } from '@/components/ui/button';
@@ -108,6 +110,10 @@ export default function ForgotPasswordPage() {
   const [showPw, setShowPw] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resending, setResending] = useState(false);
+  // A 429 "too many attempts" from any step (send, resend, verify, reset):
+  // the backend's limit is per email/IP, so one lockout covers the whole flow.
+  const rateLimit = useRetryCooldown();
+  const RATE_LIMIT_FALLBACK = 'Too many attempts. Please try again later.';
 
   // Counts down once per second while a resend cooldown is active, regardless
   // of which step is showing (it only ever matters while on the OTP step).
@@ -125,8 +131,12 @@ export default function ForgotPasswordPage() {
     onSubmit: async (values) => {
       setError('');
       setLoading(true);
-      const { data, errors } = await resetPasswordAction(values.email);
+      const { data, errors, status, retryAfter } = await resetPasswordAction(values.email);
       setLoading(false);
+      if (status === 429) {
+        rateLimit.start(retryAfter ?? DEFAULT_RETRY_AFTER_SECONDS, errors?.[0]?.message ?? RATE_LIMIT_FALLBACK);
+        return;
+      }
       if (errors || !data) {
         setError(errors?.map((err: ApiError) => err.message).join(' ') || 'Failed to send reset code');
         return;
@@ -140,8 +150,12 @@ export default function ForgotPasswordPage() {
     if (resendCooldown > 0 || resending) return;
     setResending(true);
     setError('');
-    const { errors } = await resetPasswordAction(emailFormik.values.email);
+    const { errors, status, retryAfter } = await resetPasswordAction(emailFormik.values.email);
     setResending(false);
+    if (status === 429) {
+      rateLimit.start(retryAfter ?? DEFAULT_RETRY_AFTER_SECONDS, errors?.[0]?.message ?? RATE_LIMIT_FALLBACK);
+      return;
+    }
     if (errors) {
       setError(errors.map((err: ApiError) => err.message).join(' ') || 'Failed to resend code');
       return;
@@ -165,6 +179,11 @@ export default function ForgotPasswordPage() {
         });
         setStep('password');
       } catch (err) {
+        const limited = rateLimitFrom(err);
+        if (limited) {
+          rateLimit.start(limited.retryAfter, limited.message);
+          return;
+        }
         setError(getErrorMessage(err, 'Invalid or expired code'));
       } finally {
         setLoading(false);
@@ -193,6 +212,11 @@ export default function ForgotPasswordPage() {
         });
         setStep('done');
       } catch (err) {
+        const limited = rateLimitFrom(err);
+        if (limited) {
+          rateLimit.start(limited.retryAfter, limited.message);
+          return;
+        }
         setError(getErrorMessage(err, 'Failed to reset password'));
       } finally {
         setLoading(false);
@@ -236,13 +260,13 @@ export default function ForgotPasswordPage() {
             />
             {(emailFormik.touched.email && emailFormik.errors.email) && <p className="text-sm text-destructive">{emailFormik.errors.email}</p>}
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {(rateLimit.message || error) && <p className="text-sm text-destructive" role="alert">{rateLimit.message || error}</p>}
           <Button
             type="submit"
             className="h-12 w-full rounded-xl text-base"
-            disabled={!(emailFormik.isValid && emailFormik.dirty) || loading}
+            disabled={!(emailFormik.isValid && emailFormik.dirty) || loading || rateLimit.active}
           >
-            {loading ? 'Sending...' : 'Send Reset Code'}
+            {loading ? 'Sending...' : rateLimit.active ? `Try again in ${rateLimit.label}` : 'Send Reset Code'}
           </Button>
           <button
             type="button"
@@ -267,8 +291,8 @@ export default function ForgotPasswordPage() {
           </div>
           <p className="text-center text-sm text-muted-foreground">
             Didn&apos;t get a code?{' '}
-            {resendCooldown > 0 ? (
-              <span>Resend in {resendCooldown}s</span>
+            {resendCooldown > 0 || rateLimit.active ? (
+              <span>Resend in {formatCooldown(Math.max(resendCooldown, rateLimit.secondsLeft))}</span>
             ) : (
               <button
                 type="button"
@@ -280,13 +304,13 @@ export default function ForgotPasswordPage() {
               </button>
             )}
           </p>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {(rateLimit.message || error) && <p className="text-sm text-destructive" role="alert">{rateLimit.message || error}</p>}
           <Button
             type="submit"
             className="h-12 w-full rounded-xl text-base"
-            disabled={!(otpFormik.isValid && otpFormik.dirty) || loading}
+            disabled={!(otpFormik.isValid && otpFormik.dirty) || loading || rateLimit.active}
           >
-            {loading ? 'Verifying...' : 'Verify Code'}
+            {loading ? 'Verifying...' : rateLimit.active ? `Try again in ${rateLimit.label}` : 'Verify Code'}
           </Button>
           <button
             type="button"
@@ -347,13 +371,13 @@ export default function ForgotPasswordPage() {
             </div>
             {(passwordFormik.touched.confirm && passwordFormik.errors.confirm) && <p className="text-sm text-destructive">{passwordFormik.errors.confirm}</p>}
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {(rateLimit.message || error) && <p className="text-sm text-destructive" role="alert">{rateLimit.message || error}</p>}
           <Button
             type="submit"
             className="h-12 w-full rounded-xl text-base"
-            disabled={!(passwordFormik.isValid && passwordFormik.dirty) || loading}
+            disabled={!(passwordFormik.isValid && passwordFormik.dirty) || loading || rateLimit.active}
           >
-            {loading ? 'Updating...' : 'Reset Password'}
+            {loading ? 'Updating...' : rateLimit.active ? `Try again in ${rateLimit.label}` : 'Reset Password'}
           </Button>
         </form>
       )}

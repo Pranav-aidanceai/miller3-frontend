@@ -1,5 +1,8 @@
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { NextResponse } from 'next/server';
+import { authErrorResponse } from '@/lib/api/authError';
+import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '@/lib/api/authCookies';
+import { forwardedForHeader, parseClientIp } from '@/lib/api/clientIp';
 
 const API_URL = process.env.API_BASE_URL;
 
@@ -12,12 +15,20 @@ const API_URL = process.env.API_BASE_URL;
 // client.
 export async function POST(req: Request) {
     try {
+        // TEMPORARY — confirms App Service's X-Forwarded-For format (see
+        // src/lib/api/clientIp.ts). Set LOG_XFF=1 in App Settings, log in
+        // once, check the log, unset it, then delete this block.
+        if (process.env.LOG_XFF === '1') {
+            const raw = req.headers.get('x-forwarded-for');
+            console.warn('[xff-check]', JSON.stringify({ raw, parsed: parseClientIp(raw) }));
+        }
+
         const { email, password } = await req.json();
 
         const response = await axios.post(
             `${API_URL}/api/v1/auth/login`,
             { email, password },
-            { headers: { 'Content-Type': 'application/json' } }
+            { headers: { 'Content-Type': 'application/json', ...(await forwardedForHeader()) } }
         );
 
         const { access_token, refresh_token, role, user_details, role_details, credits_left } = response.data?.data;
@@ -27,32 +38,14 @@ export async function POST(req: Request) {
             { status: response.status || 200 }
         );
 
-        nextResponse.cookies.set('access_token', access_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-        });
-        nextResponse.cookies.set('refresh_token', refresh_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: 7 * 24 * 60 * 60, // 7 days
-        });
+        nextResponse.cookies.set('access_token', access_token, ACCESS_TOKEN_COOKIE);
+        nextResponse.cookies.set('refresh_token', refresh_token, REFRESH_TOKEN_COOKIE);
 
         return nextResponse;
     } catch (error: unknown) {
         console.error('error', error);
-        if (error instanceof AxiosError) {
-            return NextResponse.json(
-                { errors: error.response?.data?.errors ?? [{ message: 'Login failed' }] },
-                { status: error.response?.status || 500 }
-            );
-        }
-        if (error instanceof Error) {
-            return NextResponse.json({ errors: [{ message: error.message }] }, { status: 500 });
-        }
-        return NextResponse.json({ errors: [{ message: 'Something went wrong' }] }, { status: 500 });
+        // Passes the backend's status, errors and Retry-After through (429
+        // rate limits, 413 body too large, …) — see src/lib/api/authError.ts.
+        return authErrorResponse(error, 'Login failed');
     }
 }

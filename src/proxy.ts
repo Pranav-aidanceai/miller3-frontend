@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isCrossSiteRequest } from "@/lib/csrf";
 
 const WHITE_LISTED_ROUTES = [
   "/",
@@ -19,6 +20,19 @@ const isProtected = (pathname: string) =>
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // API routes: only the cross-site check. Page redirects below don't apply,
+  // and authentication is enforced by the backend on every forwarded call.
+  if (pathname.startsWith("/api/")) {
+    if (isCrossSiteRequest(request)) {
+      return NextResponse.json(
+        { errors: [{ code: "CROSS_SITE_REQUEST", message: "Cross-site requests are not allowed." }] },
+        { status: 403 }
+      );
+    }
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get("refresh_token")?.value;
 
   if (isProtected(pathname) && !token) {
@@ -36,6 +50,7 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/data|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|\\.swa).*)',
+    // /api is included so state-changing calls get the cross-site check.
+    '/((?!_next/data|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|\\.swa).*)',
   ],
 }
