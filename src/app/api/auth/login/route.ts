@@ -2,7 +2,7 @@ import axios from 'axios';
 import { NextResponse } from 'next/server';
 import { authErrorResponse } from '@/lib/api/authError';
 import { ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '@/lib/api/authCookies';
-import { forwardedForHeader, parseClientIp } from '@/lib/api/clientIp';
+import { forwardedForHeader } from '@/lib/api/clientIp';
 
 const API_URL = process.env.API_BASE_URL;
 
@@ -15,14 +15,6 @@ const API_URL = process.env.API_BASE_URL;
 // client.
 export async function POST(req: Request) {
     try {
-        // TEMPORARY — confirms App Service's X-Forwarded-For format (see
-        // src/lib/api/clientIp.ts). Set LOG_XFF=1 in App Settings, log in
-        // once, check the log, unset it, then delete this block.
-        if (process.env.LOG_XFF === '1') {
-            const raw = req.headers.get('x-forwarded-for');
-            console.warn('[xff-check]', JSON.stringify({ raw, parsed: parseClientIp(raw) }));
-        }
-
         const { email, password } = await req.json();
 
         const response = await axios.post(
